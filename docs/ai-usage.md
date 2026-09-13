@@ -40,3 +40,20 @@ What the AI got wrong: it treated `.gitignore` as a deployment boundary, and it 
 What was corrected: `.vercelignore` was added, the affected deployment deleted, both database passwords rotated and the old ones confirmed dead, the Vercel variable replaced, and the deployment path changed so staging is only built from Git. The final control is architectural, not a pattern file.
 
 Evidence retained: the saved upload manifest showing the ignored paths, the later manifest showing them empty, the 404 for the deleted deployment ID, the failed authentication for the old credentials, and the smoke test against the rotated staging environment. See the security document for the full incident record.
+
+## Issue 2 — Holdings CRUD and ownership isolation
+
+- Tool: Claude (Opus 5) in Claude Code, continuing from the Codex work recorded above.
+- Instruction: implement Issue 2 only, keep the existing authentication architecture unchanged, add no new infrastructure, and leave PR #2 open for a real student review.
+- Generated work: migration `003_holdings.sql`, `src/lib/holdings-store.ts`, `src/app/actions/holdings.ts`, `src/components/holdings.tsx`, holdings validation in `src/lib/validation.ts`, unit and integration cases, `tests/e2e/holdings.spec.ts`, and these documentation updates.
+- Validation: `npm run verify` from the existing test database — lint, strict TypeScript, 33 unit tests, production build, migrations, 36 integration tests against real PostgreSQL, 8 Chromium tests. Results are recorded in the pull request.
+
+Problems found while writing the code, worth being able to explain:
+
+1. **The obvious `CHECK (quantity > 0)` does not reject `NaN`.** PostgreSQL sorts `NaN` above every other numeric, so `'NaN'::numeric > 0` is true and the row would be stored. The constraint excludes `NaN` explicitly, and an integration test inserts `'NaN'` with direct SQL to prove the database refuses it without help from the form.
+2. **A first draft let the input schema and the column disagree.** The schema allowed a maximum of `1000000000000`, which is 13 digits, while `numeric(20, 8)` holds 12. A value the form accepted would have failed at the database with an unhelpful error. The digit bounds now match the column exactly and the requirements state them.
+3. **A test assertion was wrong, not the code.** `TOOLONGSYM` was expected to be rejected; the ticker pattern allows ten characters, so it is valid. The test was corrected rather than the pattern loosened or tightened to make it pass.
+4. **A successful removal showed no confirmation.** The success notice lived inside the row it deleted, so it unmounted immediately. Rather than move state around, the row disappearing is the confirmation and only failures render a message. This is stated in the testing document so it is not mistaken for a missing feature.
+5. **`getByRole("alert")` also matched Next.js's route announcer**, the same trap recorded in Issue 1. The browser tests exclude that element by id instead of weakening the selector, and the announcer stays in the page.
+
+Student review: pending. Nothing in this entry should be read as a student approval, and no review has been attributed to a team member who has not written one.

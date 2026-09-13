@@ -4,7 +4,7 @@ Investment portfolio tracker for the Financial Software Engineering course at Fr
 
 ## Current scope
 
-Issue 1 provides account registration, login/logout, database-backed sessions, protected `/dashboard` and `/portfolio` pages, and the existing portfolio create/rename form. Holdings, quotes, financial calculations, and `/analytics` are not implemented. No Supabase or hosted authentication service is used.
+Issue 1 provides account registration, login/logout, database-backed sessions, protected `/dashboard` and `/portfolio` pages, and the portfolio create/rename form. Issue 2 adds holdings: add, list, edit and remove a position with a validated ticker, quantity and average purchase price, isolated per user. Quotes, financial calculations, and `/analytics` are not implemented. No Supabase or hosted authentication service is used.
 
 ## Local setup
 
@@ -28,7 +28,7 @@ npm run dev
 
 Open [localhost:3000](http://localhost:3000), register with an email address and a 15–128 character passphrase, then sign in. Email delivery and password recovery are not implemented; registration does not verify ownership of the email address.
 
-## Verify Issue 1
+## Verify
 
 ```sh
 npx playwright install chromium

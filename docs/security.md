@@ -11,6 +11,17 @@
 - Failures: authentication returns generic errors; SQL connection details and credentials are not returned to users. Failed authentication does not create a session.
 - Headers: frame embedding denied, content sniffing disabled, same-origin referrer policy, camera/microphone/geolocation disabled.
 
+## Holdings authorization and validation (Issue 2)
+
+- Ownership: every holdings statement reaches a row only through `holdings → portfolios → sessions` with `expires_at > now()`. There is no code path that accepts an owner from the browser.
+- Creation: `portfolio_id` is selected from the caller's own session inside the `INSERT`, so a `portfolio_id` submitted with the form is ignored rather than checked.
+- Reassignment: no `UPDATE` sets `portfolio_id`. A holding cannot be moved between portfolios by any request the application accepts.
+- Identifiers: another user's holding id and an id that never existed produce the same message and the same absence of change, so the forms cannot be used to enumerate holdings. A malformed id is rejected by the schema before it reaches SQL, where it would otherwise raise a distinguishable cast error.
+- Input: tickers are uppercased and matched against a fixed pattern; amounts are validated as decimal text before any numeric conversion, which rejects `NaN`, `Infinity`, exponent notation and signs by construction. Database `CHECK` constraints repeat the positivity rule and exclude `NaN` explicitly, because PostgreSQL sorts `NaN` above every other numeric and would otherwise satisfy `> 0`.
+- Duplicates: enforced by `UNIQUE (portfolio_id, symbol)` and reported from the resulting `23505`, not by a prior `SELECT`, which would be racy.
+- Amounts are read and written as strings so no floating-point rounding is introduced before the valuation increment.
+- Origin and session checks are the same ones the existing actions use; holdings add no new authentication mechanism.
+
 ## Authentication throttle and its trade-off
 
 The old application-wide cap was removed because one attacker could deny access to everyone. The current fixed window allows 10 valid-form authentication attempts per normalized email address in 15 minutes, shared between registration and login. PostgreSQL upsert makes concurrent attempts atomic. Rejected attempts do not extend the window; counters saturate at 11. Unrelated addresses have independent limits.

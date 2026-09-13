@@ -1,6 +1,6 @@
 # Engineering decisions
 
-Foundation choices below are implemented and awaiting student review. Financial/API choices remain proposed.
+Foundation and holdings choices below are implemented and awaiting student review. Quote/valuation choices remain proposed.
 
 | Decision | Why | Alternative | Accepted cost |
 | --- | --- | --- | --- |
@@ -41,3 +41,19 @@ Node 24 is declared in `.nvmrc` and `engines.node: 24.x`; GitHub Actions reads `
 ## Issue 1 — Deploy from Git only, not from the working tree
 
 Problem: `vercel deploy` uploads the working directory, so `.gitignore` does not protect anything; a staging deployment shipped ignored credential files to a third party. Decision: staging is built by the GitHub integration from a pushed commit, and the staging alias points at a Git-source deployment. Alternatives: keep CLI deploys and rely on `.vercelignore` (rejected — one forgotten pattern is a credential leak), or keep secrets outside the project directory (helps, but does not remove the upload class). Accepted trade-off: publishing requires a commit and push, which is slower than a local deploy but produces the commit to CI to deployment chain the assessment expects. `.vercelignore` is retained as defence in depth. Verified by inspecting the deployment upload manifest and by the deployment source field reporting `git`.
+
+## Issue 2 — Derive the portfolio from the session instead of validating a submitted id
+
+Problem: a holdings form that carries `portfolio_id` invites forgery, and the usual answer is to check the id against the caller. Decision: the `INSERT` selects `portfolio_id` from the caller's own session, and no `UPDATE` sets it. Alternatives: accept the id and verify it (rejected — the check is one forgotten line away from a cross-user write), or a database policy per row (rejected as new infrastructure for one table; the application boundary already exists and is tested). Accepted trade-off: this shape only works while a user has one portfolio, so multiple portfolios would need an explicit, tested selection step. Tests submit another user's portfolio id to both forms and assert nothing moves.
+
+## Issue 2 — Amounts are decimal text, never JavaScript numbers
+
+Problem: `10.1` cannot be represented exactly in binary floating point, and money read through a float is wrong before any arithmetic happens. Decision: `numeric(20, 8)` in PostgreSQL, strings in TypeScript, and validation performed on the text with a regular expression. Alternatives: JavaScript numbers (rejected — silent rounding), or a decimal library now (deferred — nothing computes with these values yet). Accepted trade-off: comparisons in validation use `Number()` only for "greater than zero" and "at most the maximum", where a double is exact enough at these magnitudes; real arithmetic waits for the valuation increment and will use a decimal type. Tests assert `0.00000001` survives the round trip unchanged.
+
+## Issue 2 — Validate the text, then let the database repeat it
+
+Problem: `Number("NaN")` is `NaN`, `Number("1e5")` is `100000`, and PostgreSQL sorts `NaN` above every other numeric, so `CHECK (quantity > 0)` accepts it. Any single one of these layers can be talked past. Decision: reject the input as text with `^\d{1,12}(\.\d{1,8})?$` before conversion, and independently exclude `NaN` and non-positive values in the `CHECK` constraints. Alternatives: `Number.isFinite` after parsing (weaker — it accepts `1e5` and signs), or constraints alone (no useful message for the user). Accepted trade-off: the same rule is written twice and the two must be kept in agreement; the digit bounds match `numeric(20, 8)` exactly and both are stated in the requirements. Tests exercise the constraints directly with SQL that bypasses the form.
+
+## Issue 2 — One answer for "not yours" and "does not exist"
+
+Problem: distinguishing the two tells an attacker which identifiers are real. Decision: both produce "That holding is no longer available." and change nothing; a malformed id is mapped to the same answer before it can raise a PostgreSQL cast error. Alternative: a specific "not authorised" response (rejected — clearer for the user, but it confirms the id exists). Accepted trade-off: a user who genuinely broke their own page gets a vaguer message. Tests assert the two responses are equal and that the owner's row is untouched.
