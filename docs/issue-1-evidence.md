@@ -31,7 +31,7 @@ Retain the PR diff, CI run, this record, migration SQL, Playwright report, final
 ## Deployed staging verification — 2026-09-13
 
 - Public URL: https://fseproject-staging.vercel.app
-- Deployment: `dpl_FAZ41RxeG9AmayQec2kKPhQhNvRV`, source `git`, Preview target, branch `feat/auth-foundation`, commit `487394f`.
+- Deployment: source `git`, Preview target, branch `feat/auth-foundation`. The alias is moved onto the newest Git build of the branch. The smoke test below passed on `dpl_FAZ41RxeG9AmayQec2kKPhQhNvRV` (commit `487394f`) and again on `dpl_EntWcmwpRvv6b4KJGYsY66nnCj6d` (commit `05f0c95`). Later commits on this branch are documentation only and do not change application behaviour; re-run the smoke test before the assessment if the alias has moved again.
 - Environment: Vercel Preview variables scoped to that branch only — `DATABASE_URL` (restricted `fse_runtime` role, sensitive) and `APP_ORIGIN` (the canonical alias). Node 24.x. Database: dedicated Neon PostgreSQL, Frankfurt, provider authentication disabled.
 
 Automated smoke test against the public alias passed every step:
