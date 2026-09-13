@@ -24,3 +24,20 @@ This is basic account throttling, not complete abuse protection. It permits targ
 ## Explicit limitations
 
 No email verification, password reset, MFA, breached-password check, periodic expired-row cleanup, or independent penetration test. No PostgreSQL RLS: the application and runtime database credential are the authorization boundary. Basic headers are not a complete CSP. The database can still be queried by its administrator. See deployment evidence for controls actually verified on staging.
+
+## Issue 1 — Credential exposure incident and remediation
+
+A staging deployment created with `vercel deploy` from the working tree uploaded files that Git ignores. Inspecting the deployment's own upload manifest after publishing showed `.local/staging.env`, `.local/staging-runtime-url`, `.local/staging-origin`, the local helper scripts, and the entire `.local/postgres` data directory. Exposed material: the Neon database owner connection string, the `fse_runtime` connection string, and the local test database contents (generated `integration-*@example.com` and `e2e-*@example.com` accounts with scrypt hashes of test-only passwords). No student, teacher, or real account data existed in that database.
+
+Deployment protection is disabled on this project, so we state only that there is no evidence of third-party access; we cannot prove none occurred. The exposure window was approximately fifteen minutes.
+
+Remediation, in order:
+
+1. The upload manifest of the published deployment was inspected and the ignored files were found.
+2. `.vercelignore` was added; a later manifest confirms `.local`, `playwright-report`, and `test-results` upload no files.
+3. The affected deployment was deleted; its ID now returns 404 from the deployments API.
+4. Both database passwords were rotated with `ALTER ROLE`. The previous owner and runtime credentials were then confirmed to be rejected by the server.
+5. The Vercel `DATABASE_URL` preview variable was replaced with the new restricted runtime connection string.
+6. The staging alias was moved onto a Git-source deployment, and CLI deployment from the working tree was stopped for this project.
+
+Root cause: `vercel deploy` uploads the working directory, not the Git index, so `.gitignore` does not apply. A Git-source deployment builds from the repository and structurally cannot include ignored files. `.vercelignore` remains as a second layer rather than the only control.

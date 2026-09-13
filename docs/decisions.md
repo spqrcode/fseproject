@@ -37,3 +37,7 @@ A reusable dev server could point at a real development database and issue diffe
 ## Issue 1 — Runtime and hosting
 
 Node 24 is declared in `.nvmrc` and `engines.node: 24.x`; GitHub Actions reads `.nvmrc`. Vercel also uses the package engine range, as documented in [its Node runtime configuration](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions). Patch updates are allowed for security maintenance. The existing Vercel `fseproject` project was verified as linked to `spqrcode/fseproject`; other projects are outside this task.
+
+## Issue 1 — Deploy from Git only, not from the working tree
+
+Problem: `vercel deploy` uploads the working directory, so `.gitignore` does not protect anything; a staging deployment shipped ignored credential files to a third party. Decision: staging is built by the GitHub integration from a pushed commit, and the staging alias points at a Git-source deployment. Alternatives: keep CLI deploys and rely on `.vercelignore` (rejected — one forgotten pattern is a credential leak), or keep secrets outside the project directory (helps, but does not remove the upload class). Accepted trade-off: publishing requires a commit and push, which is slower than a local deploy but produces the commit to CI to deployment chain the assessment expects. `.vercelignore` is retained as defence in depth. Verified by inspecting the deployment upload manifest and by the deployment source field reporting `git`.

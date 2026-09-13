@@ -17,9 +17,13 @@ Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `A
 1. Run `npm ci`, install the Playwright browser, and run `npm run verify`.
 2. Review and push the feature branch to the repository above; GitHub Actions runs all checks on the PR.
 3. Apply additive migrations with a separate owner connection, using `node scripts/migrate.mjs` with DATABASE_URL supplied securely. Never run schema changes through the runtime role.
-4. Deploy the feature branch as a Vercel Preview and assign the canonical staging alias. APP_ORIGIN must match the URL used for sign-in.
+4. Push the branch. The GitHub integration builds the Preview; assign the canonical staging alias to that Git-source deployment. Do not publish this project with `vercel deploy` from a working tree — see the deployment decision record. APP_ORIGIN must match the URL used for sign-in.
 5. Visit `/register`, create a test account with a 15-character-or-longer password, sign in, create a named portfolio, reload, sign out, then reopen `/portfolio` and confirm login is required.
 
 The staging sign-in page is public, as requested. Application authentication still protects private pages and data. Vercel's additional login wall is disabled only for this school project.
 
 Main branch protection and a student review are still required. GitHub/Vercel integration can build previews before CI finishes; preview availability alone is not approval for production. Do not promote until the PR checks and human review pass. Application rollback does not roll back database migrations.
+
+## Production
+
+The project has no working production deployment. The only production-target build is an errored one from the documentation-only commit made before any application code existed. Production comes with the merge to `main` plus production-target environment variables and its own database; that is deliberately outside Issue 1, which asked for staging.
