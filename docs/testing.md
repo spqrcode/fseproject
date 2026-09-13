@@ -1,30 +1,25 @@
-# Testing strategy
+# Testing and reproducibility
 
-Status: no executable tests or test tooling yet. This increment checks documentation only.
+Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and run `npm run verify`. That command includes a production build and the test migrations. `npx playwright install chromium` is needed once per machine; Linux may need `--with-deps`.
 
-## Layers
-
-- Vitest unit tests: financial calculations, numeric validation, and quote normalization.
-- Database integration tests: real PostgreSQL constraints and application ownership enforcement using isolated test users and authenticated sessions.
-- Server integration tests: authentication failures, invalid requests, persistence errors, and provider failure mapping.
-- Playwright: account/session flow, portfolio and holding lifecycle, dashboard behavior, and persistence after reload.
-
-Mock the external provider in repeatable CI tests. Add a separately recorded live-provider smoke check to establish that the real integration works. Mocked tests alone cannot prove provider compatibility. Use isolated test data and never run destructive tests against assessment data.
-
-## Required cases
-
-| Area | Cases |
+| Command | Coverage |
 | --- | --- |
-| Arithmetic | Fractional quantities, decimal prices, gains/losses, multiple positions, rounding boundaries, empty portfolio, invalid values, undefined percentage |
-| Completeness | Missing one/all quotes, mixed fresh/stale quotes, partial totals clearly labeled, no false full allocation |
-| Ownership | Two users and anonymous access; read/create/update/delete; forged owner; foreign parent; parent reassignment |
-| Persistence | Duplicate instrument, duplicate portfolio, invalid numeric constraints, reload after mutation, failed write |
-| Market API | Timeout, disconnect, 429, 5xx, invalid JSON, wrong schema, wrong instrument/currency, nonpositive price, invalid timestamp, stale quote |
-| Sessions | Invalid login, expired session, logout, direct protected route and server-operation access |
-| User experience | Loading, empty, validation, failure, and recovery states; keyboard-accessible forms |
+| `npm run lint` | ESLint with zero warnings allowed |
+| `npm run typecheck` | Strict TypeScript |
+| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens |
+| `npm run db:migrate:test` | Ordered migrations against the isolated test database |
+| `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, and server actions |
+| `npm run build` | Next.js production compilation and route generation |
+| `npm run test:e2e` | Actual Chromium and production server: account lifecycle, cookies, expiry, existing portfolio persistence |
 
-## Per-change completion
+## Test isolation
 
-Run relevant tests, lint, TypeScript checks, and production build after the scaffold exists. Record actual commands, outcomes, and any skipped checks with reasons. Review security and verify affected acceptance criteria. Broaden tests when new changes or failures justify it.
+`scripts/test.mjs` requires `TEST_DATABASE_URL` ending in `_test` and passes it as the child's `DATABASE_URL`. Playwright also checks they match. It starts a new server at `http://localhost:3100`, with `APP_ORIGIN` set to that address, and refuses to reuse another server. Tests cannot silently hit development/staging through the ordinary script commands.
 
-Retain CI links, test reports, useful screenshots, and reviewer feedback. A passing unit suite does not establish database-backed authorization, deployment correctness, or complete end-to-end behavior.
+Fixtures use unique generated account addresses, clean up only their own rows, and close database connections. No production table truncation, shared global counter, or hard-coded account credentials are needed. Retrying tests is not used to hide failures. Browser traces are disabled to avoid recording credentials; the HTML report retains names, outcomes, and sanitized assertion failures.
+
+## Security evidence boundaries
+
+Integration tests use the real PostgreSQL driver and SQL, including real password hashing. Only Next.js request adapters (cookies, headers, redirect, cache revalidation) are mocked so server actions can be invoked directly. Playwright verifies those adapters in a real application server. Neither layer substitutes mocked data for database authorization.
+
+Current financial/API tests do not exist because those features are not implemented. Staging smoke checks must be recorded separately from local tests. See [Issue 1 evidence](issue-1-evidence.md) for actual results and identified corrections.

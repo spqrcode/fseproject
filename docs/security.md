@@ -1,33 +1,26 @@
-# Security plan
+# Security
 
-Status: intended controls, not a security certification or record of completed implementation.
+## Implemented and tested in Issue 1
 
-## Authentication and authorization
+- Passwords: Node's built-in scrypt (`N=131072`, `r=8`, `p=1`), random 16-byte salt, 64-byte derived key, versioned encoding, constant-time comparison. Password input is 15–128 characters; it is not trimmed or truncated. Unknown accounts still incur a hash calculation.
+- Sessions: 32 random bytes; only their SHA-256 digest is stored. A fixed 24-hour expiry is checked in SQL. Login rotates the current browser session; logout revokes it before clearing the cookie. Other browser sessions remain valid.
+- Cookie: HttpOnly, SameSite=Lax, path `/`, no Domain attribute, Secure in production, and 24-hour Max-Age/Expires. Production-mode Playwright checks the actual cookie and rejects replay after logout. Localhost Chromium supports Secure cookies for this test; staging additionally verifies HTTPS.
+- Authorization: server pages and actions require an authenticated user. Portfolio SQL scopes reads and writes through an unexpired session. Submitted ownership fields do not select another user's portfolio. Tests exercise two users, anonymous access, expired cookies, and direct server-action calls.
+- CSRF: Next.js server actions use POST and framework origin checks; application mutations additionally require an exact match with configured `APP_ORIGIN`. Missing/foreign origins are rejected. No wildcard origin or caller-supplied Host fallback is trusted.
+- Input/SQL: Zod checks email, password, and portfolio name server-side; database constraints enforce uniqueness and valid names. Values use PostgreSQL `$1` parameters. An SQL-looking portfolio name is stored as literal data in a regression test.
+- Failures: authentication returns generic errors; SQL connection details and credentials are not returned to users. Failed authentication does not create a session.
+- Headers: frame embedding denied, content sniffing disabled, same-origin referrer policy, camera/microphone/geolocation disabled.
 
-The application owns registration, password verification, and session management. Use a maintained password-hashing library with an appropriate slow password hash and library-managed salts. Never store plaintext passwords or implement cryptographic primitives ourselves.
+## Authentication throttle and its trade-off
 
-Create cryptographically random opaque session tokens, store only their hashes in PostgreSQL, and enforce expiry server-side. Use HttpOnly cookies, Secure in production, and an appropriate SameSite policy. Rotate sessions on login and revoke them on logout. Rate-limit authentication attempts and avoid account-enumerating errors. Exact parameters must be selected and tested before implementation.
+The old application-wide cap was removed because one attacker could deny access to everyone. The current fixed window allows 10 valid-form authentication attempts per normalized email address in 15 minutes, shared between registration and login. PostgreSQL upsert makes concurrent attempts atomic. Rejected attempts do not extend the window; counters saturate at 11. Unrelated addresses have independent limits.
 
-Derive the user ID from the verified session. A server-only data-access layer must scope every portfolio read and mutation to that ID. Holding operations verify parent ownership, including any resulting parent after an update. Never trust a submitted owner ID. Test guessed identifiers and cross-user access through real application operations.
+This is basic account throttling, not complete abuse protection. It permits targeted temporary lockout and can be bypassed by rotating addresses. No untrusted proxy/IP headers are used. Before higher-risk use, choose trusted network-level limits for the actual hosting environment. See [OWASP's authentication guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) for the lockout/availability trade-off.
 
-The browser has no direct database access. Use a restricted runtime database role and separate migration privileges. Parameterized SQL prevents injection but does not replace ownership checks.
+## Secrets and database access
 
-## Inputs and requests
+`.env*` files, `.local/`, `.vercel/`, and test outputs are ignored; only `.env.example` is committed. No `NEXT_PUBLIC_` credential variables are used. The database driver, hashing code, and session/data-access modules import `server-only`. Do not put privileged migration credentials in the runtime environment. Use certificate-verified TLS for hosted PostgreSQL. Passwords, session tokens, and database URLs must not appear in logs, PRs, or test reports; browser traces are disabled because form payloads contain credentials.
 
-Validate all mutations server-side, and add database constraints as a second layer. Reject nonfinite numbers, out-of-bounds values, invalid instruments, and unknown fields where appropriate. Use parameterized database operations. Review framework origin/CSRF protections for the chosen mutation mechanism and do not introduce state-changing GET requests.
+## Explicit limitations
 
-Quote requests must target a fixed provider origin and validated identifiers, with timeouts and bounded request volume. Do not accept arbitrary remote URLs from users.
-
-## Secrets and data handling
-
-Keep market-data and database credentials in local ignored environment files and deployment secret settings. Commit only a placeholder environment example. Database connection strings and session secrets, if required, must remain server-only.
-
-Never log tokens, passwords, full authentication headers, or unnecessary personal/portfolio data. Return sanitized provider errors. User-specific responses must not leak through shared caches. Rotate any exposed credential and remove it from active use; deleting a committed secret alone is insufficient.
-
-## Review evidence
-
-Each feature PR records input boundaries, identity verification, ownership enforcement, secret exposure checks, error handling, and relevant automated tests. Add discovered issues and their actual fixes; do not claim a review found nothing without performing it.
-
-## Outstanding work
-
-Session configuration, abuse limits, email verification, recovery, dependency checks, and production headers require implementation and verification. See limitations for institutional readiness gaps.
+No email verification, password reset, MFA, breached-password check, periodic expired-row cleanup, or independent penetration test. No PostgreSQL RLS: the application and runtime database credential are the authorization boundary. Basic headers are not a complete CSP. The database can still be queried by its administrator. See deployment evidence for controls actually verified on staging.

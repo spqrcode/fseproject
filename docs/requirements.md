@@ -1,13 +1,13 @@
 # Requirements
 
-Status: proposed baseline; implementation and verification pending.
+Status: Issue 1 foundation implemented; later features remain planned. See the traceability table below.
 
 ## US-01 — Account and session
 
 As a visitor, I can register, log in, and log out so that I can securely access my data.
 
 Acceptance criteria:
-- Valid registration follows the configured email-verification policy; invalid input produces a useful error.
+- Valid registration stores a password hash and returns a generic response; duplicate registration does not overwrite credentials. Email verification is out of scope for this increment. Invalid input is rejected server-side.
 - Valid credentials establish a session; invalid credentials do not disclose whether an account exists.
 - Protected pages and server operations reject unauthenticated or expired sessions.
 - Logout removes the current session and protected navigation requires login again.
@@ -57,15 +57,15 @@ Acceptance criteria:
 - Stale quotes remain visibly stale, including at aggregate level.
 - Calculation and rounding behavior is covered by automated tests.
 
-## US-06 — Allocation and concentration
+## US-06 — Allocation and P/L contribution
 
 As a portfolio owner, I can see how portfolio value is distributed across instruments.
 
 Acceptance criteria:
 - Allocation uses position market value divided by complete portfolio market value.
-- The largest position weight is displayed as a simple concentration indicator, with its meaning explained.
+- Each position’s unrealized P/L is shown as its absolute contribution to total P/L; contributions sum to the portfolio P/L. Do not divide by total P/L, which can be zero.
 - Incomplete prices prevent complete allocation claims; zero-value portfolios show unavailable allocation.
-- The UI does not describe concentration as a complete assessment of investment risk.
+- The UI does not describe allocation or P/L contribution as a complete assessment of investment risk.
 
 ## US-07 — Ownership isolation
 
@@ -86,3 +86,16 @@ Acceptance criteria:
 - The application is publicly reachable for assessment; private data still requires authentication.
 - Requirements, architecture, decisions, tests, security, deployment, limitations, and AI use are documented.
 - AI-generated changes receive the same review and verification as human-authored changes.
+
+## Issue 1 traceability
+
+| Requirement | Implementation | Verification | Delivery |
+| --- | --- | --- | --- |
+| US-01 registration, login, logout | `src/app/actions/auth.ts`, password/session modules | Unit security tests; integration server-action tests; all four E2E scenarios | `feat/auth-foundation`; staging record in deployment document |
+| US-01 session expiration/revocation | Session SQL and protected page/action checks | Integration expiry/replay; browser expiry, logout replay, expired open form | Same branch and deployment |
+| US-07 existing ownership boundary | `src/lib/portfolio-store.ts`, `requireUser` | Real database two-user, anonymous, forged-owner and expired-token tests | Existing foundation only; no holdings claims |
+| Reproducible automated checks | `scripts/test.mjs`, `.github/workflows/ci.yml` | Migration rerun; full `npm run verify` | GitHub PR CI |
+| US-02 portfolio setup | Existing create/read/rename implementation | Existing behavior checked as an authentication regression | Issue 2 not started or declared complete |
+| US-03–06 | Not implemented | Pending | Later increments |
+
+Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.

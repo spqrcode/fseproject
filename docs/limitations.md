@@ -1,20 +1,15 @@
-# Known limitations and trade-offs
+# Limitations
 
-## Current state
+## Current application
 
-Only project documentation exists. No functional requirement, security control, test pipeline, or deployment has been implemented or verified.
+Issue 1 provides account/session handling and the existing portfolio setup UI. Holdings, stock quotes, valuations, P/L, and analytics are not implemented. Passing foundation tests does not mean the whole course specification is complete.
 
-## Intended university scope
+Email addresses are not verified. Password recovery, MFA, compromised-password screening, network-level abuse protection, and session housekeeping are absent. Per-address throttling can lock out a targeted address temporarily and does not stop attackers rotating addresses.
 
-- One portfolio per user and USD instruments only; no currency conversion.
-- Current positions with average purchase prices, not a transaction ledger; no realized P/L, dividends, fees, taxes, or corporate-action accounting.
-- Quotes may be delayed or unavailable, depending on provider coverage and quotas.
-- Allocation and concentration describe current holdings; they do not measure complete market risk or predict losses.
-- No trading, brokerage connection, investment recommendations, or suitability assessment.
-- Public assessment hosting depends on configured service limits and availability.
+Authorization is enforced by the application, not database row-level policies. Production backup/restore exercises, audit logging, complete CSP, load testing, and independent security review remain future work. Hosted database/Vercel availability and quotas affect staging; no unconditional zero-cost or availability guarantee is made.
 
-## Before use in a financial institution
+## Later financial scope
 
-The project would need an agreed financial methodology, licensed data and quality controls, reconciled transaction accounting, operational monitoring, audited access controls, incident response, tested backup and recovery, stronger account protection, independent security testing, accessibility review, and formal legal/compliance assessment for its intended jurisdiction and use.
+One portfolio per user, USD instruments, current positions and average purchase price. No transaction ledger, realized P/L, FX, dividends, fees, taxes, corporate-action accounting, trades, advice, or advanced risk models. Allocation and P/L contribution will be descriptive, not a complete measure of investment risk.
 
-These are future engineering needs, not claims that the university application satisfies institutional requirements.
+A real financial institution would need licensed data, reconciled accounting, reviewed financial methodology, stronger identity and access controls, monitoring, incident response, tested recovery, and legal/compliance assessment for its jurisdiction and use.
