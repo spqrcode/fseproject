@@ -6,6 +6,8 @@ import { savePortfolio, getPortfolio } from "@/lib/portfolio-store";
 import { allowAuthAttempt, authLimitKey } from "@/lib/rate-limit";
 import { register, login, logout } from "@/app/actions/auth";
 import { updatePortfolio } from "@/app/actions/portfolio";
+import { listHoldings, createHolding, updateHolding, deleteHolding } from "@/lib/holdings-store";
+import { addHolding, editHolding, removeHolding } from "@/app/actions/holdings";
 import { requireUser, SESSION_COOKIE } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 
@@ -211,5 +213,169 @@ describe("server actions with a real database", () => {
     for (let i = 0; i < 10; i++) await allowAuthAttempt(emails[0]);
     expect((await login({}, credentials(emails[0]))).error).toContain("Too many attempts");
     expect(request.cookies.has(SESSION_COOKIE)).toBe(false);
+  });
+});
+
+const APPLE = { symbol: "AAPL", quantity: "10", averageBuyPrice: "185.40" };
+function holdingForm(values: Record<string, string>) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(values)) form.set(key, value);
+  return form;
+}
+async function only(token: string) {
+  const holdings = await listHoldings(token);
+  expect(holdings).toHaveLength(1);
+  return holdings[0];
+}
+
+describe("holdings persistence and validation", () => {
+  beforeEach(async () => { await savePortfolio(alice, "Alice portfolio"); });
+
+  it("creates, lists, updates and deletes a holding for its owner", async () => {
+    await createHolding(alice, APPLE);
+    const created = await only(alice);
+    expect(created).toMatchObject({ symbol: "AAPL", quantity: "10.00000000", average_buy_price: "185.40000000" });
+    await updateHolding(alice, created.id, { symbol: "msft", quantity: "2.5", averageBuyPrice: "300" });
+    const updated = await only(alice);
+    expect(updated).toMatchObject({ id: created.id, symbol: "MSFT", quantity: "2.50000000", average_buy_price: "300.00000000" });
+    expect(updated.updated_at.getTime()).toBeGreaterThanOrEqual(created.updated_at.getTime());
+    await deleteHolding(alice, created.id);
+    expect(await listHoldings(alice)).toEqual([]);
+  });
+
+  it("rejects a duplicate ticker in the same portfolio but allows it in another user's", async () => {
+    await savePortfolio(bob, "Bob portfolio");
+    await createHolding(alice, APPLE);
+    await expect(createHolding(alice, { ...APPLE, quantity: "1" })).rejects.toMatchObject({ reason: "duplicate" });
+    await expect(createHolding(alice, { ...APPLE, symbol: "aapl" })).rejects.toMatchObject({ reason: "duplicate" });
+    expect(await listHoldings(alice)).toHaveLength(1);
+    await createHolding(bob, APPLE);
+    expect((await only(bob)).symbol).toBe("AAPL");
+    await createHolding(alice, { ...APPLE, symbol: "MSFT" });
+    const first = (await listHoldings(alice))[0];
+    await expect(updateHolding(alice, first.id, { ...APPLE, symbol: "MSFT" })).rejects.toMatchObject({ reason: "duplicate" });
+  });
+
+  it("refuses non-finite, non-positive and oversized values before writing", async () => {
+    for (const quantity of ["NaN", "Infinity", "-5", "0", "1e3"]) {
+      await expect(createHolding(alice, { ...APPLE, quantity })).rejects.toThrow();
+    }
+    await expect(createHolding(alice, { ...APPLE, averageBuyPrice: "1000000001" })).rejects.toThrow();
+    await expect(createHolding(alice, { ...APPLE, symbol: "not a ticker" })).rejects.toThrow();
+    expect(await listHoldings(alice)).toEqual([]);
+  });
+
+  it("stops the database accepting NaN or a non-positive amount even without the form", async () => {
+    const portfolio = await getPortfolio(alice);
+    for (const value of ["NaN", "0", "-1"]) {
+      await expect(database().query("INSERT INTO holdings(portfolio_id,symbol,quantity,average_buy_price) VALUES ($1,'AAPL',$2,1)",
+        [portfolio!.id, value])).rejects.toMatchObject({ code: "23514" });
+    }
+    await expect(database().query("INSERT INTO holdings(portfolio_id,symbol,quantity,average_buy_price) VALUES ($1,'aapl',1,1)",
+      [portfolio!.id])).rejects.toMatchObject({ code: "23514" });
+  });
+
+  it("removes holdings with the portfolio and the account", async () => {
+    await createHolding(alice, APPLE);
+    await database().query("DELETE FROM users WHERE id = $1", [ids[0]]);
+    const remaining = await database().query("SELECT 1 FROM holdings h JOIN portfolios p ON p.id = h.portfolio_id WHERE p.user_id = $1", [ids[0]]);
+    expect(remaining.rowCount).toBe(0);
+  });
+});
+
+describe("holdings ownership isolation", () => {
+  let aliceHolding: string;
+  beforeEach(async () => {
+    await savePortfolio(alice, "Alice portfolio");
+    await savePortfolio(bob, "Bob portfolio");
+    await createHolding(alice, APPLE);
+    aliceHolding = (await only(alice)).id;
+  });
+
+  it("never lists another user's holdings", async () => {
+    expect(await listHoldings(bob)).toEqual([]);
+    expect(await listHoldings(undefined)).toEqual([]);
+    expect(await listHoldings("0".repeat(64))).toEqual([]);
+  });
+
+  it("refuses anonymous and unknown-token writes", async () => {
+    for (const token of [undefined, "0".repeat(64), "not-a-token"]) {
+      await expect(createHolding(token, APPLE)).rejects.toThrow();
+      await expect(updateHolding(token, aliceHolding, APPLE)).rejects.toThrow();
+      await expect(deleteHolding(token, aliceHolding)).rejects.toThrow();
+    }
+    expect(await listHoldings(alice)).toHaveLength(1);
+  });
+
+  it("gives the same answer for another user's holding id and one that does not exist", async () => {
+    const unknown = randomUUID();
+    await expect(updateHolding(bob, aliceHolding, { ...APPLE, quantity: "999" })).rejects.toMatchObject({ reason: "not-found" });
+    await expect(updateHolding(bob, unknown, APPLE)).rejects.toMatchObject({ reason: "not-found" });
+    await expect(deleteHolding(bob, aliceHolding)).rejects.toMatchObject({ reason: "not-found" });
+    await expect(deleteHolding(bob, unknown)).rejects.toMatchObject({ reason: "not-found" });
+    await expect(deleteHolding(bob, "../../etc/passwd")).rejects.toMatchObject({ reason: "not-found" });
+    const survivor = await only(alice);
+    expect(survivor).toMatchObject({ id: aliceHolding, quantity: "10.00000000" });
+  });
+
+  it("ignores a submitted portfolio id when adding", async () => {
+    const alicePortfolio = (await getPortfolio(alice))!.id;
+    request.cookies.set(SESSION_COOKIE, bob);
+    const state = await addHolding({}, holdingForm({ ...APPLE, symbol: "MSFT", portfolio_id: alicePortfolio }));
+    expect(state.success).toBeTruthy();
+    expect((await listHoldings(alice)).map(h => h.symbol)).toEqual(["AAPL"]);
+    expect((await only(bob)).symbol).toBe("MSFT");
+  });
+
+  it("cannot move a holding into another portfolio through the edit form", async () => {
+    const bobPortfolio = (await getPortfolio(bob))!.id;
+    request.cookies.set(SESSION_COOKIE, alice);
+    const state = await editHolding({}, holdingForm({ ...APPLE, quantity: "4", id: aliceHolding, portfolio_id: bobPortfolio }));
+    expect(state.success).toBeTruthy();
+    expect(await listHoldings(bob)).toEqual([]);
+    const row = await database().query("SELECT portfolio_id, quantity FROM holdings WHERE id = $1", [aliceHolding]);
+    expect(row.rows[0].portfolio_id).not.toBe(bobPortfolio);
+    expect(row.rows[0].quantity).toBe("4.00000000");
+  });
+
+  it("returns an unhelpful message and changes nothing when another user forges an id", async () => {
+    request.cookies.set(SESSION_COOKIE, bob);
+    const forged = holdingForm({ ...APPLE, quantity: "999", id: aliceHolding });
+    expect(await editHolding({}, forged)).toEqual({ error: "That holding is no longer available." });
+    expect(await removeHolding({}, holdingForm({ id: aliceHolding }))).toEqual({ error: "That holding is no longer available." });
+    expect(await removeHolding({}, holdingForm({ id: randomUUID() }))).toEqual({ error: "That holding is no longer available." });
+    expect(await removeHolding({}, holdingForm({ id: "1 OR 1=1" }))).toEqual({ error: "That holding is no longer available." });
+    expect(await only(alice)).toMatchObject({ quantity: "10.00000000" });
+  });
+
+  it("blocks every operation once the session has expired", async () => {
+    await database().query("UPDATE sessions SET expires_at = now() - interval '1 second' WHERE token_hash = $1", [tokenHash(alice)]);
+    expect(await listHoldings(alice)).toEqual([]);
+    await expect(createHolding(alice, { ...APPLE, symbol: "MSFT" })).rejects.toMatchObject({ reason: "no-portfolio" });
+    await expect(updateHolding(alice, aliceHolding, APPLE)).rejects.toMatchObject({ reason: "not-found" });
+    await expect(deleteHolding(alice, aliceHolding)).rejects.toMatchObject({ reason: "not-found" });
+    const row = await database().query("SELECT quantity FROM holdings WHERE id = $1", [aliceHolding]);
+    expect(row.rows[0].quantity).toBe("10.00000000");
+  });
+
+  it("requires an authenticated session in the server actions themselves", async () => {
+    await expect(addHolding({}, holdingForm(APPLE))).rejects.toThrow("redirect:/login");
+    await expect(editHolding({}, holdingForm({ ...APPLE, id: aliceHolding }))).rejects.toThrow("redirect:/login");
+    await expect(removeHolding({}, holdingForm({ id: aliceHolding }))).rejects.toThrow("redirect:/login");
+  });
+
+  it.each([null, "https://untrusted.example"])("rejects a missing or foreign origin: %s", async origin => {
+    request.cookies.set(SESSION_COOKIE, bob);
+    request.origin = origin;
+    expect((await addHolding({}, holdingForm({ ...APPLE, symbol: "MSFT" }))).error).toBeTruthy();
+    expect(await listHoldings(bob)).toEqual([]);
+  });
+
+  it("asks the user to create a portfolio instead of failing silently", async () => {
+    const fresh = await database().query("INSERT INTO users(email,password_hash) VALUES ($1,$2) RETURNING id", [uniqueEmail(), passwordHash]);
+    ids.push(fresh.rows[0].id);
+    const token = (await createSession(fresh.rows[0].id)).token;
+    request.cookies.set(SESSION_COOKIE, token);
+    expect(await addHolding({}, holdingForm(APPLE))).toEqual({ error: "Create a portfolio before adding holdings." });
   });
 });
