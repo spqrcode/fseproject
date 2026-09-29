@@ -13,7 +13,15 @@
 
 ## Authentication throttle and its trade-off
 
-The old application-wide cap was removed because one attacker could deny access to everyone. The current fixed window allows 10 valid-form authentication attempts per normalized email address in 15 minutes, shared between registration and login. PostgreSQL upsert makes concurrent attempts atomic. Rejected attempts do not extend the window; counters saturate at 11. Unrelated addresses have independent limits.
+The old application-wide cap was removed because one attacker could deny access to everyone. Login is now throttled per normalized email address with a fixed 15-minute window, and only failed logins count:
+
+- Before the password is verified, login reads the counter without changing it and refuses the request if the address already has 10 failures in the current window (the correct password is also refused). The refusal is read-only and does not extend the window.
+- A wrong password, or an unknown address, increments the counter through a single atomic PostgreSQL upsert; counters saturate at 11.
+- A successful login deletes that address's counter, so legitimate sign-ins can never lock an account.
+- Registration uses its own counter (`register:` key prefix, 10 attempts per address per window) so repeated registration requests cannot lock a login for a known address. Login counters use the `login:` prefix.
+- Unrelated addresses have independent limits.
+
+Known limit of the check-then-increment design: the check and the increment are separate statements, so a burst of parallel wrong guesses can pass the check before any of them is counted. The overshoot is bounded by the number of requests in flight at once (each takes a full scrypt computation) and the next request after the burst is blocked. Registration uses increment-then-compare and is exact under concurrency.
 
 This is basic account throttling, not complete abuse protection. It permits targeted temporary lockout and can be bypassed by rotating addresses. No untrusted proxy/IP headers are used. Before higher-risk use, choose trusted network-level limits for the actual hosting environment. See [OWASP's authentication guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) for the lockout/availability trade-off.
 
