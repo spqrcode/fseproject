@@ -1,38 +1,24 @@
 # Architecture
 
-Status: proposed; no components or policies implemented yet.
+## Implemented foundation
 
-## Request flow
+One Next.js application runs on Node 24. Server components render private pages; server actions process forms. PostgreSQL stores accounts, sessions, and the existing portfolio.
 
-The browser renders Next.js pages. The application manages accounts and database-backed sessions. Next.js server operations validate the session and input before accessing PostgreSQL through a shared server-only data-access layer. Every portfolio query includes the authenticated user ID; holding queries verify ownership through their parent portfolio.
+Browser → Next.js server action/component → server-only application logic → PostgreSQL.
 
-Next.js server code calls the external quote provider. The browser never receives the provider secret. Provider responses are validated and converted into a small internal quote type before use in calculations or display.
+- `src/app`: routes, server actions, loading/error responses.
+- `src/components`: forms and navigation; passwords and tokens are not stored in browser JavaScript state or local storage.
+- `src/lib/password.ts`: Node scrypt password hashing and constant-time hash comparison.
+- `src/lib/session-store.ts`: random tokens, digest storage, expiry checks, revocation.
+- `src/lib/auth.ts`: cookie lookup and server-side authentication requirement.
+- `src/lib/portfolio-store.ts`: ownership-scoped access to the existing portfolio.
+- `src/lib/validation.ts`: server input schemas.
+- `scripts/migrate.mjs`, `db/migrations`: reproducible schema changes.
 
-## Responsibilities
+A session is an opaque random value, not a JWT. The browser sends an HttpOnly cookie; PostgreSQL stores its SHA-256 digest. Every protected operation checks the stored expiry. Logout deletes the database session, so replaying the old cookie fails.
 
-- Pages and UI components: forms, loading/error states, accessible tables, and charts.
-- Server operations: verified identity, input validation, database calls, and useful error responses.
-- Market-data adapter: provider requests, timeout, response validation, normalization, freshness, and rate-limit handling.
-- Calculation module: pure decimal arithmetic without network or database dependencies.
-- Database: persistence, constraints, accounts, sessions, and migrations.
+Checks exist in protected pages and mutations, and portfolio SQL checks ownership again. A layout alone is not the security boundary. User-specific data is not put in a shared application cache.
 
-Use these boundaries within one application. Separate microservices are unnecessary for this scope.
+## Later increments
 
-## Proposed data model
-
-- `users`: id, normalized unique email, password_hash, created_at. Passwords are hashed with a maintained password-hashing library; never implement cryptography ourselves.
-- `sessions`: hashed random session token, user_id, expires_at. The browser receives the opaque token in an HttpOnly, Secure production cookie with an appropriate SameSite setting. Logout revokes the database session.
-- `portfolios`: id, user_id referencing users, name, created_at, updated_at. Unique user_id enforces one portfolio per user.
-- `holdings`: id, portfolio_id, canonical instrument identifier, quantity, average_purchase_price, created_at, updated_at. Unique portfolio/instrument pair prevents duplicates.
-- Database numeric columns preserve decimal inputs. Precision and maximum values will be explicitly selected with the schema.
-- Holding access checks ownership of the parent portfolio. Updates must validate both existing and resulting ownership.
-
-Initial instruments must be provider-validated and USD-denominated. Canonical identifiers must disambiguate exchanges; do not assume a ticker string uniquely identifies every instrument.
-
-Quote-cache persistence and expiry will be chosen after verifying provider terms and quotas. Never place user-specific portfolio responses in a shared public cache. Instrument-level quotes may be shared only if provider licensing permits it.
-
-## Financial behavior
-
-Store decimal values and carry out calculations using decimal arithmetic, with rounding at presentation boundaries. Confirm the decimal library during implementation. Holdings represent current positions and average purchase prices, not a transaction ledger.
-
-A missing quote creates an incomplete valuation, not a zero-valued position. Aggregate freshness reflects constituent quotes. Concentration is a limited descriptive measure; it does not require historical data or imply future losses.
+Holdings, a server-side market-data adapter, pure decimal financial calculations, and `/analytics` are planned. They are not implemented in Issue 1. A single currency and current positions keep the later financial model small. See requirements for the planned calculations and failure states.
