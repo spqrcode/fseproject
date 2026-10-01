@@ -101,7 +101,9 @@ Sessions record no browser name or IP address, so the list shows times only. Sto
 
 ## Accessibility
 
-A skip link is the first keyboard stop on every page. Headings follow one `h1` per page. Form controls have visible labels and descriptions linked with `aria-describedby`. Status colours are paired with text. On phone-sized screens the navigation scrolls horizontally inside the header and the page itself never scrolls sideways. Animations run only when the user has not asked for reduced motion.
+`tests/e2e/accessibility.spec.ts` runs axe-core against every public and signed-in page, plus a form error and a confirmation, in both light and dark mode, and fails on any WCAG 2.0, 2.1 or 2.2 level A or AA violation it can detect. Lowering the muted text colour by a few shades makes it fail with colour-contrast errors, which shows the check is effective. Automated rules find only part of what WCAG asks for, so keyboard use, focus order and the skip link are tested separately in the browser specs.
+
+A skip link is the first keyboard stop on every page. Headings follow one `h1` per page. Form controls have visible labels and descriptions linked with `aria-describedby`. Status colours are paired with text. On phone-sized screens the navigation scrolls horizontally inside the header, scrolls itself so the current section is fully visible, and the page itself never scrolls sideways. Animations run only when the user has not asked for reduced motion.
 
 ## How the Forecast Engine and Scenarios & FX plug in
 

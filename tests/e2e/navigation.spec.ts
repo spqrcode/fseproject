@@ -90,6 +90,8 @@ test("phone-sized screens never scroll sideways", async ({ page, account }) => {
     await page.goto(section.path);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(section.heading);
     expect(await noSidewaysScroll(page), section.path).toBeLessThanOrEqual(0);
+    // The menu scrolls inside the header; the current section must not be cut off at the edge.
+    await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: section.label, exact: true })).toBeInViewport({ ratio: 1 });
   }
   await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Settings", exact: true })).toBeAttached();
 });

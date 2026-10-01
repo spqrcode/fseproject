@@ -50,6 +50,8 @@ Alternatives: a separate `user_preferences` table (cleaner if many preferences a
 
 Appearance: stored per account like the currency, rendered by the server as `data-theme`, with colour tokens switched in CSS. Alternatives: `localStorage` plus an inline script before paint (per browser only, and an inline script would need an exception in a future Content Security Policy); following the device only (no way to override it). Unlike the currency, the database checks the complete list, because these three values are defined by the interface itself.
 
+Accessibility checks: axe-core through `@axe-core/playwright` inside the existing Playwright suite, so CI runs them with no extra job. Alternatives: Lighthouse (slower, one page at a time, scores rather than failures) or manual review only (not repeatable). Automated rules cover part of WCAG; the remaining keyboard and focus behaviour stays in the browser specs.
+
 Fonts: self-hosted through pinned Fontsource npm packages instead of loading Google Fonts at runtime (no third-party requests from users' browsers) or `next/font/google` (downloads at build time, so builds fail without access to Google). The cost is three small dependencies and no automatic preload of font files.
 
 Accepted trade-offs: a code removed from the application list falls back to EUR on display until a migration cleans stored values; the interface uses one number format for everyone; currency conversion does not exist until Scenarios & FX delivers it. Tests: `tests/unit/format.test.ts`, `tests/integration/preferences.test.ts`, `tests/e2e/navigation.spec.ts`. Migration 003 is additive and safe to apply before the application change.

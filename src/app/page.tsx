@@ -13,7 +13,7 @@ const principles = [
   { title: "No invented numbers", text: "A missing value is shown as unavailable, never as zero, and sections that are not connected yet say so." },
   { title: "Exact amounts", text: "Amounts travel as decimal strings from the database to the screen and are rounded only when they are displayed." },
   { title: "Private by default", text: "Every query is scoped to your own session. Fonts are served by the application itself, with no trackers or third-party font services." },
-  { title: "Tested on every change", text: "Unit, database and browser tests run on every pull request before anything reaches the main branch." },
+  { title: "Tested on every change", text: "Unit, database, browser and automated accessibility tests run on every pull request before anything reaches the main branch." },
 ];
 
 export default async function Home() {
