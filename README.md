@@ -6,7 +6,7 @@ Investment portfolio tracker for the Financial Software Engineering course at Fr
 
 Issue 1 provides account registration, login/logout, database-backed sessions, protected `/dashboard` and `/portfolio` pages, and the existing portfolio create/rename form. Holdings, quotes, financial calculations, and `/analytics` are not implemented. No Supabase or hosted authentication service is used.
 
-The interface is branded FinTwin Global. It includes navigation for the Forecast and Scenarios sections, which show a not-connected state until their engines are delivered, and a reporting currency setting at `/settings`. See [product experience](docs/product-experience.md).
+The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the Forecast and Scenarios sections, which show a not-connected state until their engines are delivered, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
 
 ## Local setup
 
