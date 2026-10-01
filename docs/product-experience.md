@@ -1,0 +1,88 @@
+# Product experience
+
+Owner: Product Experience (member D). Scope of this increment: the FinTwin Global interface shell, shared presentation rules, and the reporting currency preference. Forecast and scenario logic belong to the Forecast Engine and Scenarios & FX increments and are not implemented here.
+
+## Information architecture
+
+| Route | Purpose | State in this increment |
+| --- | --- | --- |
+| `/login`, `/register` | Account access | Existing, rebranded |
+| `/dashboard` | Overview of the workspace: portfolio, reporting currency, forecast and scenarios | Implemented; forecast and scenarios shown as not connected |
+| `/forecast` | Projections from the forecast engine | Page and navigation ready; honest empty state until the engine is connected |
+| `/scenarios` | What-if and FX scenario comparison | Page and navigation ready; honest empty state until scenario analysis is connected |
+| `/portfolio` | Portfolio name | Existing |
+| `/settings` | Reporting currency | Implemented |
+
+Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/forecast/2027`).
+
+Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the page states what will appear and that nothing is estimated today.
+
+## Visual design
+
+The interface follows an editorial direction, closer to a printed financial report than to a generic dashboard: warm paper background, ink-coloured type, hairline rules instead of shadows and rounded cards, and a single cobalt accent reserved for the brand mark, the current section and keyboard focus. Green and amber are used only for status, so they keep their meaning.
+
+| Role | Typeface | Why |
+| --- | --- | --- |
+| Headings | Instrument Serif | High-contrast serif that gives page titles an editorial voice |
+| Interface and body text | Schibsted Grotesk | Grotesk designed for a news publisher, readable at small sizes |
+| Labels, codes and amounts | IBM Plex Mono | Monospaced and tabular, so figures line up in columns |
+
+The fonts are installed from npm (Fontsource packages, SIL Open Font License) and served by the application itself. Visitors' browsers make no request to a third-party font service, which avoids sharing their IP address with that service and keeps the pages working when it is unreachable. Each font file covers a character range, so browsers download only the latin subset the interface uses.
+
+The logo is two overlapping circles: the finances as they are and their twin. Header, page content and footer share one content column (`--edge` in `globals.css`), so every left edge lines up with the logo. Placeholder figures on the forecast and scenario pages are outlines with a "today" marker and no values, for the reason given under Information architecture.
+
+## Shared states
+
+- Loading: `src/app/(protected)/loading.tsx` shows a skeleton inside the application shell and announces "Loading this page" to screen readers.
+- Error: `src/app/(protected)/error.tsx` keeps navigation and sign-out available, says that data was not changed, and offers a retry and a way back to the overview.
+- Empty and not connected: `EmptyState` and status badges ("Ready", "Not created", "Not connected yet").
+- Forms: errors use `role="alert"`, confirmations use `role="status"`, and buttons show progress while a server action runs.
+
+## Presentation rules for amounts
+
+`src/lib/format.ts` is the single place where amounts, percentages and timestamps become text. The Forecast Engine and Scenarios & FX pages should use it instead of formatting numbers themselves.
+
+- Amounts are passed as decimal strings, the form PostgreSQL `numeric` values arrive in, and are never converted to JavaScript numbers. `12345678901234567.89` is displayed exactly; as a number it would lose its last digits.
+- Rounding happens only at display time, half away from zero, using the currency's own minor units (two decimals for EUR, none for JPY).
+- A missing amount or an undefined ratio (for example a zero denominator) is shown as "Unavailable", never as 0, NaN or Infinity.
+- Input that is not a plain decimal (exponent notation, `NaN`, grouping separators, empty strings) throws instead of printing a guessed value, so a bug in a calculation is visible during development rather than shown to users.
+- Values that round to zero never show a minus sign. Changes can be shown with an explicit sign (`+£25.00`).
+- Locale `en-GB` and time zone UTC are fixed so the server and the browser render the same text, and timestamps carry the "UTC" label.
+
+## US-08: reporting currency
+
+As a signed-in user, I can choose the currency in which FinTwin Global reports my figures, so that totals, forecasts and scenarios are shown in the currency I think in.
+
+Acceptance criteria:
+- A new account reports in EUR.
+- The settings page offers EUR, USD, GBP, CHF and JPY and shows an example amount in the selected currency before saving.
+- A saved choice survives reload and new sessions and is shown on the overview, forecast and scenarios pages.
+- Unsupported, malformed or missing codes are rejected server-side with a useful message and leave the stored value unchanged.
+- Only the signed-in user's own preference can change; a submitted user id is ignored. Anonymous, unknown and expired sessions are sent to sign in, and a missing or foreign request origin is rejected.
+- The database refuses values that are not three uppercase letters even if the application is bypassed.
+
+Implementation: `db/migrations/003_reporting_currency.sql`, `src/lib/currency.ts`, `reportingCurrencySchema` in `src/lib/validation.ts`, `src/lib/preferences-store.ts`, `src/app/actions/preferences.ts`, `src/components/currency-form.tsx`, `src/app/(protected)/settings/page.tsx`.
+
+The currency is stored as a column on `users` because it is one value per account. The staging runtime role receives `UPDATE` on that column only, so the application still cannot change email addresses or password hashes. The list of offered currencies lives in the application, because it depends on the FX data that Scenarios & FX will supply; the database checks only the ISO 4217 shape.
+
+## Accessibility
+
+A skip link is the first keyboard stop on every page. Headings follow one `h1` per page. Form controls have visible labels and descriptions linked with `aria-describedby`. Status colours are paired with text. On phone-sized screens the navigation scrolls horizontally inside the header and the page itself never scrolls sideways. Animations run only when the user has not asked for reduced motion.
+
+## How the Forecast Engine and Scenarios & FX plug in
+
+1. Replace the empty state in `src/app/(protected)/forecast/page.tsx` or `scenarios/page.tsx` with the real content; the route, navigation, loading and error states already exist.
+2. Read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
+3. Pass amounts as decimal strings from the calculation layer; pass `null` when a value is unavailable.
+4. Update the module card on the overview from "Not connected yet" to the real status.
+
+## Verification
+
+See [testing](testing.md). Unit tests cover formatting and currency validation, integration tests run the preference against real PostgreSQL, and Playwright covers navigation, persistence, expired sessions, keyboard access and phone-sized screens. The browser suite was also run with the application connected as a role holding exactly the documented staging privileges.
+
+## Limitations
+
+- No currency conversion exists yet. The preference records the choice; converting amounts is part of Scenarios & FX.
+- EUR is the default because the team and the assessment are based in Europe. Changing the default needs a migration and a decision in `decisions.md`.
+- The interface is English only and uses a fixed `en-GB` number format.
+- The domain content of the forecast and scenario pages will be designed with their owners once their data model is agreed.

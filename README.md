@@ -6,6 +6,8 @@ Investment portfolio tracker for the Financial Software Engineering course at Fr
 
 Issue 1 provides account registration, login/logout, database-backed sessions, protected `/dashboard` and `/portfolio` pages, and the existing portfolio create/rename form. Holdings, quotes, financial calculations, and `/analytics` are not implemented. No Supabase or hosted authentication service is used.
 
+The interface is branded FinTwin Global. It includes navigation for the Forecast and Scenarios sections, which show a not-connected state until their engines are delivered, and a reporting currency setting at `/settings`. See [product experience](docs/product-experience.md).
+
 ## Local setup
 
 Prerequisites: Node.js 24, npm, and a running PostgreSQL 16 server. PostgreSQL must be installed separately; the application does not install or start a database service.
@@ -45,6 +47,7 @@ Node 24 is declared in `.nvmrc`, `package.json` (also used by Vercel), and GitHu
 - [Architecture](docs/architecture.md) and [database](docs/database.md)
 - [Decisions](docs/decisions.md), [security](docs/security.md), and [limitations](docs/limitations.md)
 - [Testing](docs/testing.md) and [deployment](docs/deployment.md)
+- [Product experience](docs/product-experience.md)
 - [AI use and corrections](docs/ai-usage.md)
 - [Issue 1 evidence](docs/issue-1-evidence.md)
 

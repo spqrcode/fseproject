@@ -6,13 +6,13 @@ PostgreSQL 16, accessed through the server-only `pg` driver and parameterized SQ
 
 | Table | Purpose | Constraints |
 | --- | --- | --- |
-| users | Email and password hash | UUID primary key; unique lowercase email |
+| users | Email, password hash and reporting currency | UUID primary key; unique lowercase email; currency of three uppercase letters, default EUR |
 | sessions | SHA-256 digest of random session token | Digest primary key; user FK with cascade; expiry |
 | auth_limits | Per-address attempt counter | Key primary key; positive count; window expiry |
 | portfolios | Existing named portfolio | UUID primary key; unique user FK; trimmed 1–80 character name |
 | schema_migrations | Applied migration history | Unique migration filename |
 
-Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. Holdings are not present.
+Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. Holdings are not present.
 
 ## Migrations
 
@@ -22,7 +22,7 @@ Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfol
 
 ## Authorization boundary
 
-Application queries derive ownership from an unexpired session in the database, never a browser-submitted user ID. The portfolio read and upsert join/select through `sessions`; an expired or unknown token cannot select an owner. This is application-level authorization, not PostgreSQL row-level security. Direct privileged SQL can bypass it, so database credentials stay server-only.
+Application queries derive ownership from an unexpired session in the database, never a browser-submitted user ID. The portfolio read and upsert, and the reporting currency read and update, join/select through `sessions`; an expired or unknown token cannot select an owner. This is application-level authorization, not PostgreSQL row-level security. Direct privileged SQL can bypass it, so database credentials stay server-only.
 
 ## Environments and privileges
 

@@ -6,11 +6,11 @@ Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and 
 | --- | --- |
 | `npm run lint` | ESLint with zero warnings allowed |
 | `npm run typecheck` | Strict TypeScript |
-| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens |
+| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens, money/percent/timestamp formatting, reporting currency validation |
 | `npm run db:migrate:test` | Ordered migrations against the isolated test database |
-| `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, and server actions |
+| `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, and server actions, including the reporting currency (two users, forged user id, anonymous/unknown/expired sessions, foreign origin, database constraint) |
 | `npm run build` | Next.js production compilation and route generation |
-| `npm run test:e2e` | Actual Chromium and production server: account lifecycle, cookies, expiry, existing portfolio persistence |
+| `npm run test:e2e` | Actual Chromium and production server: account lifecycle, cookies, expiry, existing portfolio persistence; navigation of every section, signed-out redirects, honest not-connected states, reporting currency persistence, expired session on an open settings page, skip link, no sideways scrolling at 375 px |
 
 ## Test isolation
 

@@ -77,6 +77,10 @@ Acceptance criteria:
 - Tests cover forged ownership, guessed identifiers, and changes to parent portfolio references.
 - Server responses, logs, and caches do not disclose another user's holdings.
 
+## US-08 Reporting currency and navigation (FinTwin Global)
+
+As a signed-in user, I can move between the FinTwin Global sections and choose the currency in which my figures are reported. Acceptance criteria and implementation are in [product experience](product-experience.md#us-08-reporting-currency).
+
 ## Engineering acceptance criteria
 
 - At least three distinct functional views: authentication, portfolio management, and dashboard analytics.
@@ -97,5 +101,7 @@ Acceptance criteria:
 | Reproducible automated checks | `scripts/test.mjs`, `.github/workflows/ci.yml` | Migration rerun; full `npm run verify` | GitHub PR CI |
 | US-02 portfolio setup | Existing create/read/rename implementation | Existing behavior checked as an authentication regression | Issue 2 not started or declared complete |
 | US-03–06 | Not implemented | Pending | Later increments |
+| US-08 reporting currency | `src/lib/preferences-store.ts`, `src/app/actions/preferences.ts`, migration 003 | Unit currency validation; integration ownership, origin, expiry and constraint tests; Playwright persistence and expired-session tests | Product experience branch |
+| US-08 navigation and states | `src/components/navigation.tsx`, `(protected)` loading, error, forecast, scenarios and settings pages | Playwright navigation, signed-out redirects, keyboard and phone-width tests | Product experience branch |
 
 Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.
