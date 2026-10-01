@@ -6,6 +6,7 @@ Owner: Product Experience (member D). Scope of this increment: the FinTwin Globa
 
 | Route | Purpose | State in this increment |
 | --- | --- | --- |
+| `/` | Public home page: what FinTwin Global is, which views are available or in development, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
 | `/dashboard` | Overview of the workspace: portfolio, reporting currency, forecast and scenarios | Implemented; forecast and scenarios shown as not connected |
 | `/forecast` | Projections from the forecast engine | Page and navigation ready; honest empty state until the engine is connected |
@@ -14,6 +15,8 @@ Owner: Product Experience (member D). Scope of this increment: the FinTwin Globa
 | `/settings` | Reporting currency | Implemented |
 
 Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/forecast/2027`).
+
+The home page lists Today as available and Forecast and Scenarios as in development, so a visitor is never promised a feature that does not exist yet. The logo on the sign-in and registration pages links back to it.
 
 Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the page states what will appear and that nothing is estimated today.
 

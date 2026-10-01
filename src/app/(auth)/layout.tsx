@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { Brand } from "@/components/brand";
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return <div className="auth-shell">
     <aside className="auth-aside" aria-label="About FinTwin Global">
-      <Brand />
+      <Link href="/" className="brand-link" aria-label="FinTwin Global home"><Brand /></Link>
       <div>
         <p className="auth-statement">Your finances, <em>and their twin.</em></p>
         <p className="auth-sub">Model where you stand today and where you could be tomorrow, in the currency you think in.</p>

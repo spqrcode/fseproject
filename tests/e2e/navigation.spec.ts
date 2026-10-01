@@ -1,33 +1,5 @@
-import { test as base, expect, type Page } from "@playwright/test";
-import { createHash, randomUUID } from "node:crypto";
-import { Pool } from "pg";
+import { test, expect, signUpAndIn, noSidewaysScroll } from "./fixtures";
 
-type Account = { email: string; password: string; db: Pool };
-const test = base.extend<{ account: Account }>({
-  account: async ({}, provide) => {
-    const email = `e2e-nav-${randomUUID()}@example.com`;
-    const db = new Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 1 });
-    try { await provide({ email, password: `test-only-${randomUUID()}`, db }); }
-    finally {
-      await db.query("DELETE FROM users WHERE email=$1", [email]);
-      // Matches every throttle key prefix for this address, whichever naming the rate limiter uses.
-      await db.query("DELETE FROM auth_limits WHERE split_part(key, ':', 2) = $1", [createHash("sha256").update(email).digest("hex")]);
-      await db.end();
-    }
-  },
-});
-async function signUpAndIn(page: Page, account: Account) {
-  await page.goto("/register");
-  await page.getByLabel("Email address").fill(account.email);
-  await page.getByLabel("Password", { exact: true }).fill(account.password);
-  await page.getByRole("button", { name: "Create account", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("account is ready");
-  await page.goto("/login");
-  await page.getByLabel("Email address").fill(account.email);
-  await page.getByLabel("Password", { exact: true }).fill(account.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
-}
 const sections = [
   { label: "Overview", path: "/dashboard", heading: "Overview" },
   { label: "Forecast", path: "/forecast", heading: "Forecast" },
@@ -117,8 +89,7 @@ test("phone-sized screens never scroll sideways", async ({ page, account }) => {
   for (const section of sections) {
     await page.goto(section.path);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(section.heading);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    expect(overflow, section.path).toBeLessThanOrEqual(0);
+    expect(await noSidewaysScroll(page), section.path).toBeLessThanOrEqual(0);
   }
   await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Settings", exact: true })).toBeAttached();
 });

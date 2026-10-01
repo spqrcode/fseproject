@@ -10,7 +10,7 @@ Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and 
 | `npm run db:migrate:test` | Ordered migrations against the isolated test database |
 | `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, and server actions, including the reporting currency (two users, forged user id, anonymous/unknown/expired sessions, foreign origin, database constraint) |
 | `npm run build` | Next.js production compilation and route generation |
-| `npm run test:e2e` | Actual Chromium and production server: account lifecycle, cookies, expiry, existing portfolio persistence; navigation of every section, signed-out redirects, honest not-connected states, reporting currency persistence, expired session on an open settings page, skip link, no sideways scrolling at 375 px |
+| `npm run test:e2e` | Actual Chromium and production server: account lifecycle, cookies, expiry, existing portfolio persistence; navigation of every section, signed-out redirects, honest not-connected states, reporting currency persistence, expired session on an open settings page, skip link, no sideways scrolling at 375 px; public home page content, links, redirect of signed-in users and phone layout |
 
 ## Test isolation
 
