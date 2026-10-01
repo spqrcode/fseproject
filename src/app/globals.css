@@ -164,6 +164,16 @@ button:disabled { opacity: .6; cursor: progress; }
 .settings-section .form { max-width: 520px; }
 .settings-section > div > p { max-width: 34ch; margin-top: 10px; color: var(--muted); font-size: 14px; }
 
+/* Sessions table */
+.settings-section + .settings-section { margin-top: 56px; padding-top: 48px; border-top: 1px solid var(--line); }
+.sessions { display: grid; gap: 24px; align-content: start; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th { padding: 0 12px 10px 0; color: var(--muted); font-family: var(--mono); font-size: 11.5px; font-weight: 500; letter-spacing: .1em; text-align: left; text-transform: uppercase; border-bottom: 1px solid var(--ink); }
+.data-table td { padding: 14px 12px 14px 0; border-bottom: 1px solid var(--line); }
+.data-table td:last-child { text-align: right; }
+.data-table .amount { font-size: 13px; }
+.sessions-form .button { justify-self: start; }
+
 /* Loading and errors */
 .skeleton { background: var(--line-soft); border-radius: var(--radius); }
 .skeleton-eyebrow { width: 120px; height: 12px; margin-bottom: 22px; }

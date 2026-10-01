@@ -12,7 +12,7 @@ Owner: Product Experience (member D). Scope of this increment: the FinTwin Globa
 | `/forecast` | Projections from the forecast engine | Page and navigation ready; honest empty state until the engine is connected |
 | `/scenarios` | What-if and FX scenario comparison | Page and navigation ready; honest empty state until scenario analysis is connected |
 | `/portfolio` | Portfolio name | Existing |
-| `/settings` | Reporting currency | Implemented |
+| `/settings` | Reporting currency and active sessions | Implemented |
 
 Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/forecast/2027`).
 
@@ -67,6 +67,21 @@ Acceptance criteria:
 Implementation: `db/migrations/003_reporting_currency.sql`, `src/lib/currency.ts`, `reportingCurrencySchema` in `src/lib/validation.ts`, `src/lib/preferences-store.ts`, `src/app/actions/preferences.ts`, `src/components/currency-form.tsx`, `src/app/(protected)/settings/page.tsx`.
 
 The currency is stored as a column on `users` because it is one value per account. The staging runtime role receives `UPDATE` on that column only, so the application still cannot change email addresses or password hashes. The list of offered currencies lives in the application, because it depends on the FX data that Scenarios & FX will supply; the database checks only the ISO 4217 shape.
+
+## US-09: active sessions
+
+As a signed-in user, I can see where my account is signed in and sign out of every other session, so that a shared or lost device does not keep access to my data.
+
+Acceptance criteria:
+- The settings page lists my unexpired sessions with their start and expiry time in UTC, and marks the one in this browser.
+- One action signs out every other session of my account; this browser stays signed in, and the other browsers are sent to sign in on their next request.
+- Other users' sessions and expired sessions are never listed or affected.
+- The action requires a valid session and a matching request origin, like every other mutation.
+- Session token digests never leave the server.
+
+Implementation: `src/lib/account-sessions.ts`, `src/app/actions/account.ts`, `src/components/sign-out-others.tsx` and the second section of the settings page. The delete statement joins the caller's own unexpired session (`mine`) to the rows it removes (`other`), so an expired or unknown token matches nothing and deletes nothing. It uses only the `SELECT` and `DELETE` privileges the staging runtime role already has on `sessions`; no new grant is needed.
+
+Sessions record no browser name or IP address, so the list shows times only. Storing a user agent would make the list easier to read but adds personal data to keep and protect; that is left as a team decision.
 
 ## Accessibility
 
