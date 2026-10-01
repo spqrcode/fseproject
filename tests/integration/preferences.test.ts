@@ -2,8 +2,8 @@ import { beforeAll, beforeEach, afterEach, afterAll, describe, it, expect, vi } 
 import { randomUUID } from "node:crypto";
 import { database } from "@/lib/db";
 import { createSession } from "@/lib/session-store";
-import { getReportingCurrency, saveReportingCurrency } from "@/lib/preferences-store";
-import { updateReportingCurrency } from "@/app/actions/preferences";
+import { getAppearance, getPreferences, getReportingCurrency, saveAppearance, saveReportingCurrency } from "@/lib/preferences-store";
+import { updateAppearance, updateReportingCurrency } from "@/app/actions/preferences";
 import { SESSION_COOKIE } from "@/lib/auth";
 
 // Same request adapters as ownership.test.ts: only Next.js cookies, headers, redirect and cache are mocked.
@@ -126,5 +126,41 @@ describe("reporting currency with a real database", () => {
   it("falls back to the default when a stored code is no longer offered", async () => {
     await database().query("UPDATE users SET reporting_currency = 'SEK' WHERE id = $1", [ids[0]]);
     expect(await getReportingCurrency(alice)).toBe("EUR");
+  });
+});
+
+describe("appearance with a real database", () => {
+  function appearance(value: string) {
+    const form = new FormData();
+    form.set("appearance", value);
+    return form;
+  }
+  it("follows the device by default and reads both preferences in one query", async () => {
+    expect(await getAppearance(alice)).toBe("system");
+    expect(await getPreferences(alice)).toEqual({ reportingCurrency: "EUR", appearance: "system" });
+  });
+  it("changes only the signed-in user's appearance", async () => {
+    request.cookies.set(SESSION_COOKIE, alice);
+    expect(await updateAppearance({}, appearance("dark"))).toEqual({ success: "Appearance saved." });
+    expect(await getAppearance(alice)).toBe("dark");
+    expect(await getAppearance(bob)).toBe("system");
+  });
+  it.each(["Dark", "auto", "", "dark' OR '1'='1"])("rejects %j without changing data", async value => {
+    request.cookies.set(SESSION_COOKIE, alice);
+    expect((await updateAppearance({}, appearance(value))).error).toBe("Choose light, dark or match this device.");
+    expect(await getAppearance(alice)).toBe("system");
+  });
+  it("rejects a foreign origin and sends expired sessions to sign in", async () => {
+    request.cookies.set(SESSION_COOKIE, alice);
+    request.origin = "https://untrusted.example";
+    expect((await updateAppearance({}, appearance("light"))).error).toBe("Unable to save your settings. Please try again.");
+    request.origin = "http://localhost:3100";
+    await database().query("UPDATE sessions SET expires_at = now() - interval '1 second' WHERE user_id = $1", [ids[0]]);
+    await expect(updateAppearance({}, appearance("light"))).rejects.toThrow("redirect:/login");
+    expect((await database().query("SELECT appearance FROM users WHERE id = $1", [ids[0]])).rows[0].appearance).toBe("system");
+    await expect(saveAppearance(alice, "light")).rejects.toThrow("Authentication required.");
+  });
+  it("the database refuses values outside the list even when the application is bypassed", async () => {
+    await expect(database().query("UPDATE users SET appearance = 'blue' WHERE id = $1", [ids[0]])).rejects.toMatchObject({ code: "23514" });
   });
 });

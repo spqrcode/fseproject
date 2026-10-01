@@ -12,7 +12,7 @@ Owner: Product Experience (member D). Scope of this increment: the FinTwin Globa
 | `/forecast` | Projections from the forecast engine | Page and navigation ready; honest empty state until the engine is connected |
 | `/scenarios` | What-if and FX scenario comparison | Page and navigation ready; honest empty state until scenario analysis is connected |
 | `/portfolio` | Portfolio name | Existing |
-| `/settings` | Reporting currency and active sessions | Implemented |
+| `/settings` | Reporting currency, appearance and active sessions | Implemented |
 
 Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/forecast/2027`).
 
@@ -31,6 +31,8 @@ The interface follows an editorial direction, closer to a printed financial repo
 | Labels, codes and amounts | IBM Plex Mono | Monospaced and tabular, so figures line up in columns |
 
 The fonts are installed from npm (Fontsource packages, SIL Open Font License) and served by the application itself. Visitors' browsers make no request to a third-party font service, which avoids sharing their IP address with that service and keeps the pages working when it is unreachable. Each font file covers a character range, so browsers download only the latin subset the interface uses.
+
+The dark palette keeps the same roles: near-black paper, warm off-white ink, a lighter cobalt accent, and sign-in and onboarding panels that stay dark in both themes. Every colour in `globals.css` is a token, so the two palettes cannot drift apart.
 
 The logo is two overlapping circles: the finances as they are and their twin. Header, page content and footer share one content column (`--edge` in `globals.css`), so every left edge lines up with the logo. Placeholder figures on the forecast and scenario pages are outlines with a "today" marker and no values, for the reason given under Information architecture.
 
@@ -67,6 +69,20 @@ Acceptance criteria:
 Implementation: `db/migrations/003_reporting_currency.sql`, `src/lib/currency.ts`, `reportingCurrencySchema` in `src/lib/validation.ts`, `src/lib/preferences-store.ts`, `src/app/actions/preferences.ts`, `src/components/currency-form.tsx`, `src/app/(protected)/settings/page.tsx`.
 
 The currency is stored as a column on `users` because it is one value per account. The staging runtime role receives `UPDATE` on that column only, so the application still cannot change email addresses or password hashes. The list of offered currencies lives in the application, because it depends on the FX data that Scenarios & FX will supply; the database checks only the ISO 4217 shape.
+
+## US-10: appearance
+
+As a signed-in user, I can choose a light or dark interface, or let it follow my device, and the choice follows my account to every browser.
+
+Acceptance criteria:
+- A new account follows the device. Signed-out pages always follow the device.
+- A saved choice applies to every signed-in page, survives reload and overrides the device setting.
+- Only `system`, `light` and `dark` are accepted, by the server action and by a database `CHECK`.
+- The same ownership, origin and session rules as the reporting currency apply.
+
+Implementation: `db/migrations/004_appearance.sql`, `src/lib/appearance.ts`, `appearanceSchema`, `getPreferences`/`saveAppearance` in `src/lib/preferences-store.ts`, `updateAppearance`, `src/components/appearance-form.tsx`, and the dark palette in `globals.css`.
+
+The protected layout renders the choice as `data-theme` on the application shell, so it is part of the first HTML response: there is no inline script and no flash of the wrong theme. The stylesheet switches its colour tokens with `:root:has([data-theme="dark"])`, or with `prefers-color-scheme: dark` unless the page carries `data-theme="light"`. `getPreferences` is wrapped in React's `cache`, so the layout (appearance) and the page (currency) share one database query per request. Browsers without `:has()` support (before 2023) keep the light theme for an explicit dark choice.
 
 ## US-09: active sessions
 

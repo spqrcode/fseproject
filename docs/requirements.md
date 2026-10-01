@@ -103,6 +103,7 @@ As a signed-in user, I can move between the FinTwin Global sections and choose t
 | US-03–06 | Not implemented | Pending | Later increments |
 | US-08 reporting currency | `src/lib/preferences-store.ts`, `src/app/actions/preferences.ts`, migration 003 | Unit currency validation; integration ownership, origin, expiry and constraint tests; Playwright persistence and expired-session tests | Product experience branch |
 | US-08 public home page | `src/app/page.tsx` | Playwright content, links, signed-in redirect and phone-width tests | Product experience branch |
+| US-10 appearance | Migration 004, `src/lib/preferences-store.ts`, `updateAppearance`, `src/components/appearance-form.tsx`, dark palette | Unit choice validation; integration ownership, origin, expiry and constraint tests; Playwright device-following, saved dark and light overrides and persistence | Product experience branch |
 | US-09 active sessions | `src/lib/account-sessions.ts`, `src/app/actions/account.ts`, settings page | Integration own-sessions listing, other-user isolation, expired caller, origin and redirect tests; Playwright two-browser sign-out test | Product experience branch |
 | US-08 navigation and states | `src/components/navigation.tsx`, `(protected)` loading, error, forecast, scenarios and settings pages | Playwright navigation, signed-out redirects, keyboard and phone-width tests | Product experience branch |
 

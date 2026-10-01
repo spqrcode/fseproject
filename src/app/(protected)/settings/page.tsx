@@ -1,19 +1,22 @@
 import { requireUser, sessionToken } from "@/lib/auth";
-import { getReportingCurrency } from "@/lib/preferences-store";
+import { getPreferences } from "@/lib/preferences-store";
 import { listActiveSessions } from "@/lib/account-sessions";
 import { DEFAULT_REPORTING_CURRENCY } from "@/lib/currency";
+import { DEFAULT_APPEARANCE } from "@/lib/appearance";
 import { formatTimestamp } from "@/lib/format";
 import { PageHeading } from "@/components/page-heading";
 import { CurrencyForm } from "@/components/currency-form";
+import { AppearanceForm } from "@/components/appearance-form";
 import { SignOutOthers } from "@/components/sign-out-others";
 export const metadata = { title: "Settings" };
 export default async function SettingsPage() {
   await requireUser();
   const token = await sessionToken();
-  const [currency, sessions] = await Promise.all([getReportingCurrency(token), listActiveSessions(token)]);
+  const [preferences, sessions] = await Promise.all([getPreferences(token), listActiveSessions(token)]);
   return <>
     <PageHeading eyebrow="Preferences" title="Settings" intro="Choose how FinTwin Global presents your figures." />
-    <section className="settings-section"><div><h2>Reporting currency</h2><p>Totals, forecasts and scenarios will be reported in this currency. Only you can change it.</p></div><CurrencyForm current={currency ?? DEFAULT_REPORTING_CURRENCY} /></section>
+    <section className="settings-section"><div><h2>Reporting currency</h2><p>Totals, forecasts and scenarios will be reported in this currency. Only you can change it.</p></div><CurrencyForm current={preferences?.reportingCurrency ?? DEFAULT_REPORTING_CURRENCY} /></section>
+    <section className="settings-section"><div><h2>Appearance</h2><p>Light, dark, or the same as your device. The choice follows your account to every browser you sign in from.</p></div><AppearanceForm current={preferences?.appearance ?? DEFAULT_APPEARANCE} /></section>
     <section className="settings-section" aria-labelledby="sessions-heading">
       <div><h2 id="sessions-heading">Active sessions</h2><p>Every sign-in starts a session that lasts 24 hours. If you signed in on a shared or lost device, sign out of the other sessions here.</p></div>
       <div className="sessions">

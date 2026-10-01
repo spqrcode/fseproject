@@ -6,11 +6,11 @@ Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and 
 | --- | --- |
 | `npm run lint` | ESLint with zero warnings allowed |
 | `npm run typecheck` | Strict TypeScript |
-| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens, money/percent/timestamp formatting, reporting currency validation |
+| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens, money/percent/timestamp formatting, reporting currency and appearance validation |
 | `npm run db:migrate:test` | Ordered migrations against the isolated test database |
-| `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, and server actions, including the reporting currency (two users, forged user id, anonymous/unknown/expired sessions, foreign origin, database constraint) and active sessions (listing only the caller's unexpired sessions, signing out others without touching other users) |
+| `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, and server actions, including the reporting currency (two users, forged user id, anonymous/unknown/expired sessions, foreign origin, database constraint) active sessions (listing only the caller's unexpired sessions, signing out others without touching other users) and appearance (allowed values, ownership, origin, expiry, database constraint) |
 | `npm run build` | Next.js production compilation and route generation |
-| `npm run test:e2e` | Actual Chromium and production server: account lifecycle, cookies, expiry, existing portfolio persistence; navigation of every section, signed-out redirects, honest not-connected states, reporting currency persistence, expired session on an open settings page, skip link, no sideways scrolling at 375 px; public home page content, links, redirect of signed-in users and phone layout; signing out of other sessions across two browsers |
+| `npm run test:e2e` | Actual Chromium and production server: account lifecycle, cookies, expiry, existing portfolio persistence; navigation of every section, signed-out redirects, honest not-connected states, reporting currency persistence, expired session on an open settings page, skip link, no sideways scrolling at 375 px; public home page content, links, redirect of signed-in users and phone layout; signing out of other sessions across two browsers; dark and light appearance against a light or dark device, checked on the computed page background |
 
 ## Test isolation
 

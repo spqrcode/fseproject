@@ -6,13 +6,13 @@ PostgreSQL 16, accessed through the server-only `pg` driver and parameterized SQ
 
 | Table | Purpose | Constraints |
 | --- | --- | --- |
-| users | Email, password hash and reporting currency | UUID primary key; unique lowercase email; currency of three uppercase letters, default EUR |
+| users | Email, password hash, reporting currency and appearance | UUID primary key; unique lowercase email; currency of three uppercase letters, default EUR; appearance one of system, light, dark |
 | sessions | SHA-256 digest of random session token | Digest primary key; user FK with cascade; expiry |
 | auth_limits | Per-address attempt counter | Key primary key; positive count; window expiry |
 | portfolios | Existing named portfolio | UUID primary key; unique user FK; trimmed 1–80 character name |
 | schema_migrations | Applied migration history | Unique migration filename |
 
-Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. Holdings are not present.
+Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. `004_appearance.sql` does the same for the appearance preference. Holdings are not present.
 
 ## Migrations
 
