@@ -21,7 +21,7 @@ async function incrementAttempts(key: string): Promise<number> {
 }
 
 // Counts the attempt first, then compares: used where every attempt counts (registration).
-export async function allowAuthAttempt(email: string, scope: AuthScope = "login"): Promise<boolean> {
+export async function allowAuthAttempt(email: string, scope: AuthScope): Promise<boolean> {
   return await incrementAttempts(authLimitKey(email, scope)) <= AUTH_ATTEMPTS;
 }
 
@@ -37,6 +37,7 @@ export async function recordFailedAuth(email: string): Promise<void> {
   await incrementAttempts(authLimitKey(email));
 }
 
+// Closes the window instead of deleting: the runtime role has no DELETE on auth_limits.
 export async function clearAuthAttempts(email: string): Promise<void> {
-  await database().query("DELETE FROM auth_limits WHERE key = $1", [authLimitKey(email)]);
+  await database().query("UPDATE auth_limits SET reset_at = now() WHERE key = $1 AND reset_at > now()", [authLimitKey(email)]);
 }

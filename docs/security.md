@@ -17,7 +17,7 @@ The old application-wide cap was removed because one attacker could deny access 
 
 - Before the password is verified, login reads the counter without changing it and refuses the request if the address already has 10 failures in the current window (the correct password is also refused). The refusal is read-only and does not extend the window.
 - A wrong password, or an unknown address, increments the counter through a single atomic PostgreSQL upsert; counters saturate at 11.
-- A successful login deletes that address's counter, so legitimate sign-ins can never lock an account.
+- A successful login closes that address's window (`UPDATE ... SET reset_at = now()`), so the next failure starts a fresh count and legitimate sign-ins can never lock an account. It uses `UPDATE` rather than `DELETE` because the runtime role `fse_runtime` has only SELECT/INSERT/UPDATE on `auth_limits`. Closed rows stay until the address is used again. Rows from before this change with the `account:` key prefix are no longer read and are harmless.
 - Registration uses its own counter (`register:` key prefix, 10 attempts per address per window) so repeated registration requests cannot lock a login for a known address. Login counters use the `login:` prefix.
 - Unrelated addresses have independent limits.
 
