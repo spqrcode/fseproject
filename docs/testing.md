@@ -6,7 +6,8 @@ Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and 
 | --- | --- |
 | `npm run lint` | ESLint with zero warnings allowed |
 | `npm run typecheck` | Strict TypeScript |
-| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens |
+| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens, and Forecast Decimal/Money/FX rules |
+| `npm exec vitest -- run tests/unit/forecast` | Decimal parsing, Money arithmetic, currency isolation, half-even rounding, immutability, and direct/reciprocal EUR/USD/SGD conversion |
 | `npm run db:migrate:test` | Ordered migrations against the isolated test database |
 | `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, and server actions |
 | `npm run build` | Next.js production compilation and route generation |
@@ -22,4 +23,4 @@ Fixtures use unique generated account addresses, clean up only their own rows, a
 
 Integration tests use the real PostgreSQL driver and SQL, including real password hashing. Only Next.js request adapters (cookies, headers, redirect, cache revalidation) are mocked so server actions can be invoked directly. Playwright verifies those adapters in a real application server. Neither layer substitutes mocked data for database authorization.
 
-Current financial/API tests do not exist because those features are not implemented. Staging smoke checks must be recorded separately from local tests. See [Issue 1 evidence](issue-1-evidence.md) for actual results and identified corrections.
+Cash-event projection, Scenario, provider-adapter, and broader financial/API tests do not exist because those features are not implemented. The Decimal/Money/FX foundation has focused unit tests.
