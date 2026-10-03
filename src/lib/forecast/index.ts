@@ -15,3 +15,26 @@ export {
   type Currency,
   type Money,
 } from "@/lib/forecast/money";
+
+// Member C — cash events, forecast engine, and scenario isolation
+export {
+  CashEventValidationError,
+  parseCashEvent,
+  type CashEvent,
+  type RawCashEvent,
+} from "@/lib/forecast/cash-event";
+export {
+  runForecast,
+  scenarioContribution,
+  type ForecastInput,
+  type ForecastPoint,
+  type ForecastResult,
+} from "@/lib/forecast/forecast-engine";
+export {
+  applyDelayAdjustment,
+  runScenarioForecast,
+  InvalidAdjustmentError,
+  MissingEventError,
+  type DelayAdjustment,
+  type ScenarioProjection,
+} from "@/lib/forecast/scenario";
