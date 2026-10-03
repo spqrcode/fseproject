@@ -33,3 +33,22 @@ export {
   findLatestSnapshot,
   type FxSnapshot,
 } from "@/lib/fx/snapshot-store";
+
+export {
+  calculateShockedRate,
+  evaluateFxShock,
+  convertWithShock,
+  InvalidShockPercentageError,
+  MissingSnapshotError,
+  UnusableSnapshotError,
+  type EvaluatedFxShock,
+} from "@/lib/fx/fx-shock";
+
+export {
+  addScenarioFxShock,
+  getScenarioFxShocks,
+  evaluateScenarioFxShock,
+  invalidateScenarioFxShock,
+  type PersistedFxShock,
+} from "@/lib/fx/shock-store";
+
