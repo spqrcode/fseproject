@@ -77,6 +77,12 @@ Acceptance criteria:
 - Tests cover forged ownership, guessed identifiers, and changes to parent portfolio references.
 - Server responses, logs, and caches do not disclose another user's holdings.
 
+## US-08 Reporting currency and navigation (FinTwin Global)
+
+As a signed-in user, I can move between the FinTwin Global sections and choose the currency in which my figures are reported. Acceptance criteria and implementation are in [product experience](product-experience.md#us-08-reporting-currency).
+
+Supported reporting currencies: EUR, USD and SGD, agreed at the team meeting on 2 October 2026. SGD is kept for the APAC use case in the proposal and is dropped only if its exchange rates cause problems. All three are published as ECB euro reference rates, so the FX source can supply EUR/USD and EUR/SGD directly and USD/SGD in both directions through the euro. The Forecast Engine and Scenarios & FX build against this list. To change it, edit this line, `REPORTING_CURRENCIES` in `src/lib/currency.ts` and the forecast currency list; no migration is needed, because the database only checks the three-letter shape.
+
 ## Engineering acceptance criteria
 
 - At least three distinct functional views: authentication, portfolio management, and dashboard analytics.
@@ -97,5 +103,10 @@ Acceptance criteria:
 | Reproducible automated checks | `scripts/test.mjs`, `.github/workflows/ci.yml` | Migration rerun; full `npm run verify` | GitHub PR CI |
 | US-02 portfolio setup | Existing create/read/rename implementation | Existing behavior checked as an authentication regression | Issue 2 not started or declared complete |
 | US-03–06 | Not implemented | Pending | Later increments |
+| US-08 reporting currency | `src/lib/preferences-store.ts`, `src/app/actions/preferences.ts`, migration 003 | Unit currency validation; integration ownership, origin, expiry and constraint tests; Playwright persistence and expired-session tests | Product experience branch |
+| US-08 public home page | `src/app/page.tsx` | Playwright content, links, signed-in redirect and phone-width tests | Product experience branch |
+| US-10 appearance | Migration 004, `src/lib/preferences-store.ts`, `updateAppearance`, `src/components/appearance-form.tsx`, dark palette | Unit choice validation; integration ownership, origin, expiry and constraint tests; Playwright device-following, saved dark and light overrides and persistence | Product experience branch |
+| US-09 active sessions | `src/lib/account-sessions.ts`, `src/app/actions/account.ts`, settings page | Integration own-sessions listing, other-user isolation, expired caller, origin and redirect tests; Playwright two-browser sign-out test | Product experience branch |
+| US-08 navigation and states | `src/components/navigation.tsx`, `(protected)` loading, error, forecast, scenarios and settings pages | Playwright navigation, signed-out redirects, keyboard and phone-width tests | Product experience branch |
 
 Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.
