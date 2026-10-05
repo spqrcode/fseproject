@@ -1,5 +1,13 @@
 // Keep Decimal construction internal so callers cannot bypass Money and FX
 // validation. The input error remains public for boundary error handling.
+export {
+  CASH_EVENT_STATUSES,
+  CashEventValidationError,
+  parseCashEvent,
+  type CashEvent,
+  type CashEventStatus,
+  type RawCashEvent,
+} from "@/lib/forecast/cash-event";
 export { DecimalInputError } from "@/lib/forecast/decimal";
 export { convertMoney, fxRate, FxRateError, type FxRate } from "@/lib/forecast/fx";
 export {
