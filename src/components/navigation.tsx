@@ -2,11 +2,13 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+// The three MVP views agreed by the team, then setup. The forecast has no page of its own: it is
+// the main content of the liquidity overview.
 const sections = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/forecast", label: "Forecast" },
-  { href: "/scenarios", label: "Scenarios" },
-  { href: "/portfolio", label: "Portfolio" },
+  { href: "/dashboard", label: "Liquidity overview" },
+  { href: "/cash-events", label: "Cash events" },
+  { href: "/scenarios", label: "Scenario lab" },
+  { href: "/workspace", label: "Workspace" },
   { href: "/settings", label: "Settings" },
 ];
 export function Navigation() {

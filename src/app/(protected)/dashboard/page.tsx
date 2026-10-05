@@ -4,29 +4,35 @@ import { getPortfolio } from "@/lib/portfolio-store";
 import { getReportingCurrency } from "@/lib/preferences-store";
 import { DEFAULT_REPORTING_CURRENCY, currencyLabel } from "@/lib/currency";
 import { PageHeading } from "@/components/page-heading";
-export const metadata = { title: "Overview" };
+import { EmptyState } from "@/components/empty-state";
+import { ForecastFigure } from "@/components/placeholder-figures";
+export const metadata = { title: "Liquidity overview" };
 type Module = { title: string; text: string; state: string; tone: "ready" | "pending" | "value"; href: string; action: string };
-export default async function Dashboard() {
+export default async function LiquidityOverview() {
   await requireUser();
   const token = await sessionToken();
-  const [portfolio, currency] = await Promise.all([getPortfolio(token), getReportingCurrency(token)]);
+  // The workspace is still stored in the portfolios table until the workspace schema replaces it.
+  const [workspace, currency] = await Promise.all([getPortfolio(token), getReportingCurrency(token)]);
   const reporting = currency ?? DEFAULT_REPORTING_CURRENCY;
   const modules: Module[] = [
-    { title: "Portfolio", text: portfolio ? "Your portfolio is saved and only you can access it." : "Name your portfolio to get started.", state: portfolio ? "Ready" : "Not created", tone: portfolio ? "ready" : "pending", href: "/portfolio", action: "Open portfolio" },
+    { title: "Workspace", text: workspace ? "Your workspace is saved and only you can access it." : "Name your workspace to get started.", state: workspace ? "Ready" : "Not created", tone: workspace ? "ready" : "pending", href: "/workspace", action: "Open workspace" },
     { title: "Reporting currency", text: `Figures will be reported in ${currencyLabel(reporting)}.`, state: reporting, tone: "value", href: "/settings", action: "Change currency" },
-    { title: "Forecast", text: "Projections of your financial position will appear once the forecast engine is delivered.", state: "Not connected yet", tone: "pending", href: "/forecast", action: "Open forecast" },
-    { title: "Scenarios", text: "What-if scenarios, including exchange-rate changes, will appear once scenario analysis is delivered.", state: "Not connected yet", tone: "pending", href: "/scenarios", action: "Open scenarios" },
+    { title: "Cash events", text: "Planned income and expenses will be listed once cash events are stored.", state: "Not connected yet", tone: "pending", href: "/cash-events", action: "Open cash events" },
+    { title: "Scenario lab", text: "What-if scenarios, including exchange-rate shocks, will appear once scenario analysis is delivered.", state: "Not connected yet", tone: "pending", href: "/scenarios", action: "Open scenario lab" },
   ];
   return <>
-    <PageHeading eyebrow="Workspace" title="Overview" intro={portfolio ? portfolio.name : "Your financial twin starts here."}>
-      {portfolio && <Link className="button secondary" href="/portfolio">Manage portfolio</Link>}
+    <PageHeading eyebrow="Liquidity" title="Liquidity overview" intro={workspace ? workspace.name : "Your financial twin starts here."}>
+      {workspace && <Link className="button secondary" href="/workspace">Manage workspace</Link>}
     </PageHeading>
-    {!portfolio && <section className="callout" aria-labelledby="onboarding-heading">
-      <div><p className="eyebrow">First step</p><h2 id="onboarding-heading">Make room for your investments.</h2><p>Create a portfolio to give your investments a home. You can change its name at any time.</p></div>
-      <Link className="button inverse" href="/portfolio">Create your portfolio</Link>
+    {!workspace && <section className="callout" aria-labelledby="onboarding-heading">
+      <div><p className="eyebrow">First step</p><h2 id="onboarding-heading">Set up your workspace.</h2><p>Give your workspace a name. Cash events and scenarios will belong to it, and only you can see it.</p></div>
+      <Link className="button inverse" href="/workspace">Create your workspace</Link>
     </section>}
-    <section aria-labelledby="workspace-heading">
-      <div className="index-head"><h2 id="workspace-heading">Your workspace</h2><p className="eyebrow">{modules.length} modules</p></div>
+    <EmptyState eyebrow="Awaiting the forecast engine" title="The liquidity forecast is not connected yet." figure={<ForecastFigure />}>
+      <p>Once it is delivered, this page will show your projected balance over time, its lowest point and how long your cash lasts, in {currencyLabel(reporting)}. Nothing is estimated today, so no number is shown until a real projection exists.</p>
+    </EmptyState>
+    <section className="modules" aria-labelledby="modules-heading">
+      <div className="index-head"><h2 id="modules-heading">Modules</h2><p className="eyebrow">{modules.length} modules</p></div>
       <ol className="index-list">
         {modules.map((module, index) => <li key={module.title} className="index-row">
           <span className="index-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
@@ -36,6 +42,6 @@ export default async function Dashboard() {
         </li>)}
       </ol>
     </section>
-    <aside className="footnote" aria-label="About this version"><p className="eyebrow">About this version</p><p>Account access, portfolio setup and the reporting currency are available. Forecasts and scenarios are being built by other members of the team; until they are connected, no figures are estimated or simulated on these pages.</p></aside>
+    <aside className="footnote" aria-label="About this version"><p className="eyebrow">About this version</p><p>Account access, your workspace and the reporting currency are available. The liquidity forecast, cash events and the scenario lab are being built by other members of the team; until they are connected, no figures are estimated or simulated on these pages.</p></aside>
   </>;
 }

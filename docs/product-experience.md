@@ -8,15 +8,17 @@ Owner: Product Experience (member D). Scope of this increment: the FinTwin Globa
 | --- | --- | --- |
 | `/` | Public home page: what FinTwin Global is, which views are available or in development, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
-| `/dashboard` | Overview of the workspace: portfolio, reporting currency, forecast and scenarios | Implemented; forecast and scenarios shown as not connected |
-| `/forecast` | Projections from the forecast engine | Page and navigation ready; honest empty state until the engine is connected |
-| `/scenarios` | What-if and FX scenario comparison | Page and navigation ready; honest empty state until scenario analysis is connected |
-| `/portfolio` | Portfolio name | Existing |
+| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented; the forecast is shown as not connected until the engine is delivered |
+| `/cash-events` | Planned income and expenses by date | Page and navigation ready; honest empty state until cash events are stored |
+| `/scenarios` | Scenario lab: what-if and FX scenario comparison against the base case | Page and navigation ready; honest empty state until scenario analysis is connected |
+| `/workspace` | Workspace name (stored in the `portfolios` table until the workspace schema replaces it) | Existing form, renamed from `/portfolio` |
 | `/settings` | Reporting currency, appearance and active sessions | Implemented |
 
-Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/forecast/2027`).
+Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/scenarios/compare`).
 
-The home page lists Today as available and Forecast and Scenarios as in development, so a visitor is never promised a feature that does not exist yet. The logo on the sign-in and registration pages links back to it.
+Section names follow the MVP views agreed by the team on 2 October 2026: Liquidity overview, Cash events and Scenario lab, then Workspace (which replaces the Portfolio page of the earlier project) and Settings. The forecast has no page of its own, because the projected balance is the main content of the liquidity overview. Routes keep short, stable paths (`/dashboard` is where sign-in lands), so renaming a label never breaks a link.
+
+The home page lists the three MVP views as in development and names what is available today, so a visitor is never promised a feature that does not exist yet. The logo on the sign-in and registration pages links back to it.
 
 Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the page states what will appear and that nothing is estimated today.
 
@@ -61,7 +63,7 @@ As a signed-in user, I can choose the currency in which FinTwin Global reports m
 Acceptance criteria:
 - A new account reports in EUR.
 - The settings page offers the currencies listed in [requirements](requirements.md#us-08-reporting-currency-and-navigation-fintwin-global), EUR, USD and SGD, and shows an example amount in the selected currency before saving.
-- A saved choice survives reload and new sessions and is shown on the overview, forecast and scenarios pages.
+- A saved choice survives reload and new sessions and is shown on the liquidity overview and the scenario lab.
 - Unsupported, malformed or missing codes are rejected server-side with a useful message and leave the stored value unchanged.
 - Only the signed-in user's own preference can change; a submitted user id is ignored. Anonymous, unknown and expired sessions are sent to sign in, and a missing or foreign request origin is rejected.
 - The database refuses values that are not three uppercase letters even if the application is bypassed.
@@ -107,10 +109,10 @@ A skip link is the first keyboard stop on every page. Headings follow one `h1` p
 
 ## How the Forecast Engine and Scenarios & FX plug in
 
-1. Replace the empty state in `src/app/(protected)/forecast/page.tsx` or `scenarios/page.tsx` with the real content; the route, navigation, loading and error states already exist.
+1. Replace the empty state with the real content: the forecast in `src/app/(protected)/dashboard/page.tsx`, events in `cash-events/page.tsx`, scenarios in `scenarios/page.tsx`. The route, navigation, loading and error states already exist.
 2. Read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
 3. Pass amounts as decimal strings from the calculation layer; pass `null` when a value is unavailable.
-4. Update the module card on the overview from "Not connected yet" to the real status.
+4. Update the module row on the liquidity overview from "Not connected yet" to the real status.
 
 ## Verification
 
@@ -121,4 +123,4 @@ See [testing](testing.md). Unit tests cover formatting and currency validation, 
 - No currency conversion exists yet. The preference records the choice; converting amounts is part of Scenarios & FX.
 - EUR is the default because the team and the assessment are based in Europe. Changing the default needs a migration and a decision in `decisions.md`.
 - The interface is English only and uses a fixed `en-GB` number format.
-- The domain content of the forecast and scenario pages will be designed with their owners once their data model is agreed.
+- The domain content of the liquidity overview, cash events and scenario lab will be designed with their owners once their data model is agreed.

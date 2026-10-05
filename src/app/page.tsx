@@ -5,9 +5,9 @@ import { findSession } from "@/lib/session-store";
 import { Brand } from "@/components/brand";
 
 const views = [
-  { title: "Today", text: "Your portfolio and reporting currency, stored privately and visible only to you.", state: "Available", tone: "ready" },
-  { title: "Forecast", text: "Projections of your financial position over time.", state: "In development", tone: "pending" },
-  { title: "Scenarios", text: "What-if comparisons against your base case, including exchange-rate changes.", state: "In development", tone: "pending" },
+  { title: "Liquidity overview", text: "Your projected balance over time, its lowest point and how long your cash lasts.", state: "In development", tone: "pending" },
+  { title: "Cash events", text: "Planned income and expenses by date, each in its own currency.", state: "In development", tone: "pending" },
+  { title: "Scenario lab", text: "What-if comparisons against your base case, such as a delayed invoice or an exchange-rate shock.", state: "In development", tone: "pending" },
 ];
 const principles = [
   { title: "No invented numbers", text: "A missing value is shown as unavailable, never as zero, and sections that are not connected yet say so." },
@@ -42,6 +42,7 @@ export default async function Home() {
             <p className={`state state-${view.tone}`}>{view.state}</p>
           </li>)}
         </ol>
+        <p className="views-note">Available today: a private account, your workspace and the reporting currency in euro, US dollar or Singapore dollar.</p>
       </section>
       <section className="landing-principles" aria-labelledby="principles-heading">
         <h2 id="principles-heading">How it is built</h2>

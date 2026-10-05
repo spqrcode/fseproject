@@ -30,7 +30,7 @@ async function login(page: Page, account: Account) {
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
-test("US-01: registration, login, existing portfolio persistence, logout and replay rejection", async ({ page, browser, account }) => {
+test("US-01: registration, login, workspace persistence, logout and replay rejection", async ({ page, browser, account }) => {
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login$/);
   await register(page, account);
@@ -49,23 +49,23 @@ test("US-01: registration, login, existing portfolio persistence, logout and rep
   expect(cookie?.path).toBe("/");
   expect(cookie!.expires - Date.now() / 1000).toBeGreaterThan(86000);
   expect(cookie!.expires - Date.now() / 1000).toBeLessThanOrEqual(86400);
-  await page.getByRole("link", { name: "Create your portfolio", exact: true }).click();
-  await page.getByLabel("Portfolio name").fill("Long-term savings");
-  await page.getByRole("button", { name: "Create portfolio", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("Portfolio saved.");
+  await page.getByRole("link", { name: "Create your workspace", exact: true }).click();
+  await page.getByLabel("Workspace name").fill("Long-term savings");
+  await page.getByRole("button", { name: "Create workspace", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("Workspace saved.");
   await page.reload();
-  await expect(page.getByLabel("Portfolio name")).toHaveValue("Long-term savings");
+  await expect(page.getByLabel("Workspace name")).toHaveValue("Long-term savings");
   const anonymous = await browser.newContext();
   try {
     const other = await anonymous.newPage();
-    await other.goto("/portfolio");
+    await other.goto("/workspace");
     await expect(other).toHaveURL(/\/login$/);
   } finally { await anonymous.close(); }
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   expect((await page.context().cookies()).find(c => c.name === "portfolio_session")).toBeUndefined();
   await page.context().addCookies([cookie!]);
-  await page.goto("/portfolio");
+  await page.goto("/workspace");
   await expect(page).toHaveURL(/\/login$/);
 });
 
@@ -75,7 +75,7 @@ test("US-01: server expiry overrides a still-valid browser cookie", async ({ pag
   await account.db.query("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE user_id=(SELECT id FROM users WHERE email=$1)", [account.email]);
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login$/);
-  await page.goto("/portfolio");
+  await page.goto("/workspace");
   await expect(page).toHaveURL(/\/login$/);
 });
 
@@ -90,10 +90,10 @@ test("US-01: duplicate registration preserves the password and gives the same re
 test("US-01: expired session cannot submit a form already open in the browser", async ({ page, account }) => {
   await register(page, account);
   await login(page, account);
-  await page.getByRole("link", { name: "Portfolio", exact: true }).click();
-  await page.getByLabel("Portfolio name").fill("Must not be saved");
+  await page.getByRole("link", { name: "Workspace", exact: true }).click();
+  await page.getByLabel("Workspace name").fill("Must not be saved");
   await account.db.query("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE user_id=(SELECT id FROM users WHERE email=$1)", [account.email]);
-  await page.getByRole("button", { name: "Create portfolio", exact: true }).click();
+  await page.getByRole("button", { name: "Create workspace", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   const result = await account.db.query("SELECT p.id FROM portfolios p JOIN users u ON u.id=p.user_id WHERE u.email=$1", [account.email]);
   expect(result.rowCount).toBe(0);

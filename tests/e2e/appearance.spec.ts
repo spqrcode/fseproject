@@ -30,7 +30,7 @@ test("a saved dark appearance applies everywhere, survives reload and overrides 
   expect(await background(page)).toBe(DARK);
   await page.reload();
   await expect(page.getByRole("radio", { name: "Dark", exact: true })).toBeChecked();
-  await page.goto("/forecast");
+  await page.goto("/cash-events");
   expect(await background(page)).toBe(DARK);
   expect(await storedAppearance(account)).toBe("dark");
 });

@@ -6,7 +6,7 @@ import { test, expect, signUpAndIn } from "./fixtures";
 // not all of them; keyboard and screen-reader behaviour is covered by the other specs.
 const WCAG_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const publicPages = ["/", "/login", "/register", "/no-such-page"];
-const privatePages = ["/dashboard", "/forecast", "/scenarios", "/portfolio", "/settings"];
+const privatePages = ["/dashboard", "/cash-events", "/scenarios", "/workspace", "/settings"];
 
 async function violations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(WCAG_AA).analyze();

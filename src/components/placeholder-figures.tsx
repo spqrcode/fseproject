@@ -13,6 +13,18 @@ export function ForecastFigure() {
   </svg>;
 }
 
+// Income rises above the line and expenses fall below it; the heights carry no values.
+const events = [[24, 40], [56, -24], [88, 28], [144, -36], [184, 48], [224, -20], [264, 32]];
+export function CashEventsFigure() {
+  return <svg className="figure" viewBox="0 0 320 180" aria-hidden="true" focusable="false">
+    {grid}
+    <line className="marker" x1="120" x2="120" y1="12" y2="168" />
+    <text x="128" y="22">TODAY</text>
+    <line className="known" x1="0" x2="320" y1="96" y2="96" />
+    {events.map(([x, height]) => <rect key={x} className={x < 120 ? "known" : "unknown"} x={x} width="16" y={height > 0 ? 96 - height : 96} height={Math.abs(height)} />)}
+  </svg>;
+}
+
 export function ScenarioFigure() {
   return <svg className="figure" viewBox="0 0 320 180" aria-hidden="true" focusable="false">
     {grid}

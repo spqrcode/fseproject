@@ -18,7 +18,7 @@ Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `A
 2. Review and push the feature branch to the repository above; GitHub Actions runs all checks on the PR.
 3. Apply additive migrations with a separate owner connection, using `node scripts/migrate.mjs` with DATABASE_URL supplied securely. Never run schema changes through the runtime role.
 4. Push the branch. The GitHub integration builds the Preview; assign the canonical staging alias to that Git-source deployment. Do not publish this project with `vercel deploy` from a working tree — see the deployment decision record. APP_ORIGIN must match the URL used for sign-in.
-5. Visit `/register`, create a test account with a 15-character-or-longer password, sign in, create a named portfolio, reload, sign out, then reopen `/portfolio` and confirm login is required.
+5. Visit `/register`, create a test account with a 15-character-or-longer password, sign in, create a named workspace, reload, sign out, then reopen `/workspace` and confirm login is required.
 
 The staging sign-in page is public, as requested. Application authentication still protects private pages and data. Vercel's additional login wall is disabled only for this school project.
 

@@ -1,10 +1,10 @@
 import { test, expect, signUpAndIn, noSidewaysScroll } from "./fixtures";
 
 const sections = [
-  { label: "Overview", path: "/dashboard", heading: "Overview" },
-  { label: "Forecast", path: "/forecast", heading: "Forecast" },
-  { label: "Scenarios", path: "/scenarios", heading: "Scenarios" },
-  { label: "Portfolio", path: "/portfolio", heading: "Your portfolio" },
+  { label: "Liquidity overview", path: "/dashboard", heading: "Liquidity overview" },
+  { label: "Cash events", path: "/cash-events", heading: "Cash events" },
+  { label: "Scenario lab", path: "/scenarios", heading: "Scenario lab" },
+  { label: "Workspace", path: "/workspace", heading: "Your workspace" },
   { label: "Settings", path: "/settings", heading: "Settings" },
 ];
 
@@ -31,11 +31,18 @@ test("main navigation reaches every section and marks only the current one", asy
 
 test("sections that are not connected yet say so instead of showing figures", async ({ page, account }) => {
   await signUpAndIn(page, account);
-  await expect(page.getByRole("link", { name: "Create your portfolio", exact: true })).toBeVisible();
-  for (const path of ["/forecast", "/scenarios"]) {
+  await expect(page.getByRole("link", { name: "Create your workspace", exact: true })).toBeVisible();
+  for (const path of ["/dashboard", "/cash-events", "/scenarios"]) {
     await page.goto(path);
-    await expect(page.getByRole("heading", { level: 2 })).toContainText("not connected yet");
-    await expect(page.locator("main")).not.toContainText(/[€$£¥]\s?\d/);
+    await expect(page.getByRole("heading", { level: 2, name: /not connected yet/ })).toBeVisible();
+    await expect(page.locator("main")).not.toContainText(/[€$£¥]\s?\d|SGD\s\d/);
+  }
+});
+
+test("the old Forecast and Portfolio pages are gone, not left behind as duplicates", async ({ page, account }) => {
+  await signUpAndIn(page, account);
+  for (const path of ["/forecast", "/portfolio"]) {
+    expect((await page.goto(path))?.status(), path).toBe(404);
   }
 });
 
@@ -57,7 +64,7 @@ test("the reporting currency is saved, survives reload and reaches the other pag
   await expect(page.getByLabel("Reporting currency")).toHaveValue("USD");
   await page.goto("/dashboard");
   await expect(page.getByText("Figures will be reported in US dollar (USD).")).toBeVisible();
-  await page.goto("/forecast");
+  await page.goto("/scenarios");
   await expect(page.locator("main")).toContainText("US dollar (USD)");
 });
 
@@ -94,4 +101,17 @@ test("phone-sized screens never scroll sideways", async ({ page, account }) => {
     await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: section.label, exact: true })).toBeInViewport({ ratio: 1 });
   }
   await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Settings", exact: true })).toBeAttached();
+});
+
+test("on tablet and small laptop screens the whole menu and sign-out stay on screen", async ({ page, account }) => {
+  await signUpAndIn(page, account);
+  for (const width of [900, 1024]) {
+    await page.setViewportSize({ width, height: 760 });
+    await page.goto("/dashboard");
+    expect(await noSidewaysScroll(page), `${width}px`).toBeLessThanOrEqual(0);
+    for (const section of sections) {
+      await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: section.label, exact: true })).toBeInViewport({ ratio: 1 });
+    }
+    await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeInViewport({ ratio: 1 });
+  }
 });
