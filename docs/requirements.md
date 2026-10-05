@@ -81,6 +81,8 @@ Acceptance criteria:
 
 As a signed-in user, I can move between the FinTwin Global sections and choose the currency in which my figures are reported. Acceptance criteria and implementation are in [product experience](product-experience.md#us-08-reporting-currency).
 
+Supported reporting currencies: EUR, USD and SGD, agreed at the team meeting on 2 October 2026. SGD is kept for the APAC use case in the proposal and is dropped only if its exchange rates cause problems. All three are published as ECB euro reference rates, so the FX source can supply EUR/USD and EUR/SGD directly and USD/SGD in both directions through the euro. The Forecast Engine and Scenarios & FX build against this list. To change it, edit this line, `REPORTING_CURRENCIES` in `src/lib/currency.ts` and the forecast currency list; no migration is needed, because the database only checks the three-letter shape.
+
 ## Engineering acceptance criteria
 
 - At least three distinct functional views: authentication, portfolio management, and dashboard analytics.

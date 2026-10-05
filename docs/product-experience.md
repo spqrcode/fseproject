@@ -48,10 +48,10 @@ The logo is two overlapping circles: the finances as they are and their twin. He
 `src/lib/format.ts` is the single place where amounts, percentages and timestamps become text. The Forecast Engine and Scenarios & FX pages should use it instead of formatting numbers themselves.
 
 - Amounts are passed as decimal strings, the form PostgreSQL `numeric` values arrive in, and are never converted to JavaScript numbers. `12345678901234567.89` is displayed exactly; as a number it would lose its last digits.
-- Rounding happens only at display time, half away from zero, using the currency's own minor units (two decimals for EUR, none for JPY).
+- Rounding happens only at display time, half away from zero, using the currency's own minor units (two decimals for EUR, USD and SGD).
 - A missing amount or an undefined ratio (for example a zero denominator) is shown as "Unavailable", never as 0, NaN or Infinity.
 - Input that is not a plain decimal (exponent notation, `NaN`, grouping separators, empty strings) throws instead of printing a guessed value, so a bug in a calculation is visible during development rather than shown to users.
-- Values that round to zero never show a minus sign. Changes can be shown with an explicit sign (`+£25.00`).
+- Values that round to zero never show a minus sign. Changes can be shown with an explicit sign (`+US$25.00`).
 - Locale `en-GB` and time zone UTC are fixed so the server and the browser render the same text, and timestamps carry the "UTC" label.
 
 ## US-08: reporting currency
@@ -60,7 +60,7 @@ As a signed-in user, I can choose the currency in which FinTwin Global reports m
 
 Acceptance criteria:
 - A new account reports in EUR.
-- The settings page offers EUR, USD, GBP, CHF and JPY and shows an example amount in the selected currency before saving.
+- The settings page offers the currencies listed in [requirements](requirements.md#us-08-reporting-currency-and-navigation-fintwin-global), EUR, USD and SGD, and shows an example amount in the selected currency before saving.
 - A saved choice survives reload and new sessions and is shown on the overview, forecast and scenarios pages.
 - Unsupported, malformed or missing codes are rejected server-side with a useful message and leave the stored value unchanged.
 - Only the signed-in user's own preference can change; a submitted user id is ignored. Anonymous, unknown and expired sessions are sent to sign in, and a missing or foreign request origin is rejected.

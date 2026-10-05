@@ -65,7 +65,7 @@ test("an expired session cannot change the currency from a page that is already 
   await signUpAndIn(page, account);
   await page.goto("/settings");
   await account.db.query("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE user_id=(SELECT id FROM users WHERE email=$1)", [account.email]);
-  await page.getByLabel("Reporting currency").selectOption("GBP");
+  await page.getByLabel("Reporting currency").selectOption("SGD");
   await page.getByRole("button", { name: "Save currency", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   const stored = await account.db.query("SELECT reporting_currency FROM users WHERE email=$1", [account.email]);

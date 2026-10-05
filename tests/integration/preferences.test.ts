@@ -69,11 +69,11 @@ describe("reporting currency with a real database", () => {
   });
   it("ignores a submitted user id and derives the owner from the session", async () => {
     request.cookies.set(SESSION_COOKIE, alice);
-    await updateReportingCurrency({}, choose("GBP", { user_id: ids[1], userId: ids[1] }));
-    expect(await storedCurrency(ids[0])).toBe("GBP");
+    await updateReportingCurrency({}, choose("SGD", { user_id: ids[1], userId: ids[1] }));
+    expect(await storedCurrency(ids[0])).toBe("SGD");
     expect(await storedCurrency(ids[1])).toBe("EUR");
   });
-  it.each(["usd", "SEK", "EURO", "", "EUR'; DROP TABLE users; --"])("rejects %j without changing data", async value => {
+  it.each(["usd", "SEK", "GBP", "EURO", "", "EUR'; DROP TABLE users; --"])("rejects %j without changing data", async value => {
     request.cookies.set(SESSION_COOKIE, alice);
     expect((await updateReportingCurrency({}, choose(value))).error).toBe("Choose one of the listed currencies.");
     expect(await storedCurrency(ids[0])).toBe("EUR");
@@ -89,7 +89,7 @@ describe("reporting currency with a real database", () => {
   it.each([null, "https://untrusted.example"])("rejects missing or foreign origin without changing data: %s", async origin => {
     request.cookies.set(SESSION_COOKIE, alice);
     request.origin = origin;
-    expect((await updateReportingCurrency({}, choose("JPY"))).error).toBe("Unable to save your settings. Please try again.");
+    expect((await updateReportingCurrency({}, choose("SGD"))).error).toBe("Unable to save your settings. Please try again.");
     expect(await storedCurrency(ids[0])).toBe("EUR");
   });
   it("sends anonymous, unknown and expired sessions to sign in", async () => {
@@ -124,7 +124,8 @@ describe("reporting currency with a real database", () => {
     await expect(database().query("UPDATE users SET reporting_currency = NULL WHERE id = $1", [ids[0]])).rejects.toMatchObject({ code: "23502" });
   });
   it("falls back to the default when a stored code is no longer offered", async () => {
-    await database().query("UPDATE users SET reporting_currency = 'SEK' WHERE id = $1", [ids[0]]);
+    // GBP was offered before the team narrowed the list to EUR, USD and SGD.
+    await database().query("UPDATE users SET reporting_currency = 'GBP' WHERE id = $1", [ids[0]]);
     expect(await getReportingCurrency(alice)).toBe("EUR");
   });
 });

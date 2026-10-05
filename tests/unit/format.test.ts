@@ -7,9 +7,10 @@ describe("money", () => {
   it("formats each reporting currency with its own symbol and minor units", () => {
     expect(formatMoney("1234.5", "EUR")).toBe("€1,234.50");
     expect(formatMoney("1234.5", "USD")).toBe("US$1,234.50");
-    expect(formatMoney("1234.5", "GBP")).toBe("£1,234.50");
-    // ICU separates the CHF code from the amount with a non-breaking space, so it never wraps onto two lines.
-    expect(formatMoney("1234.5", "CHF")).toBe("CHF\u00a01,234.50");
+    // ICU separates the SGD code from the amount with a non-breaking space, so it never wraps onto two lines.
+    expect(formatMoney("1234.5", "SGD")).toBe("SGD\u00a01,234.50");
+  });
+  it("uses the minor units of any ISO currency it is given, not only the reporting ones", () => {
     expect(formatMoney("1234.5", "JPY")).toBe("JP¥1,235");
   });
   it("keeps every digit of large decimal strings instead of going through floating point", () => {
@@ -26,9 +27,9 @@ describe("money", () => {
     expect(formatMoney("-0.001", "EUR", { signed: true })).toBe("€0.00");
   });
   it("can show the sign of a change", () => {
-    expect(formatMoney("25", "GBP", { signed: true })).toBe("+£25.00");
-    expect(formatMoney("-25", "GBP", { signed: true })).toBe("-£25.00");
-    expect(formatMoney("0", "GBP", { signed: true })).toBe("£0.00");
+    expect(formatMoney("25", "USD", { signed: true })).toBe("+US$25.00");
+    expect(formatMoney("-25", "USD", { signed: true })).toBe("-US$25.00");
+    expect(formatMoney("0", "USD", { signed: true })).toBe("US$0.00");
   });
   it("shows a missing amount as unavailable rather than zero", () => {
     expect(formatMoney(null, "EUR")).toBe(UNAVAILABLE);
@@ -70,10 +71,10 @@ describe("timestamps", () => {
 describe("reporting currency", () => {
   it("accepts only the listed codes", () => {
     for (const code of REPORTING_CURRENCIES) expect(reportingCurrencySchema.parse(code)).toBe(code);
-    for (const value of ["usd", "SEK", "EUR ", "", null, 1, ["EUR"]]) expect(reportingCurrencySchema.safeParse(value).success).toBe(false);
+    for (const value of ["usd", "SEK", "GBP", "JPY", "EUR ", "", null, 1, ["EUR"]]) expect(reportingCurrencySchema.safeParse(value).success).toBe(false);
   });
   it("defaults to a listed currency and labels it for people", () => {
     expect(REPORTING_CURRENCIES).toContain(DEFAULT_REPORTING_CURRENCY);
-    expect(currencyLabel("CHF")).toBe("Swiss franc (CHF)");
+    expect(currencyLabel("SGD")).toBe("Singapore dollar (SGD)");
   });
 });
