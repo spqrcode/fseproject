@@ -50,7 +50,7 @@ The logo is two overlapping circles: the finances as they are and their twin. He
 `src/lib/format.ts` is the single place where amounts, percentages and timestamps become text. The Forecast Engine and Scenarios & FX pages should use it instead of formatting numbers themselves.
 
 - Amounts are passed as decimal strings, the form PostgreSQL `numeric` values arrive in, and are never converted to JavaScript numbers. `12345678901234567.89` is displayed exactly; as a number it would lose its last digits.
-- Rounding happens only at display time, half away from zero, using the currency's own minor units (two decimals for EUR, USD and SGD).
+- Rounding happens only at display time, half to even (1.245 becomes 1.24, 1.255 becomes 1.26), using the currency's own minor units (two decimals for EUR, USD and SGD). This is the rule the forecast engine uses when it rounds, so the screen never disagrees with a rounded calculation by a cent. Unrounded engine results with 40 significant digits are accepted as they are.
 - A missing amount or an undefined ratio (for example a zero denominator) is shown as "Unavailable", never as 0, NaN or Infinity.
 - Input that is not a plain decimal (exponent notation, `NaN`, grouping separators, empty strings) throws instead of printing a guessed value, so a bug in a calculation is visible during development rather than shown to users.
 - Values that round to zero never show a minus sign. Changes can be shown with an explicit sign (`+US$25.00`).
