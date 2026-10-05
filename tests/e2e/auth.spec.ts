@@ -10,7 +10,8 @@ const test = base.extend<{ account: Account }>({
     try { await provide({ email, password: `test-only-${randomUUID()}`, db }); }
     finally {
       await db.query("DELETE FROM users WHERE email=$1", [email]);
-      await db.query("DELETE FROM auth_limits WHERE key=$1", [`account:${createHash("sha256").update(email).digest("hex")}`]);
+      const hash = createHash("sha256").update(email).digest("hex");
+      await db.query("DELETE FROM auth_limits WHERE key = ANY($1::text[])", [[`login:${hash}`, `register:${hash}`]]);
       await db.end();
     }
   },
