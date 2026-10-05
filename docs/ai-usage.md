@@ -41,19 +41,50 @@ What was corrected: `.vercelignore` was added, the affected deployment deleted, 
 
 Evidence retained: the saved upload manifest showing the ignored paths, the later manifest showing them empty, the 404 for the deleted deployment ID, the failed authentication for the old credentials, and the smoke test against the rotated staging environment. See the security document for the full incident record.
 
-## Login throttle fix and origin test coverage (branch `fix/auth-throttle`)
+## Product experience increment: FinTwin Global shell, formatting and reporting currency
 
-Date: 2026-09-29. Tool: Claude Code (Claude Sonnet 5.5). Owner: Foundation & Security student.
+Date: 2026-10-01. Tool: Claude Code. Owner: Product Experience student (member D).
 
-Problem found by the student: the throttle counted successful logins (10 correct sign-ins in 15 minutes locked the account) and shared its counter with registration, so anyone could lock a known email through the register form. The origin (CSRF) test covered only `register` and `login`.
+Request: review the open pull requests, then advance the Product Experience task while the FinTwin Global domain model is still being agreed by the team. Following the team rule, the AI did not stage, commit or push: the changes were delivered as a patch for the student to inspect, test and commit.
 
-AI-generated: the split of `allowAuthAttempt` into `authAttemptsAllowed` (read-only check), `recordFailedAuth` and `clearAuthAttempts` in `src/lib/rate-limit.ts`; `login`/`register` changes in `src/app/actions/auth.ts`; the new integration tests (12 successful logins, lockout after 10 failures and window reset, counter reset on success, registration not blocking login, origin checks for `logout` and `updatePortfolio`); the `docs/security.md` throttle section. The student specified the required behaviour and approved the plan before any code was written.
+AI-generated: the FinTwin Global branding and editorial visual design (stylesheet, self-hosted fonts, logo mark, placeholder figures), requested by the student after a first version looked like a generic AI-generated dashboard; navigation for Overview, Forecast, Scenarios, Portfolio and Settings; forecast and scenario pages with honest not-connected states; in-shell loading and error states; `PageHeading`, `EmptyState` and `Brand` components; `src/lib/format.ts` and `src/lib/currency.ts`; the reporting currency migration, store, server action, form and settings page; unit, integration and browser tests; `docs/product-experience.md` and the related documentation updates.
 
-Reviewed and changed by the student: reviewed the full diff before committing. Removed an unnecessary .gitignore change (duplicate node_modules entry) and found that the browser-test cleanup still deleted the old account: throttle key; updated it to the new login:/register: keys.
+Problems found in the AI's own output by the tests before delivery: the first currency form used a controlled select with a comment claiming React's automatic form reset could not affect it. The browser test showed the select jumping back to EUR after USD had been saved. The select is now keyed by the saved currency and a regression assertion was added. Installing the font packages with the container's older npm rewrote unrelated `libc` entries in `package-lock.json`; the lockfile was restored and only the three font entries were added, then checked with `npm ci`. A first skip-link test assumed the focus position after a client-side redirect and failed for that reason; it now loads the page before pressing Tab.
 
-PR review finding: the AI-generated `clearAuthAttempts` used `DELETE` on `auth_limits`, but the staging runtime role `fse_runtime` has only SELECT/INSERT/UPDATE there (`docs/deployment.md`), so every successful login would have failed on staging. Neither the AI output nor the student's own diff review caught it, and the integration tests could not, because they connect as the database owner. Fix: `clearAuthAttempts` now closes the window with `UPDATE auth_limits SET reset_at = now() WHERE key = $1 AND reset_at > now()` (no new privilege, no migration); the `scope` argument of `allowAuthAttempt` is now required so login cannot fall back to the increment-first path; the reset test now asserts no open window rather than no row.
+Student review and corrections (covers this entry and the follow-up below): I asked for the work as patches so that I could apply and commit it myself, and I made the ten commits on my own machine. I rejected the first visual design because it looked like a generic AI-generated dashboard and asked for a different one. Before publishing my review of PR #6 I went through the reproduction of the staging login failure and the proposed fix. On my machine (macOS, Node 25.2) I ran npm ci, lint, typecheck, the 37 unit tests and the production build, and all of them passed. The database and browser tests did not run locally because my PostgreSQL server was not running, so for those I rely on the CI run on the pull request.
 
-AI-flagged trade-off: check-then-increment is not atomic, so parallel wrong guesses can slightly overshoot the limit. Documented in `docs/security.md`.
+Validation (2026-10-01, cloud container with Node 22.22 and PostgreSQL 16; the project targets Node 24, so the full suite must be rerun locally): migrations applied from an empty test database and a second run applied nothing; ESLint with zero warnings and strict TypeScript clean; 35 unit tests, 36 integration tests (20 before) and 11 Chromium tests (4 before) passed; production build succeeded. The browser suite also passed with the application connected as a role holding exactly the staging privileges listed in `deployment.md`. Deliberately removing the origin check or the session expiry condition made the new integration tests fail.
 
-Validation (2026-09-29, local, Node 24, PostgreSQL 16): npm run verify passed. ESLint (zero warnings) and strict TypeScript clean; 8 unit tests, 26 integration tests (previously 20), 4 Chromium tests passed; production build succeeded; test migrations applied.
+Related review work: while reviewing PR #6 with AI assistance, the same staging-privilege run showed that every login fails on that branch, because the new `clearAuthAttempts` deletes from `auth_limits` and the runtime role has no `DELETE` there. This was reported in the PR review with a reproduction and a proposed fix.
 
+## Product experience follow-ups: home page, sessions, appearance and accessibility checks
+
+Date: 2026-10-01. Tool: Claude Code. Owner: Product Experience student (member D). Same branch and delivery as the entry above: patches inspected, tested and committed by the student.
+
+AI-generated: the public home page; the active sessions list and the action that signs out other sessions; the appearance preference (migration 004, store, action, form, dark palette); shared Playwright fixtures; `tests/e2e/accessibility.spec.ts` with `@axe-core/playwright`; the matching documentation.
+
+Problems found in the AI's own output by the tests before delivery:
+1. The appearance cards hid the real radio buttons with `pointer-events: none`, so only the label could be clicked and the browser test could not select an option. The invisible radio button now covers its whole card.
+2. Keeping the current menu item visible on phones was first done with `scrollIntoView`. In Chrome that also moves the keyboard starting point onto the link, so the first Tab skipped the "Skip to content" link; the existing skip-link test caught it. The menu container is now scrolled directly, which leaves focus alone.
+3. Adding `@axe-core/playwright` with the container's older npm would again have rewritten unrelated lockfile entries; only the one new entry was added and checked with `npm ci`.
+
+The accessibility check was itself checked: making the muted text colour lighter turns both light-mode runs red with colour-contrast errors.
+
+Validation (2026-10-01, cloud container with Node 22.22 and PostgreSQL 16; the full suite must be rerun on Node 24): four migrations applied from an empty test database and a second run applied nothing; ESLint with zero warnings and strict TypeScript clean; 37 unit tests, 51 integration tests and 22 Chromium tests passed; production build succeeded. The browser suite also passed with the application connected as a role holding exactly the staging privileges, which after migrations 003 and 004 include `UPDATE` on `users.reporting_currency` and `users.appearance` only. Deliberately removing the user predicate or the caller's expiry condition from the session-revoking query made the new integration tests fail.
+
+## Product experience: changes requested in review and at the team meeting of 2 October
+
+Date: 2026-10-04. Tool: Claude Code. Owner: Product Experience student (member D). Same delivery as the entries above: patches inspected, tested and committed by the student.
+
+Request: apply what Bastian asked for before merging PR #7 and what the team decided on 2 October: report only in EUR, USD and SGD; rename the sections to the agreed MVP views (Liquidity overview, Cash events, Scenario lab) and Portfolio to Workspace; write down why SGD and dark mode stay. While reviewing Haina's forecast PR (#8) the AI also noticed that the screen rounded half away from zero while the forecast engine rounds half to even, so the same amount could show a different cent.
+
+AI-generated: the currency list change and its tests; the decisions note on the additions beyond the MVP; the renamed navigation, the forecast moved into the liquidity overview, the new cash events page and figure, the workspace page and form; half-to-even display rounding; the matching documentation.
+
+Problems found in the AI's own output before delivery:
+1. With five longer menu labels the header no longer fitted between about 760 and 1080 px wide: at 1024 px the sign-out button was pushed off the screen. This was seen on a screenshot, not by a test. The menu now moves to its own row below 1080 px, and the account email can shrink.
+2. The first version of the new test for that case checked 1024 and 1100 px and still passed with the old header, so it proved nothing. It now checks 900 px, where the old header scrolls sideways, and fails without the fix.
+3. After the rename, `npm run typecheck` fails on a machine that still has a `.next` folder from an earlier build, because Next.js generated types for the deleted Forecast and Portfolio pages. CI starts clean and is not affected; locally, delete `.next` before running the checks.
+
+Student review and corrections: I checked that the four changes match Bastian's review comments and the meeting minutes of 2 October, read the diff of each patch before committing it, deleted `.next` and ran `npm run check` (lint, typecheck, unit tests and production build) on my machine. Database and browser tests run in CI on the pull request.
+
+Validation (2026-10-04, cloud container with Node 22.22 and PostgreSQL 16): four migrations applied from an empty test database and a second run applied nothing; ESLint with zero warnings and strict TypeScript clean; 39 unit tests, 52 integration tests and 24 Chromium tests passed; production build succeeded. The browser suite also passed with the application connected as a role holding exactly the staging privileges. Each of these commits passes lint, typecheck (from a clean `.next`), unit tests and the build on its own.
