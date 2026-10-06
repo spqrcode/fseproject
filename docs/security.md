@@ -5,7 +5,7 @@
 - Passwords: Node's built-in scrypt (`N=131072`, `r=8`, `p=1`), random 16-byte salt, 64-byte derived key, versioned encoding, constant-time comparison. Password input is 15–128 characters; it is not trimmed or truncated. Unknown accounts still incur a hash calculation.
 - Sessions: 32 random bytes; only their SHA-256 digest is stored. A fixed 24-hour expiry is checked in SQL. Login rotates the current browser session; logout revokes it before clearing the cookie. Other browser sessions remain valid.
 - Cookie: HttpOnly, SameSite=Lax, path `/`, no Domain attribute, Secure in production, and 24-hour Max-Age/Expires. Production-mode Playwright checks the actual cookie and rejects replay after logout. Localhost Chromium supports Secure cookies for this test; staging additionally verifies HTTPS.
-- Authorization: server pages and actions require an authenticated user. Portfolio SQL scopes reads and writes through an unexpired session. Submitted ownership fields do not select another user's portfolio. Tests exercise two users, anonymous access, expired cookies, and direct server-action calls.
+- Authorization: server pages and actions require an authenticated user. Workspace SQL scopes reads and writes through an unexpired session. Submitted ownership fields do not select another user's portfolio. Tests exercise two users, anonymous access, expired cookies, and direct server-action calls.
 - CSRF: Next.js server actions use POST and framework origin checks; application mutations additionally require an exact match with configured `APP_ORIGIN`. Missing/foreign origins are rejected. No wildcard origin or caller-supplied Host fallback is trusted.
 - Input/SQL: Zod checks email, password, and portfolio name server-side; database constraints enforce uniqueness and valid names. Values use PostgreSQL `$1` parameters. An SQL-looking portfolio name is stored as literal data in a regression test.
 - Failures: authentication returns generic errors; SQL connection details and credentials are not returned to users. Failed authentication does not create a session.
@@ -24,6 +24,15 @@ The old application-wide cap was removed because one attacker could deny access 
 Known limit of the check-then-increment design: the check and the increment are separate statements, so a burst of parallel wrong guesses can pass the check before any of them is counted. The overshoot is bounded by the number of requests in flight at once (each takes a full scrypt computation) and the next request after the burst is blocked. Registration uses increment-then-compare and is exact under concurrency.
 
 This is basic account throttling, not complete abuse protection. It permits targeted temporary lockout and can be bypassed by rotating addresses. No untrusted proxy/IP headers are used. Before higher-risk use, choose trusted network-level limits for the actual hosting environment. See [OWASP's authentication guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) for the lockout/availability trade-off.
+
+## Ownership chain for cash data
+
+Cash accounts and events belong to a workspace, and a workspace to one user. `src/lib/cash-events-store.ts` reaches every row through `sessions` (unexpired) → `workspaces` → `cash_accounts` / `cash_events`; no user, workspace or ownership id is accepted from input, and unknown input keys such as `workspaceId` are stripped by the schema. An account id in input is only a choice among the caller's own accounts: the query joins it to the caller's workspace.
+
+- Another user's id and a non-existent id give the same result (`null`, or `false` for delete), and a malformed UUID is rejected before SQL, so it cannot raise a distinguishable database error. A missing or expired session throws `Authentication required.`; that check runs only after a query found nothing.
+- The database is the second layer. The composite foreign key `(account_id, workspace_id)` makes an event for another workspace's account impossible even for faulty SQL, and the staging role has column-level `UPDATE`, so `account_id`, `workspace_id` and an account's `currency` cannot be rewritten by the application role at all.
+- Status changes are enforced in the application (only `expected` → `received`, `paid` or `cancelled`); the database enforces the sign rule and the allowed values, not the transition order.
+- Tests: `tests/integration/cash-events.test.ts` (constraints by direct SQL, two-user matrix, anonymous/unknown/expired sessions, forged and malformed ids, cascade), also run with the application connected as a role with exactly the staging grants.
 
 ## Secrets and database access
 

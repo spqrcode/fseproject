@@ -8,6 +8,10 @@ Email addresses are not verified. Password recovery, MFA, compromised-password s
 
 Authorization is enforced by the application, not database row-level policies. Production backup/restore exercises, audit logging, complete CSP, load testing, and independent security review remain future work. Hosted database/Vercel availability and quotas affect staging; no unconditional zero-cost or availability guarantee is made.
 
+## Cash events
+
+A cash event's status can only move once, from `expected` to `received`, `paid` or `cancelled`. There is no undo or reopening; a wrong status is corrected by deleting the event and entering it again. The order is enforced by the application, not by a database trigger, so a privileged connection could still bypass it. Accounts cannot be deleted, and an account's currency and opening balance cannot be edited after creation. Account names are case-sensitive. Amounts have at most two decimals and dates must lie between 2000 and 2100. Event descriptions, amounts and dates can still be edited after an event is paid, received or cancelled, as long as the amount keeps the sign that status requires.
+
 ## Later financial scope
 
 One portfolio per user, USD instruments, current positions and average purchase price. No transaction ledger, realized P/L, FX, dividends, fees, taxes, corporate-action accounting, trades, advice, or advanced risk models. Allocation and P/L contribution will be descriptive, not a complete measure of investment risk.

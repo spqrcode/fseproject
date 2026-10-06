@@ -104,3 +104,23 @@ PR review finding: the AI-generated `clearAuthAttempts` used `DELETE` on `auth_l
 AI-flagged trade-off: check-then-increment is not atomic, so parallel wrong guesses can slightly overshoot the limit. Documented in `docs/security.md`.
 
 Validation (2026-09-29, local, Node 24, PostgreSQL 16): npm run verify passed. ESLint (zero warnings) and strict TypeScript clean; 8 unit tests, 26 integration tests (previously 20), 4 Chromium tests passed; production build succeeded; test migrations applied.
+
+## Workspace and cash events schema (migration 005)
+
+Date: 2026-10-07. Tool: Claude Code (Claude Sonnet 5.5). Owner: Foundation & Security student.
+
+Task given by the student: rename `portfolios` to `workspaces`; add cash accounts and cash events with the agreed rules (EUR/USD/SGD, signed amounts, date-only, four statuses, one workspace per user); a session-scoped store; integration tests against real PostgreSQL; documentation. The student required a plan and a list of unclear points before any code, and answered six questions (narrower grants, no auto-created workspace, `expected`-only status transitions, 2000–2100 dates, a danger-threshold reader and writer, full rename scope).
+
+AI-generated: `db/migrations/005_workspace_cash_events.sql`; `src/lib/cash-events-store.ts`; the danger-threshold functions and the rename in `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts`; the cash schemas in `src/lib/validation.ts`; `src/lib/cash-event-status.ts`; `hasValidSession` in `src/lib/session-store.ts`; `tests/integration/cash-events.test.ts`; `tests/unit/cash-validation.test.ts`; the documentation changes. Not copied from PR #8 or PR #9; PR #9 was read to find conflicts.
+
+Points the AI raised before coding: PR #9's migration 005 creates the same `cash_events` table and would collide; PR #9 reads `date` values with `toISOString()`, which can shift the day in Frankfurt; `NaN > 0` is true in PostgreSQL so `CHECK (amount > 0)` does not exclude NaN; the requested full grants were wider than the store needs, so column-level `UPDATE` was proposed; a new user has no workspace until one is named; the integration tests cannot run as the staging role without a separate owner connection for fixtures.
+
+Found while testing: running the new tests as `fse_runtime` made one of the AI's own constraint tests fail with "permission denied", because the test tried to move an event between accounts through the runtime connection; the role correctly has no `UPDATE` on `account_id`. The test now uses the owner connection for that check.
+
+Mutation checks: removing the session filter from the event list, the ownership join from delete, the account ownership join from event creation, or the `expected`-only status rule each made at least one new test fail.
+
+Reviewed and changed by the student: reviewed the plan before any code was written and decided the open points (narrower column-level grants, status changes only from expected, null instead of auto-creating a workspace, a getter/setter for danger_threshold, full rename scope). Read the migration and the store queries line by line. Removed 18 iCloud duplicate files from the working tree before committing. Identified that the portfolios → workspaces rename is not backward-compatible and documented the deployment order.
+
+Concerns for the student's review: paid/received/cancelled events can still be edited as long as the sign fits (documented in limitations.md); the status order is enforced by the application, not the database; the renamed table keeps its old portfolios_* constraint names; and the rename requires migration and deployment to happen together (see the deployment document).
+
+Validation (2026-10-07, local, PostgreSQL 16): `npm run verify` exit code 0 — lint with zero warnings and strict TypeScript clean; 86 unit tests; migrations applied to the test database; 95 integration tests (37 of them new, in `cash-events.test.ts`); 24 Chromium tests; production build succeeded. Run as a role holding exactly the grants in `deployment.md` (migrations 003–005 plus the base grants, on a separate `_test` database): the 37 cash tests passed with the application as `fse_runtime` and fixtures as owner, and the 24 Chromium tests passed with the application server as `fse_runtime`. As that role, `UPDATE` of `cash_events.workspace_id` or `account_id`, of `cash_accounts.currency` or `workspace_id`, and `DELETE` on `cash_accounts` or `workspaces` were refused with "permission denied". Student review: pending.
