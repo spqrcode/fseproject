@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { credentialsSchema, portfolioNameSchema } from "@/lib/validation";
+import { credentialsSchema, workspaceNameSchema } from "@/lib/validation";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { tokenHash, validToken } from "@/lib/session-store";
 describe("credentials", () => {
@@ -12,9 +12,9 @@ describe("credentials", () => {
   });
   it("rejects malformed email and non-string values", () => {
     expect(credentialsSchema.safeParse({ email: "bad", password: "a long passphrase" }).success).toBe(false);
-    expect(portfolioNameSchema.safeParse(4).success).toBe(false);
-    expect(portfolioNameSchema.safeParse(" ").success).toBe(false);
-    expect(portfolioNameSchema.safeParse("a".repeat(81)).success).toBe(false);
+    expect(workspaceNameSchema.safeParse(4).success).toBe(false);
+    expect(workspaceNameSchema.safeParse(" ").success).toBe(false);
+    expect(workspaceNameSchema.safeParse("a".repeat(81)).success).toBe(false);
   });
 });
 describe("password storage", () => {

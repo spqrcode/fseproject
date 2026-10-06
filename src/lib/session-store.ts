@@ -18,3 +18,10 @@ export async function findSession(token: string | undefined): Promise<{ id: stri
 export async function revokeSession(token: string | undefined) {
   if (token && validToken(token)) await database().query("DELETE FROM sessions WHERE token_hash = $1", [tokenHash(token)]);
 }
+// True while the token belongs to an unexpired session. Stores call it only after a query found nothing,
+// to tell "not signed in" (an error) from "not yours or not there" (an ordinary empty result).
+export async function hasValidSession(token: string | undefined): Promise<boolean> {
+  if (!token || !validToken(token)) return false;
+  const result = await database().query("SELECT 1 FROM sessions WHERE token_hash = $1 AND expires_at > now()", [tokenHash(token)]);
+  return result.rowCount === 1;
+}
