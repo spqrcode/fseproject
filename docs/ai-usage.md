@@ -113,3 +113,12 @@ PR review finding: the AI-generated `clearAuthAttempts` used `DELETE` on `auth_l
 AI-flagged trade-off: check-then-increment is not atomic, so parallel wrong guesses can slightly overshoot the limit. Documented in `docs/security.md`.
 
 Validation (2026-09-29, local, Node 24, PostgreSQL 16): npm run verify passed. ESLint (zero warnings) and strict TypeScript clean; 8 unit tests, 26 integration tests (previously 20), 4 Chromium tests passed; production build succeeded; test migrations applied.
+
+## Member B — Cash projection and review follow-up
+
+- Date: 2026-10-07. Tool: OpenAI Codex. Owner: Member B.
+- Request: implement and review deterministic cash-event projection, minimum balance, liquidity runway and agreed forecast rules.
+- AI-assisted work: proposed code, tests and documentation for the fixed 50% warning threshold, deterministic same-day ordering, shared reporting-currency allowlist and negative half-even rounding cases.
+- Student review: inspected the diff, confirmed the business rules, ran the tests and created the commits personally.
+- Validation: 90 Forecast domain tests and 129 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.
+- Remaining team decision: confirm EUR-derived cross-rate ownership and precision with the ECB adapter owner.

@@ -12,6 +12,9 @@ Foundation choices below are implemented and awaiting student review. Financial/
 | Decimal financial arithmetic | Predictable decimal precision | Binary floating point throughout | Additional library and explicit conversion rules |
 | Forecast money foundation uses `decimal.js` with 40 significant digits and half-even rounding | FX division needs a reviewed decimal implementation; JavaScript numbers and the dashboard's temporary scaled-integer helper are not sufficient | Extend the custom BigInt helper | New dependency; precision and rounding policy must remain explicit and tested |
 | FX rates are directed (`base`/`quote`) and conversion requires a matching direct or reciprocal rate | Prevents an ambiguous number from being interpreted in the wrong direction | Infer direction or silently find a cross-rate | Callers must supply the required pair; cross-rate policy remains an open decision |
+| EUR, USD and SGD come from `REPORTING_CURRENCIES` as the single application allowlist | Prevents the UI and Forecast Engine from accepting different currencies | Maintain two equal arrays and test them | The domain currency set is coupled to the agreed reporting-currency scope |
+| Cash forecasts use signed, non-zero pending events on inclusive UTC dates and record one end-of-day balance per date | Makes projection deterministic and keeps completed/cancelled events out of future cash | Event-level or intraday points | Intraday liquidity changes are not represented |
+| Liquidity warning is the first end-of-day balance strictly below 50% of a non-negative opening balance | Gives the UI one reproducible threshold and a calendar-day runway | Configurable amount or percentage per user | Negative opening balances are rejected by this percentage-based contract |
 | Allocation and absolute P/L contribution (planned) | Matches the small tracker specification | Advanced risk models | Limited analytical scope |
 | Server-side quote adapter | Keeps secrets private and isolates provider behavior | Direct browser requests | Server quota management and latency |
 
@@ -23,7 +26,7 @@ Foundation choices below are implemented and awaiting student review. Financial/
 - Node scrypt, `pg`, 24-hour database sessions, and per-address throttling are implemented. Recovery and email verification remain out of scope.
 - Staging uses a dedicated Neon PostgreSQL host with provider authentication disabled; the application still uses direct pg/SQL and internal authentication. Vercel hosts only the application.
 - Confirm available GitHub protections and hosting/database account limits.
-- Confirm whether the cash-forecast feature extends this USD-portfolio product. Define cash-event timing, forecast horizon, base currency, FX observation policy, cross-rates, minimum-balance semantics, runway threshold, and scenario-contribution semantics before implementing those calculations.
+- Confirm whether the ECB adapter or Forecast Engine owns EUR-derived cross rates, define the stale-data cutoff, and agree the attribution order for scenarios with several interacting changes.
 
 ## Defense record for significant changes
 
