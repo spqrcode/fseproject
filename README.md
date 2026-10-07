@@ -47,6 +47,7 @@ Node 24 is declared in `.nvmrc`, `package.json` (also used by Vercel), and GitHu
 - [Architecture](docs/architecture.md) and [database](docs/database.md)
 - [Decisions](docs/decisions.md), [security](docs/security.md), and [limitations](docs/limitations.md)
 - [Testing](docs/testing.md) and [deployment](docs/deployment.md)
+- [Forecast Engine working draft](docs/forecast-engine.md)
 - [Product experience](docs/product-experience.md)
 - [AI use and corrections](docs/ai-usage.md)
 - [Issue 1 evidence](docs/issue-1-evidence.md)
