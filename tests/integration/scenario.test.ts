@@ -6,7 +6,7 @@
  *  2. The base forecast result is unchanged.
  *  3. Cross-workspace access is rejected.
  *  4. Two scenarios targeting the same event do not affect each other.
- *  5. Invalid or deleted-target events produce an explicit error state.
+ *  5. Invalid adjustments surface explicitly while hard deletion cascades safely.
  */
 
 import { beforeAll, beforeEach, afterEach, afterAll, describe, it, expect, vi } from "vitest";
@@ -150,6 +150,22 @@ describe("persisted CashEvent is unchanged", () => {
     expect(after?.expectedDate).toBe("2025-03-01");
     expect(after?.amount).toBe(before?.amount);
   });
+
+  it("round-trips cash-event and adjustment dates as date-only strings", async () => {
+    const event = await aliceEvent("300", "2026-10-15");
+    const scenario = await createScenario(alice, "Date-only scenario");
+    const adjustment = await addDelayAdjustment(
+      alice,
+      scenario.id,
+      event.id,
+      "2026-10-25",
+    );
+
+    expect(event.expectedDate).toBe("2026-10-15");
+    expect(typeof event.expectedDate).toBe("string");
+    expect(adjustment.dateOverride).toBe("2026-10-25");
+    expect(typeof adjustment.dateOverride).toBe("string");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -202,6 +218,19 @@ describe("cross-workspace access rejection", () => {
       addDelayAdjustment(alice, aliceScenario.id, bobEv.id, "2025-06-01"),
     ).rejects.toThrow("Cash event not found or access denied");
   });
+
+  it("treats malformed UUIDs like missing records instead of leaking PostgreSQL errors", async () => {
+    const event = await aliceEvent();
+
+    expect(await getCashEvent(alice, "not-a-uuid")).toBeNull();
+    expect(await deleteCashEvent(alice, "not-a-uuid")).toBe(false);
+    expect(await getScenario(alice, "not-a-uuid")).toBeNull();
+    expect(await getAdjustments(alice, "not-a-uuid")).toEqual([]);
+    expect(await invalidateAdjustment(alice, "not-a-uuid")).toBe(false);
+    await expect(
+      addDelayAdjustment(alice, "not-a-uuid", event.id, "2025-06-01"),
+    ).rejects.toThrow("Scenario not found or access denied");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -234,7 +263,7 @@ describe("two scenarios targeting the same event", () => {
 // 4. Invalid / deleted target event produces explicit error state
 // ---------------------------------------------------------------------------
 
-describe("invalid adjustment when target event is deleted", () => {
+describe("invalid adjustments and safe deletion", () => {
   it("invalidateAdjustment marks status=invalid and applyDelayAdjustment then throws", async () => {
     const event = await aliceEvent("200", "2025-04-01");
     const scenario = await createScenario(alice, "Scenario with invalid adj");
@@ -264,25 +293,45 @@ describe("invalid adjustment when target event is deleted", () => {
     ).toThrow(InvalidAdjustmentError);
   });
 
-  it("deleteCashEvent is blocked by FK when an active adjustment exists", async () => {
+  it("hard-deleting a cash event cascades its scenario adjustment", async () => {
     const event = await aliceEvent("150", "2025-04-01");
     const scenario = await createScenario(alice, "Scenario referencing event");
     await addDelayAdjustment(alice, scenario.id, event.id, "2025-07-01");
 
-    // ON DELETE RESTRICT prevents deletion while an adjustment references the event
-    await expect(deleteCashEvent(alice, event.id)).rejects.toThrow();
+    expect(await getAdjustments(alice, scenario.id)).toHaveLength(1);
+    expect(await deleteCashEvent(alice, event.id)).toBe(true);
+    expect(await getAdjustments(alice, scenario.id)).toEqual([]);
   });
 
-  it("deleteCashEvent succeeds after invalidating all adjustments targeting it", async () => {
+  it("deleting a user cascades events, scenarios, and adjustments", async () => {
     const event = await aliceEvent("150", "2025-04-01");
     const scenario = await createScenario(alice, "Scenario referencing event");
-    const adj = await addDelayAdjustment(alice, scenario.id, event.id, "2025-07-01");
+    const adjustment = await addDelayAdjustment(
+      alice,
+      scenario.id,
+      event.id,
+      "2025-07-01",
+    );
+    const aliceId = ids[0];
 
-    // First invalidate (but FK still holds — must delete adjustment row)
-    await database().query("DELETE FROM scenario_adjustments WHERE id = $1", [adj.id]);
+    await database().query("DELETE FROM users WHERE id = $1", [aliceId]);
 
-    const deleted = await deleteCashEvent(alice, event.id);
-    expect(deleted).toBe(true);
+    const eventCount = await database().query(
+      "SELECT count(*)::int AS count FROM cash_events WHERE id = $1",
+      [event.id],
+    );
+    const scenarioCount = await database().query(
+      "SELECT count(*)::int AS count FROM scenarios WHERE id = $1",
+      [scenario.id],
+    );
+    const adjustmentCount = await database().query(
+      "SELECT count(*)::int AS count FROM scenario_adjustments WHERE id = $1",
+      [adjustment.id],
+    );
+
+    expect(eventCount.rows[0].count).toBe(0);
+    expect(scenarioCount.rows[0].count).toBe(0);
+    expect(adjustmentCount.rows[0].count).toBe(0);
   });
 });
 

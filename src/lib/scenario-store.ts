@@ -5,15 +5,16 @@
  * browser-submitted user or scenario ID.  Queries join through sessions
  * the same way portfolio-store.ts and cash-event-store.ts do.
  *
- * An adjustment whose target event has been deleted has status='invalid'
- * in the database.  The store surfaces this explicitly rather than silently
- * omitting the adjustment.
+ * An adjustment may be marked status='invalid' when business validation makes
+ * it unusable. Hard-deleting the target event removes its adjustment through
+ * the database foreign key so account/workspace cleanup cannot be blocked.
  */
 
 import "server-only";
 import { database } from "@/lib/db";
 import { tokenHash, validToken } from "@/lib/session-store";
 import type { DelayAdjustment } from "@/lib/forecast/scenario";
+import { uuidSchema } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // DB row types
@@ -31,7 +32,7 @@ interface AdjustmentRow {
   id: string;
   scenario_id: string;
   cash_event_id: string;
-  date_override: Date; // pg DATE → JS Date
+  date_override: string;
   status: string;
 }
 
@@ -49,7 +50,7 @@ function rowToAdjustment(row: AdjustmentRow): DelayAdjustment {
     id: row.id,
     scenarioId: row.scenario_id,
     cashEventId: row.cash_event_id,
-    dateOverride: row.date_override.toISOString().slice(0, 10),
+    dateOverride: row.date_override,
     status,
   });
 }
@@ -85,16 +86,18 @@ export async function getScenarios(token: string | undefined): Promise<Scenario[
  */
 export async function getScenario(
   token: string | undefined,
-  scenarioId: string,
+  scenarioId: unknown,
 ): Promise<Scenario | null> {
   if (!token || !validToken(token)) return null;
+  const id = uuidSchema.safeParse(scenarioId);
+  if (!id.success) return null;
   const result = await database().query<ScenarioRow>(
     `SELECT sc.id, sc.user_id, sc.name, sc.created_at, sc.updated_at
        FROM scenarios sc
        JOIN sessions s ON s.user_id = sc.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sc.id = $2`,
-    [tokenHash(token), scenarioId],
+    [tokenHash(token), id.data],
   );
   if (!result.rows[0]) return null;
   const r = result.rows[0];
@@ -111,19 +114,22 @@ export async function getScenario(
  */
 export async function getAdjustments(
   token: string | undefined,
-  scenarioId: string,
+  scenarioId: unknown,
 ): Promise<DelayAdjustment[]> {
   if (!token || !validToken(token)) return [];
+  const id = uuidSchema.safeParse(scenarioId);
+  if (!id.success) return [];
   // Join through sessions+scenarios to enforce ownership in one query.
   const result = await database().query<AdjustmentRow>(
-    `SELECT sa.id, sa.scenario_id, sa.cash_event_id, sa.date_override, sa.status
+    `SELECT sa.id, sa.scenario_id, sa.cash_event_id,
+            sa.date_override::text AS date_override, sa.status
        FROM scenario_adjustments sa
        JOIN scenarios sc ON sc.id = sa.scenario_id
        JOIN sessions s ON s.user_id = sc.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sa.scenario_id = $2
       ORDER BY sa.created_at ASC`,
-    [tokenHash(token), scenarioId],
+    [tokenHash(token), id.data],
   );
   return result.rows.map(rowToAdjustment);
 }
@@ -173,11 +179,15 @@ export async function createScenario(
  */
 export async function addDelayAdjustment(
   token: string | undefined,
-  scenarioId: string,
-  cashEventId: string,
+  scenarioId: unknown,
+  cashEventId: unknown,
   dateOverride: string, // YYYY-MM-DD
 ): Promise<DelayAdjustment> {
   if (!token || !validToken(token)) throw new Error("Authentication required.");
+  const scenario = uuidSchema.safeParse(scenarioId);
+  if (!scenario.success) throw new Error("Scenario not found or access denied.");
+  const event = uuidSchema.safeParse(cashEventId);
+  if (!event.success) throw new Error("Cash event not found or access denied.");
 
   // Verify both the scenario and the event belong to the session user in one
   // query before inserting, so the error is clear rather than a PK/FK violation.
@@ -193,7 +203,7 @@ export async function addDelayAdjustment(
            JOIN sessions s ON s.user_id = ce.user_id
           WHERE s.token_hash = $1 AND s.expires_at > now() AND ce.id = $3
        ) AS event_ok`,
-    [tokenHash(token), scenarioId, cashEventId],
+    [tokenHash(token), scenario.data, event.data],
   );
 
   const { scenario_ok, event_ok } = ownership.rows[0];
@@ -203,25 +213,26 @@ export async function addDelayAdjustment(
   const result = await database().query<AdjustmentRow>(
     `INSERT INTO scenario_adjustments (scenario_id, cash_event_id, date_override)
        VALUES ($1, $2, $3::date)
-       RETURNING id, scenario_id, cash_event_id, date_override, status`,
-    [scenarioId, cashEventId, dateOverride],
+       RETURNING id, scenario_id, cash_event_id,
+                 date_override::text AS date_override, status`,
+    [scenario.data, event.data, dateOverride],
   );
   if (result.rowCount !== 1) throw new Error("Failed to create adjustment.");
   return rowToAdjustment(result.rows[0]);
 }
 
 /**
- * Mark an adjustment as 'invalid'.  Called when the target event is deleted
- * so the adjustment remains visible for audit purposes rather than being
- * silently removed.
+ * Mark an adjustment as 'invalid' while retaining it for audit purposes.
  *
  * Only the scenario owner can invalidate their own adjustments.
  */
 export async function invalidateAdjustment(
   token: string | undefined,
-  adjustmentId: string,
+  adjustmentId: unknown,
 ): Promise<boolean> {
   if (!token || !validToken(token)) return false;
+  const id = uuidSchema.safeParse(adjustmentId);
+  if (!id.success) return false;
   const result = await database().query(
     `UPDATE scenario_adjustments sa
         SET status = 'invalid', updated_at = now()
@@ -230,7 +241,7 @@ export async function invalidateAdjustment(
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sa.scenario_id = sc.id
         AND sa.id = $2`,
-    [tokenHash(token), adjustmentId],
+    [tokenHash(token), id.data],
   );
   return (result.rowCount ?? 0) > 0;
 }

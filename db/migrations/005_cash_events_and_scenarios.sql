@@ -32,17 +32,17 @@ CREATE INDEX scenarios_user_id_idx ON scenarios(user_id);
 
 -- A scenario_adjustment says: "in this scenario, treat event X as if its date is Y".
 -- It does NOT copy the event; it only stores the override.
--- cash_event_id references the original event row; if that row is deleted the adjustment
--- becomes invalid (the FK is deliberately NOT ON DELETE CASCADE so we can surface that state).
+-- cash_event_id references the original event row. Hard deletion cascades to the adjustment so
+-- deleting a whole user/account cannot be blocked by an immediately checked RESTRICT constraint.
 -- date_override must differ from the original date; this is enforced in application logic
 -- rather than SQL because the original date lives in another table.
 -- status tracks whether the override is still usable:
 --   'active'      – adjustment applies normally
---   'invalid'     – target event was deleted or is inaccessible; stored for audit trail
+--   'invalid'     – business validation rejected the override; stored for audit trail
 CREATE TABLE scenario_adjustments (
   id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   scenario_id     uuid        NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
-  cash_event_id   uuid        NOT NULL REFERENCES cash_events(id) ON DELETE RESTRICT,
+  cash_event_id   uuid        NOT NULL REFERENCES cash_events(id) ON DELETE CASCADE,
   date_override   date        NOT NULL,
   status          text        NOT NULL DEFAULT 'active' CHECK (status IN ('active','invalid')),
   created_at      timestamptz NOT NULL DEFAULT now(),
@@ -52,3 +52,16 @@ CREATE TABLE scenario_adjustments (
 
 CREATE INDEX scenario_adjustments_scenario_id_idx   ON scenario_adjustments(scenario_id);
 CREATE INDEX scenario_adjustments_cash_event_id_idx ON scenario_adjustments(cash_event_id);
+
+-- Staging uses a restricted runtime role. The role does not exist locally or in CI, so these
+-- least-privilege grants are guarded in the same way as migrations 003 and 004.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fse_runtime') THEN
+    GRANT SELECT, INSERT, DELETE ON cash_events TO fse_runtime;
+    GRANT SELECT, INSERT, DELETE ON scenarios TO fse_runtime;
+    GRANT SELECT, INSERT, DELETE ON scenario_adjustments TO fse_runtime;
+    GRANT UPDATE (status, updated_at) ON scenario_adjustments TO fse_runtime;
+  END IF;
+END
+$$;

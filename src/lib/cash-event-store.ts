@@ -15,6 +15,7 @@ import "server-only";
 import { database } from "@/lib/db";
 import { tokenHash, validToken } from "@/lib/session-store";
 import { parseCashEvent, type CashEvent } from "@/lib/forecast/cash-event";
+import { uuidSchema } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // Types matching the DB row columns
@@ -26,19 +27,17 @@ interface CashEventRow {
   description: string;
   amount: string;
   currency: string;
-  expected_date: Date; // pg returns DATE as a JS Date in UTC midnight
+  expected_date: string;
 }
 
 function rowToEvent(row: CashEventRow): CashEvent {
-  // Convert pg Date object to YYYY-MM-DD string (UTC)
-  const expectedDate = row.expected_date.toISOString().slice(0, 10);
   return parseCashEvent({
     id: row.id,
     userId: row.user_id,
     description: row.description,
     amount: row.amount,
     currency: row.currency,
-    expectedDate,
+    expectedDate: row.expected_date,
   });
 }
 
@@ -50,7 +49,8 @@ function rowToEvent(row: CashEventRow): CashEvent {
 export async function getCashEvents(token: string | undefined): Promise<CashEvent[]> {
   if (!token || !validToken(token)) return [];
   const result = await database().query<CashEventRow>(
-    `SELECT ce.id, ce.user_id, ce.description, ce.amount::text, ce.currency, ce.expected_date
+    `SELECT ce.id, ce.user_id, ce.description, ce.amount::text, ce.currency,
+            ce.expected_date::text AS expected_date
        FROM cash_events ce
        JOIN sessions s ON s.user_id = ce.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
@@ -63,16 +63,19 @@ export async function getCashEvents(token: string | undefined): Promise<CashEven
 /** Return a single cash event, or null if it does not belong to the session owner. */
 export async function getCashEvent(
   token: string | undefined,
-  eventId: string,
+  eventId: unknown,
 ): Promise<CashEvent | null> {
   if (!token || !validToken(token)) return null;
+  const id = uuidSchema.safeParse(eventId);
+  if (!id.success) return null;
   const result = await database().query<CashEventRow>(
-    `SELECT ce.id, ce.user_id, ce.description, ce.amount::text, ce.currency, ce.expected_date
+    `SELECT ce.id, ce.user_id, ce.description, ce.amount::text, ce.currency,
+            ce.expected_date::text AS expected_date
        FROM cash_events ce
        JOIN sessions s ON s.user_id = ce.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND ce.id = $2`,
-    [tokenHash(token), eventId],
+    [tokenHash(token), id.data],
   );
   return result.rows[0] ? rowToEvent(result.rows[0]) : null;
 }
@@ -118,7 +121,8 @@ export async function createCashEvent(
        SELECT s.user_id, $2, $3::numeric, $4, $5::date
          FROM sessions s
         WHERE s.token_hash = $1 AND s.expires_at > now()
-       RETURNING id, user_id, description, amount::text, currency, expected_date`,
+       RETURNING id, user_id, description, amount::text, currency,
+                 expected_date::text AS expected_date`,
     [tokenHash(token), input.description, input.amount, input.currency, input.expectedDate],
   );
   if (result.rowCount !== 1) throw new Error("Authentication required.");
@@ -128,19 +132,21 @@ export async function createCashEvent(
 /**
  * Delete a cash event owned by the session user.
  *
- * IMPORTANT: The FK from scenario_adjustments to cash_events uses
- * ON DELETE RESTRICT, so this will fail if any active adjustment still
- * references the event.  Callers must invalidate or remove adjustments
- * before deleting an event, or catch the FK violation and handle it.
+ * Scenario adjustments are deleted by the database when their target event
+ * is hard-deleted. Normal user-facing cancellation is represented by event
+ * status in the canonical cash-event schema; hard deletion remains safe for
+ * account and workspace cleanup.
  *
  * Returns true if the row was deleted, false if it was not found or
  * does not belong to the session user.
  */
 export async function deleteCashEvent(
   token: string | undefined,
-  eventId: string,
+  eventId: unknown,
 ): Promise<boolean> {
   if (!token || !validToken(token)) return false;
+  const id = uuidSchema.safeParse(eventId);
+  if (!id.success) return false;
   const result = await database().query(
     `DELETE FROM cash_events
       WHERE id = $2
@@ -148,7 +154,7 @@ export async function deleteCashEvent(
           SELECT user_id FROM sessions
            WHERE token_hash = $1 AND expires_at > now()
         )`,
-    [tokenHash(token), eventId],
+    [tokenHash(token), id.data],
   );
   return (result.rowCount ?? 0) > 0;
 }

@@ -16,7 +16,7 @@ export {
   type Money,
 } from "@/lib/forecast/money";
 
-// Member C — cash events, forecast engine, and scenario isolation
+// Cash-event, forecast, and scenario domain exports
 export {
   CashEventValidationError,
   parseCashEvent,
