@@ -8,7 +8,7 @@ Existing Vercel project: `fseproject`, project ID `prj_kDOrGWxd4htfHHHHTVbUtuQVX
 
 PostgreSQL: dedicated Neon resource `fseproject-staging`, free_v3 plan, Frankfurt, managed authentication disabled. The service provisioned PostgreSQL 18.6; local/CI PostgreSQL is 16.15/16. The SQL uses features common to both. Staging migrations were applied successfully. Certificate-verified TLS was checked on the actual client connection; backend `pg_stat_ssl` is not evidence of client TLS when a provider proxy terminates it.
 
-Runtime role `fse_runtime` has only SELECT/INSERT on users, SELECT/INSERT/DELETE on sessions, and SELECT/INSERT/UPDATE on auth_limits and portfolios. It cannot create schema objects or write migration history. The database owner is used separately for migrations. Administrator connection files remain ignored and owner-readable locally; they must not be committed or provided to the application.
+Runtime role `fse_runtime` has only SELECT/INSERT on users, SELECT/INSERT/DELETE on sessions, and SELECT/INSERT/UPDATE on auth_limits and portfolios, and UPDATE on the `users.reporting_currency` and `users.appearance` columns only (granted by migrations 003 and 004). It cannot create schema objects or write migration history. The database owner is used separately for migrations. Administrator connection files remain ignored and owner-readable locally; they must not be committed or provided to the application.
 
 Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `APP_ORIGIN` (exact canonical HTTPS staging origin). No production or development connection to staging is intended. Do not overwrite local `.env.local` with staging credentials.
 
@@ -18,7 +18,7 @@ Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `A
 2. Review and push the feature branch to the repository above; GitHub Actions runs all checks on the PR.
 3. Apply additive migrations with a separate owner connection, using `node scripts/migrate.mjs` with DATABASE_URL supplied securely. Never run schema changes through the runtime role.
 4. Push the branch. The GitHub integration builds the Preview; assign the canonical staging alias to that Git-source deployment. Do not publish this project with `vercel deploy` from a working tree — see the deployment decision record. APP_ORIGIN must match the URL used for sign-in.
-5. Visit `/register`, create a test account with a 15-character-or-longer password, sign in, create a named portfolio, reload, sign out, then reopen `/portfolio` and confirm login is required.
+5. Visit `/register`, create a test account with a 15-character-or-longer password, sign in, create a named workspace, reload, sign out, then reopen `/workspace` and confirm login is required.
 
 The staging sign-in page is public, as requested. Application authentication still protects private pages and data. Vercel's additional login wall is disabled only for this school project.
 

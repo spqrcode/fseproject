@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { database } from "@/lib/db";
 import { createSession, findSession, revokeSession, tokenHash } from "@/lib/session-store";
 import { savePortfolio, getPortfolio } from "@/lib/portfolio-store";
-import { allowAuthAttempt, authLimitKey } from "@/lib/rate-limit";
+import { allowAuthAttempt, authLimitKey, recordFailedAuth } from "@/lib/rate-limit";
 import { register, login, logout } from "@/app/actions/auth";
 import { updatePortfolio } from "@/app/actions/portfolio";
 import { requireUser, SESSION_COOKIE } from "@/lib/auth";
@@ -63,7 +63,7 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.restoreAllMocks();
   await database().query("DELETE FROM users WHERE email = ANY($1::text[])", [emails]);
-  await database().query("DELETE FROM auth_limits WHERE key = ANY($1::text[])", [emails.map(authLimitKey)]);
+  await database().query("DELETE FROM auth_limits WHERE key = ANY($1::text[])", [emails.flatMap(email => [authLimitKey(email), authLimitKey(email, "register")])]);
   emails.length = 0;
   ids.length = 0;
 });
@@ -127,23 +127,23 @@ describe("database-backed authentication and ownership", () => {
 describe("authentication throttle", () => {
   it("allows exactly ten simultaneous attempts per normalized address", async () => {
     const email = uniqueEmail();
-    const results = await Promise.all(Array.from({ length: 12 }, (_, i) => allowAuthAttempt(i % 2 ? ` ${email.toUpperCase()} ` : email)));
+    const results = await Promise.all(Array.from({ length: 12 }, (_, i) => allowAuthAttempt(i % 2 ? ` ${email.toUpperCase()} ` : email, "register")));
     expect(results.filter(Boolean)).toHaveLength(10);
-    expect(await allowAuthAttempt(uniqueEmail())).toBe(true);
+    expect(await allowAuthAttempt(uniqueEmail(), "register")).toBe(true);
   });
   it("does not have an application-wide lockout after 100 requests", async () => {
-    for (let i = 0; i < 105; i++) expect(await allowAuthAttempt(uniqueEmail())).toBe(true);
-    expect(await allowAuthAttempt(uniqueEmail())).toBe(true);
+    for (let i = 0; i < 105; i++) expect(await allowAuthAttempt(uniqueEmail(), "register")).toBe(true);
+    expect(await allowAuthAttempt(uniqueEmail(), "register")).toBe(true);
   });
   it("resets an expired window and does not extend it for blocked attempts", async () => {
     const email = uniqueEmail();
-    for (let i = 0; i < 10; i++) await allowAuthAttempt(email);
-    const before = await database().query("SELECT reset_at FROM auth_limits WHERE key=$1", [authLimitKey(email)]);
-    expect(await allowAuthAttempt(email)).toBe(false);
-    const after = await database().query("SELECT reset_at FROM auth_limits WHERE key=$1", [authLimitKey(email)]);
+    for (let i = 0; i < 10; i++) await allowAuthAttempt(email, "register");
+    const before = await database().query("SELECT reset_at FROM auth_limits WHERE key=$1", [authLimitKey(email, "register")]);
+    expect(await allowAuthAttempt(email, "register")).toBe(false);
+    const after = await database().query("SELECT reset_at FROM auth_limits WHERE key=$1", [authLimitKey(email, "register")]);
     expect(after.rows[0].reset_at).toEqual(before.rows[0].reset_at);
-    await database().query("UPDATE auth_limits SET reset_at=now()-interval '1 second' WHERE key=$1", [authLimitKey(email)]);
-    expect(await allowAuthAttempt(email)).toBe(true);
+    await database().query("UPDATE auth_limits SET reset_at=now()-interval '1 second' WHERE key=$1", [authLimitKey(email, "register")]);
+    expect(await allowAuthAttempt(email, "register")).toBe(true);
   });
 });
 
@@ -169,6 +169,18 @@ describe("server actions with a real database", () => {
     expect((await register({}, credentials(uniqueEmail()))).error).toBeTruthy();
     expect((await login({}, credentials(emails[0]))).error).toBeTruthy();
     expect(query).not.toHaveBeenCalled();
+  });
+  it.each([null, "https://untrusted.example"])("rejects missing or foreign origin for logout and updatePortfolio without changing data: %s", async origin => {
+    await savePortfolio(alice, "Original name");
+    request.cookies.set(SESSION_COOKIE, alice);
+    request.origin = origin;
+    const form = new FormData();
+    form.set("name", "Changed by forged request");
+    expect((await logout()).error).toBeTruthy();
+    expect((await updatePortfolio({}, form)).error).toBeTruthy();
+    expect((await getPortfolio(alice))?.name).toBe("Original name");
+    expect(await findSession(alice)).toEqual({ id: ids[0], email: emails[0] });
+    expect(request.cookies.get(SESSION_COOKIE)).toBe(alice);
   });
   it("returns the same response for wrong passwords and unknown accounts", async () => {
     expect(await login({}, credentials(emails[0], "a wrong long password"))).toEqual(await login({}, credentials(uniqueEmail(), "a wrong long password")));
@@ -208,8 +220,31 @@ describe("server actions with a real database", () => {
     expect(request.cookies.has(SESSION_COOKIE)).toBe(false);
   });
   it("does not issue a session when the account is throttled", async () => {
-    for (let i = 0; i < 10; i++) await allowAuthAttempt(emails[0]);
+    for (let i = 0; i < 10; i++) await recordFailedAuth(emails[0]);
     expect((await login({}, credentials(emails[0]))).error).toContain("Too many attempts");
     expect(request.cookies.has(SESSION_COOKIE)).toBe(false);
+  });
+  it("allows many successful logins in a row", async () => {
+    for (let i = 0; i < 12; i++) await expect(login({}, credentials(emails[0]))).rejects.toThrow("redirect:/dashboard");
+  });
+  it("blocks even the correct password after 10 failed logins until the window resets", async () => {
+    for (let i = 0; i < 10; i++) expect((await login({}, credentials(emails[0], "a wrong long password"))).error).toBe("Check your email and password.");
+    expect((await login({}, credentials(emails[0]))).error).toContain("Too many attempts");
+    expect(request.cookies.has(SESSION_COOKIE)).toBe(false);
+    await database().query("UPDATE auth_limits SET reset_at = now() - interval '1 second' WHERE key = $1", [authLimitKey(emails[0])]);
+    await expect(login({}, credentials(emails[0]))).rejects.toThrow("redirect:/dashboard");
+  });
+  it("resets the failure counter after a successful login", async () => {
+    for (let i = 0; i < 9; i++) await login({}, credentials(emails[0], "a wrong long password"));
+    await expect(login({}, credentials(emails[0]))).rejects.toThrow("redirect:/dashboard");
+    const row = await database().query("SELECT 1 FROM auth_limits WHERE key = $1 AND reset_at > now()", [authLimitKey(emails[0])]);
+    expect(row.rowCount).toBe(0);
+    for (let i = 0; i < 9; i++) await login({}, credentials(emails[0], "a wrong long password"));
+    await expect(login({}, credentials(emails[0]))).rejects.toThrow("redirect:/dashboard");
+  });
+  it("does not let registration attempts lock login for the same address", async () => {
+    for (let i = 0; i < 10; i++) await register({}, credentials(emails[0], "a different test password"));
+    expect((await register({}, credentials(emails[0]))).error).toContain("Too many attempts");
+    await expect(login({}, credentials(emails[0]))).rejects.toThrow("redirect:/dashboard");
   });
 });

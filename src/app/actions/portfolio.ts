@@ -11,8 +11,8 @@ export async function updatePortfolio(_state: FormState, form: FormData): Promis
   try {
     await verifyOrigin();
     await savePortfolio(await sessionToken(), parsed.data);
-  } catch { return { error: "Unable to save your portfolio. Please try again." }; }
-  revalidatePath("/portfolio");
+  } catch { return { error: "Unable to save your workspace. Please try again." }; }
+  revalidatePath("/workspace");
   revalidatePath("/dashboard");
-  return { success: "Portfolio saved." };
+  return { success: "Workspace saved." };
 }
