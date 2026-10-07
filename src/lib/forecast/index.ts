@@ -10,6 +10,7 @@ export {
 } from "@/lib/forecast/cash-event";
 export { DecimalInputError } from "@/lib/forecast/decimal";
 export {
+  DANGER_THRESHOLD_PERCENT,
   ForecastInputError,
   runForecast,
   type ForecastInput,

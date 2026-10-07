@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { parseCashEvent, type CashEvent, type RawCashEvent } from "@/lib/forecast/cash-event";
-import { ForecastInputError, runForecast } from "@/lib/forecast/forecast-engine";
+import {
+  DANGER_THRESHOLD_PERCENT,
+  ForecastInputError,
+  runForecast,
+} from "@/lib/forecast/forecast-engine";
 import { CurrencyMismatchError } from "@/lib/forecast/money";
 
 let eventNumber = 0;
@@ -27,7 +31,6 @@ function input(overrides: Partial<Parameters<typeof runForecast>[0]> = {}) {
     openingBalance: "1000",
     events: [] as readonly CashEvent[],
     currency: "EUR" as const,
-    dangerThresholdPercent: "20",
     ...overrides,
   };
 }
@@ -68,7 +71,7 @@ describe("runForecast timeline", () => {
     expect(runForecast(input({ events })).closingBalance).toBe("1100");
   });
 
-  it("aggregates same-day events deterministically by createdAt and id", () => {
+  it("aggregates same-day events deterministically by createdAt, expense priority and id", () => {
     const first = cashEvent({
       id: "b",
       amount: "0.2",
@@ -85,6 +88,24 @@ describe("runForecast timeline", () => {
 
     expect(forward).toEqual(reverse);
     expect(forward.timeline[1].balance).toBe("0.3");
+  });
+
+  it("applies expenses before income when creation timestamps match", () => {
+    const precisionBoundary = "10000000000000000000000000000000000000000";
+    const income = cashEvent({
+      id: "a-income",
+      amount: "1",
+      createdAt: "2025-12-01T00:00:00.000Z",
+    });
+    const expense = cashEvent({
+      id: "z-expense",
+      amount: "-1",
+      createdAt: "2025-12-01T00:00:00.000Z",
+    });
+
+    const result = runForecast(input({ openingBalance: precisionBoundary, events: [income, expense] }));
+
+    expect(result.closingBalance).toBe(precisionBoundary);
   });
 
   it("does not mutate the event array or its elements", () => {
@@ -128,29 +149,28 @@ describe("runForecast minimum balance", () => {
 
 describe("runForecast threshold and runway", () => {
   it("calculates the threshold without rounding", () => {
-    const result = runForecast(
-      input({ openingBalance: "123.456", dangerThresholdPercent: "12.5" }),
-    );
+    const result = runForecast(input({ openingBalance: "123.456" }));
 
-    expect(result.dangerThresholdAmount).toBe("15.432");
-    expect(result.dangerThresholdPercent).toBe("12.5");
+    expect(DANGER_THRESHOLD_PERCENT).toBe("50");
+    expect(result.dangerThresholdAmount).toBe("61.728");
+    expect(result.dangerThresholdPercent).toBe("50");
   });
 
   it("does not trigger when balance equals the threshold and triggers when strictly below", () => {
     const events = [
-      cashEvent({ amount: "-800", expectedDate: "2026-01-01" }),
+      cashEvent({ amount: "-500", expectedDate: "2026-01-01" }),
       cashEvent({ amount: "-1", expectedDate: "2026-01-02" }),
     ];
     const result = runForecast(input({ events }));
 
-    expect(result.dangerThresholdAmount).toBe("200");
+    expect(result.dangerThresholdAmount).toBe("500");
     expect(result.firstDangerDate).toBe("2026-01-02");
     expect(result.runwayDays).toBe(1);
   });
 
   it("returns runway zero when the first end-of-day balance is below threshold", () => {
     const result = runForecast(
-      input({ events: [cashEvent({ amount: "-801", expectedDate: "2026-01-01" })] }),
+      input({ events: [cashEvent({ amount: "-501", expectedDate: "2026-01-01" })] }),
     );
 
     expect(result.firstDangerDate).toBe("2026-01-01");
@@ -172,12 +192,6 @@ describe("runForecast validation and immutability", () => {
     { startDate: "2026-01-04", endDate: "2026-01-03" },
   ])("rejects invalid date range %#", (overrides) => {
     expect(() => runForecast(input(overrides))).toThrow(ForecastInputError);
-  });
-
-  it.each(["-0.1", "100.1", "NaN", " 20"])("rejects threshold percentage %s", (value) => {
-    expect(() => runForecast(input({ dangerThresholdPercent: value }))).toThrow(
-      ForecastInputError,
-    );
   });
 
   it("rejects a negative opening balance for percentage-based thresholds", () => {

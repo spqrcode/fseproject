@@ -24,9 +24,10 @@ export type ForecastInput = Readonly<{
   openingBalance: string;
   events: readonly CashEvent[];
   currency: Currency;
-  /** Percentage of openingBalance, supplied as a plain decimal string. */
-  dangerThresholdPercent: string;
 }>;
+
+/** Warning is triggered after available cash falls below 50% of opening balance. */
+export const DANGER_THRESHOLD_PERCENT = "50";
 
 export type ForecastResult = Readonly<{
   /** One end-of-day balance for every date in the inclusive forecast range. */
@@ -49,8 +50,7 @@ export type ForecastResult = Readonly<{
 type ForecastInputField =
   | "startDate"
   | "endDate"
-  | "openingBalance"
-  | "dangerThresholdPercent";
+  | "openingBalance";
 
 export class ForecastInputError extends Error {
   constructor(
@@ -86,27 +86,14 @@ function validateOpeningBalance(value: string, currency: Currency) {
   return opening;
 }
 
-function validateThresholdPercent(value: string) {
-  let percent;
-  try {
-    percent = parseDecimal(value);
-  } catch {
-    throw new ForecastInputError(
-      "dangerThresholdPercent",
-      `Expected a plain decimal percentage, received ${JSON.stringify(value)}.`,
-    );
-  }
-  if (percent.isNegative() || percent.greaterThan(100)) {
-    throw new ForecastInputError("dangerThresholdPercent", "Must be between 0 and 100 inclusive.");
-  }
-  return percent;
-}
-
 function compareEvents(left: CashEvent, right: CashEvent) {
   if (left.expectedDate !== right.expectedDate) {
     return left.expectedDate < right.expectedDate ? -1 : 1;
   }
   if (left.createdAt !== right.createdAt) return left.createdAt < right.createdAt ? -1 : 1;
+  const leftIsExpense = parseDecimal(left.amount).isNegative();
+  const rightIsExpense = parseDecimal(right.amount).isNegative();
+  if (leftIsExpense !== rightIsExpense) return leftIsExpense ? -1 : 1;
   if (left.id === right.id) return 0;
   return left.id < right.id ? -1 : 1;
 }
@@ -124,7 +111,7 @@ export function runForecast(input: ForecastInput): ForecastResult {
 
   const currency = parseCurrency(input.currency);
   const opening = validateOpeningBalance(input.openingBalance, currency);
-  const thresholdPercent = validateThresholdPercent(input.dangerThresholdPercent);
+  const thresholdPercent = parseDecimal(DANGER_THRESHOLD_PERCENT);
   const thresholdAmount = money(
     decimalString(parseDecimal(opening.amount).times(thresholdPercent).dividedBy(100)),
     currency,
