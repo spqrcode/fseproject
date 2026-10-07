@@ -9,6 +9,13 @@ export {
   type RawCashEvent,
 } from "@/lib/forecast/cash-event";
 export { DecimalInputError } from "@/lib/forecast/decimal";
+export {
+  ForecastInputError,
+  runForecast,
+  type ForecastInput,
+  type ForecastPoint,
+  type ForecastResult,
+} from "@/lib/forecast/forecast-engine";
 export { convertMoney, fxRate, FxRateError, type FxRate } from "@/lib/forecast/fx";
 export {
   addMoney,
