@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser, sessionToken } from "@/lib/auth";
-import { getPortfolio } from "@/lib/portfolio-store";
+import { getWorkspace } from "@/lib/workspace-store";
 import { getReportingCurrency } from "@/lib/preferences-store";
 import { DEFAULT_REPORTING_CURRENCY, currencyLabel } from "@/lib/currency";
 import { PageHeading } from "@/components/page-heading";
@@ -11,8 +11,7 @@ type Module = { title: string; text: string; state: string; tone: "ready" | "pen
 export default async function LiquidityOverview() {
   await requireUser();
   const token = await sessionToken();
-  // The workspace is still stored in the portfolios table until the workspace schema replaces it.
-  const [workspace, currency] = await Promise.all([getPortfolio(token), getReportingCurrency(token)]);
+  const [workspace, currency] = await Promise.all([getWorkspace(token), getReportingCurrency(token)]);
   const reporting = currency ?? DEFAULT_REPORTING_CURRENCY;
   const modules: Module[] = [
     { title: "Workspace", text: workspace ? "Your workspace is saved and only you can access it." : "Name your workspace to get started.", state: workspace ? "Ready" : "Not created", tone: workspace ? "ready" : "pending", href: "/workspace", action: "Open workspace" },
