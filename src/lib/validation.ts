@@ -22,6 +22,7 @@ export const eventAmountSchema = balanceSchema.refine(value => !/^-?0(\.0+)?$/.t
 export const dangerThresholdSchema = balanceSchema.nullable();
 export const accountNameSchema = z.string().trim().min(1, "Enter an account name.").max(80, "Use at most 80 characters.");
 export const eventDescriptionSchema = z.string().trim().min(1, "Enter a description.").max(200, "Use at most 200 characters.");
+export const scenarioNameSchema = z.string().trim().min(1, "Enter a scenario name.").max(200, "Use at most 200 characters.");
 export const eventStatusSchema = z.enum(CASH_EVENT_STATUSES, { error: "Choose a valid status." });
 export const uuidSchema = z.uuid();
 // Date only, a real calendar day, 2000 to 2100. The range keeps out dates PostgreSQL would reject.

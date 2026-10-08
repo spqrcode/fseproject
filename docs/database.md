@@ -12,19 +12,21 @@ PostgreSQL 16, accessed through the server-only `pg` driver and parameterized SQ
 | workspaces | The user's workspace (the former `portfolios` table, renamed by 005) | UUID primary key; unique user FK, so one per user; trimmed 1–80 character name; optional `danger_threshold` numeric(20,2), NaN excluded |
 | cash_accounts | A named account in one currency | UUID primary key; workspace FK with cascade; trimmed 1–80 character name, unique per workspace; currency EUR, USD or SGD; `opening_balance` numeric(20,2), NaN excluded; `UNIQUE (id, workspace_id)` |
 | cash_events | One expected income (positive) or expense (negative) on an account | UUID primary key; workspace FK with cascade; composite FK `(account_id, workspace_id)` to `cash_accounts`; trimmed 1–200 character description; amount numeric(20,2), not zero, not NaN; finite date-only `expected_date`; status expected, received, paid or cancelled; received needs amount > 0 and paid needs amount < 0; `UNIQUE (id, workspace_id)` |
+| scenarios | A named hypothetical overlay for one workspace | UUID primary key; workspace FK with cascade; trimmed 1–200 character name; `UNIQUE (id, workspace_id)` |
+| scenario_adjustments | A delayed date for one cash event in one scenario | Composite workspace-safe FKs to `scenarios` and `cash_events`, both with cascade; finite date-only override; active or invalid status; one adjustment per scenario/event pair |
 | schema_migrations | Applied migration history | Unique migration filename |
 
-Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. `004_appearance.sql` does the same for the appearance preference. `005_workspace_cash_events.sql` renames `portfolios` to `workspaces`, adds `danger_threshold`, creates `cash_accounts` and `cash_events`, and grants the staging runtime role what the application needs on them (see [deployment](deployment.md)). Holdings are not present.
+Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. `004_appearance.sql` does the same for the appearance preference. `005_workspace_cash_events.sql` renames `portfolios` to `workspaces`, adds `danger_threshold`, creates `cash_accounts` and `cash_events`, and grants the staging runtime role what the application needs on them (see [deployment](deployment.md)). Migration 006 is reserved for ECB FX snapshots. `007_scenarios.sql` creates the scenario overlay tables. Holdings are not present.
 
 ## Migrations
 
 `npm run db:migrate` applies migrations to `DATABASE_URL`. The runner locks migrations with a PostgreSQL advisory lock, applies each file in its own transaction, and records it only after success. A second run skips applied files. Do not edit a migration after sharing or applying it; add another migration instead.
 
-`npm run db:migrate:test` uses only `TEST_DATABASE_URL`, whose database name must end in `_test`. Migrations create tables in an existing database; they do not create the PostgreSQL database itself. Integration and browser fixtures remove their own users (cascading sessions, workspaces, accounts and events) and throttle keys after tests.
+`npm run db:migrate:test` uses only `TEST_DATABASE_URL`, whose database name must end in `_test`. Migrations create tables in an existing database; they do not create the PostgreSQL database itself. Integration and browser fixtures remove their own users (cascading sessions, workspaces, accounts, events, scenarios and adjustments) and throttle keys after tests.
 
 ## Authorization boundary
 
-Application queries derive ownership from an unexpired session in the database, never a browser-submitted user ID. The workspace read and upsert, the danger threshold, the cash accounts and events, and the reporting currency read and update join/select through `sessions`; an expired or unknown token cannot select an owner. This is application-level authorization, not PostgreSQL row-level security. Direct privileged SQL can bypass it, so database credentials stay server-only.
+Application queries derive ownership from an unexpired session in the database, never a browser-submitted user ID. The workspace read and upsert, the danger threshold, the cash accounts and events, the scenarios and adjustments, and the reporting currency read and update join/select through `sessions`; an expired or unknown token cannot select an owner. This is application-level authorization, not PostgreSQL row-level security. Direct privileged SQL can bypass it, so database credentials stay server-only.
 
 ## Environments and privileges
 
@@ -45,3 +47,9 @@ Ownership runs user → workspace → account → event. The chain is enforced t
 - **Two decimals.** The application rejects amounts with more than two decimals. The database would round them silently on assignment, so the stores never pass such a value.
 - **Cascade.** Deleting a user removes the workspace, its accounts and its events. Events also cascade from the workspace directly. The account foreign key keeps the default `NO ACTION`: an account that still has events cannot be deleted on its own.
 - **Indexes.** `cash_events (workspace_id, expected_date)` serves the per-workspace date-range list. The unique constraints index accounts and the event id lookups; a separate `workspace_id` index would repeat the first column of the composite one.
+
+## Delayed-invoice scenarios (migration 007)
+
+A scenario stores only hypothetical overrides. It never copies or updates the original cash event. `scenario_adjustments.workspace_id` is deliberately repeated so PostgreSQL can enforce both `(scenario_id, workspace_id)` and `(cash_event_id, workspace_id)` composite foreign keys. Therefore faulty application SQL still cannot connect a scenario to an event from another workspace.
+
+The store creates an adjustment only for an `expected` positive event and only when the override date is later than the original date. These checks and the insert happen in one SQL statement. Deleting an expected event cascades its adjustment; received, paid and cancelled events cannot be deleted through the canonical cash-event store. Scenario calculations create new in-memory projections, leaving persisted events and the base forecast unchanged.

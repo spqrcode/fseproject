@@ -21,6 +21,8 @@ Runtime role `fse_runtime` has only SELECT/INSERT on users, SELECT/INSERT/DELETE
 
 There is no DELETE on `cash_accounts`: no application function deletes accounts. Deleting a user (owner only) cascades through workspace, accounts and events with the owner's rights. It cannot create schema objects or write migration history. The database owner is used separately for migrations. Administrator connection files remain ignored and owner-readable locally; they must not be committed or provided to the application.
 
+Migration 007 adds the delayed-invoice scenario tables. If `fse_runtime` exists when the owner applies it, the role receives SELECT and INSERT on `scenarios` and `scenario_adjustments`, plus UPDATE only on `scenario_adjustments.status` and `updated_at`. The application exposes no scenario deletion operation, so the runtime role has no direct DELETE grant; owner-side user/workspace cleanup still follows the foreign-key cascades. Migration 006 is intentionally reserved for the ECB snapshot cache. Migration 007 is additive and may be applied before the scenario code is deployed.
+
 Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `APP_ORIGIN` (exact canonical HTTPS staging origin). No production or development connection to staging is intended. Do not overwrite local `.env.local` with staging credentials.
 
 ## Delivery and manual checks

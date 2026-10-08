@@ -2,8 +2,8 @@
  * Scenario and ScenarioAdjustment persistence.
  *
  * Ownership is always derived from the session token — never from a
- * browser-submitted user or scenario ID.  Queries join through sessions
- * the same way portfolio-store.ts and cash-event-store.ts do.
+ * browser-submitted user or workspace ID. Queries follow the canonical
+ * sessions -> workspaces -> scenarios / cash_events ownership chain.
  *
  * An adjustment may be marked status='invalid' when business validation makes
  * it unusable. Hard-deleting the target event removes its adjustment through
@@ -12,9 +12,9 @@
 
 import "server-only";
 import { database } from "@/lib/db";
-import { tokenHash, validToken } from "@/lib/session-store";
+import { hasValidSession, tokenHash, validToken } from "@/lib/session-store";
 import type { DelayAdjustment } from "@/lib/forecast/scenario";
-import { uuidSchema } from "@/lib/validation";
+import { isoDateSchema, scenarioNameSchema, uuidSchema } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // DB row types
@@ -22,7 +22,7 @@ import { uuidSchema } from "@/lib/validation";
 
 interface ScenarioRow {
   id: string;
-  user_id: string;
+  workspace_id: string;
   name: string;
   created_at: Date;
   updated_at: Date;
@@ -38,11 +38,23 @@ interface AdjustmentRow {
 
 export type Scenario = {
   id: string;
-  userId: string;
+  workspaceId: string;
   name: string;
   createdAt: Date;
   updatedAt: Date;
 };
+
+export class DuplicateDelayAdjustmentError extends Error {
+  constructor() {
+    super("This cash event already has a delay adjustment in this scenario.");
+  }
+}
+
+function postgresCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error
+    ? error.code
+    : undefined;
+}
 
 function rowToAdjustment(row: AdjustmentRow): DelayAdjustment {
   const status = row.status === "active" || row.status === "invalid" ? row.status : "invalid";
@@ -63,16 +75,17 @@ function rowToAdjustment(row: AdjustmentRow): DelayAdjustment {
 export async function getScenarios(token: string | undefined): Promise<Scenario[]> {
   if (!token || !validToken(token)) return [];
   const result = await database().query<ScenarioRow>(
-    `SELECT sc.id, sc.user_id, sc.name, sc.created_at, sc.updated_at
+    `SELECT sc.id, sc.workspace_id, sc.name, sc.created_at, sc.updated_at
        FROM scenarios sc
-       JOIN sessions s ON s.user_id = sc.user_id
+       JOIN workspaces w ON w.id = sc.workspace_id
+       JOIN sessions s ON s.user_id = w.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
       ORDER BY sc.created_at ASC`,
     [tokenHash(token)],
   );
   return result.rows.map((r) => ({
     id: r.id,
-    userId: r.user_id,
+    workspaceId: r.workspace_id,
     name: r.name,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -92,16 +105,17 @@ export async function getScenario(
   const id = uuidSchema.safeParse(scenarioId);
   if (!id.success) return null;
   const result = await database().query<ScenarioRow>(
-    `SELECT sc.id, sc.user_id, sc.name, sc.created_at, sc.updated_at
+    `SELECT sc.id, sc.workspace_id, sc.name, sc.created_at, sc.updated_at
        FROM scenarios sc
-       JOIN sessions s ON s.user_id = sc.user_id
+       JOIN workspaces w ON w.id = sc.workspace_id
+       JOIN sessions s ON s.user_id = w.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sc.id = $2`,
     [tokenHash(token), id.data],
   );
   if (!result.rows[0]) return null;
   const r = result.rows[0];
-  return { id: r.id, userId: r.user_id, name: r.name, createdAt: r.created_at, updatedAt: r.updated_at };
+  return { id: r.id, workspaceId: r.workspace_id, name: r.name, createdAt: r.created_at, updatedAt: r.updated_at };
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +139,8 @@ export async function getAdjustments(
             sa.date_override::text AS date_override, sa.status
        FROM scenario_adjustments sa
        JOIN scenarios sc ON sc.id = sa.scenario_id
-       JOIN sessions s ON s.user_id = sc.user_id
+       JOIN workspaces w ON w.id = sc.workspace_id
+       JOIN sessions s ON s.user_id = w.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sa.scenario_id = $2
       ORDER BY sa.created_at ASC`,
@@ -144,21 +159,22 @@ export async function createScenario(
   name: string,
 ): Promise<Scenario> {
   if (!token || !validToken(token)) throw new Error("Authentication required.");
-  const trimmed = name.trim();
-  if (trimmed.length < 1 || trimmed.length > 200) {
-    throw new RangeError("Scenario name must be 1–200 characters.");
-  }
+  const scenarioName = scenarioNameSchema.parse(name);
   const result = await database().query<ScenarioRow>(
-    `INSERT INTO scenarios (user_id, name)
-       SELECT s.user_id, $2
+    `INSERT INTO scenarios (workspace_id, name)
+       SELECT w.id, $2
          FROM sessions s
+         JOIN workspaces w ON w.user_id = s.user_id
         WHERE s.token_hash = $1 AND s.expires_at > now()
-       RETURNING id, user_id, name, created_at, updated_at`,
-    [tokenHash(token), trimmed],
+       RETURNING id, workspace_id, name, created_at, updated_at`,
+    [tokenHash(token), scenarioName],
   );
-  if (result.rowCount !== 1) throw new Error("Authentication required.");
+  if (result.rowCount !== 1) {
+    if (!await hasValidSession(token)) throw new Error("Authentication required.");
+    throw new Error("Create a workspace before creating a scenario.");
+  }
   const r = result.rows[0];
-  return { id: r.id, userId: r.user_id, name: r.name, createdAt: r.created_at, updatedAt: r.updated_at };
+  return { id: r.id, workspaceId: r.workspace_id, name: r.name, createdAt: r.created_at, updatedAt: r.updated_at };
 }
 
 // ---------------------------------------------------------------------------
@@ -168,9 +184,10 @@ export async function createScenario(
 /**
  * Add a delayed-invoice adjustment to a scenario.
  *
- * Preconditions enforced in SQL:
- *  - The scenario must be owned by the session user.
- *  - The cash event must be owned by the session user.
+ * Preconditions enforced atomically in SQL:
+ *  - The scenario and cash event must belong to the session user's workspace.
+ *  - The cash event must be an expected income event.
+ *  - The override must be later than the original event date.
  *  - A unique constraint prevents two adjustments for the same event in the
  *    same scenario.
  *
@@ -188,36 +205,34 @@ export async function addDelayAdjustment(
   if (!scenario.success) throw new Error("Scenario not found or access denied.");
   const event = uuidSchema.safeParse(cashEventId);
   if (!event.success) throw new Error("Cash event not found or access denied.");
+  const override = isoDateSchema.parse(dateOverride);
 
-  // Verify both the scenario and the event belong to the session user in one
-  // query before inserting, so the error is clear rather than a PK/FK violation.
-  const ownership = await database().query<{ scenario_ok: boolean; event_ok: boolean }>(
-    `SELECT
-       EXISTS (
-         SELECT 1 FROM scenarios sc
-           JOIN sessions s ON s.user_id = sc.user_id
-          WHERE s.token_hash = $1 AND s.expires_at > now() AND sc.id = $2
-       ) AS scenario_ok,
-       EXISTS (
-         SELECT 1 FROM cash_events ce
-           JOIN sessions s ON s.user_id = ce.user_id
-          WHERE s.token_hash = $1 AND s.expires_at > now() AND ce.id = $3
-       ) AS event_ok`,
-    [tokenHash(token), scenario.data, event.data],
-  );
-
-  const { scenario_ok, event_ok } = ownership.rows[0];
-  if (!scenario_ok) throw new Error("Scenario not found or access denied.");
-  if (!event_ok) throw new Error("Cash event not found or access denied.");
-
-  const result = await database().query<AdjustmentRow>(
-    `INSERT INTO scenario_adjustments (scenario_id, cash_event_id, date_override)
-       VALUES ($1, $2, $3::date)
-       RETURNING id, scenario_id, cash_event_id,
-                 date_override::text AS date_override, status`,
-    [scenario.data, event.data, dateOverride],
-  );
-  if (result.rowCount !== 1) throw new Error("Failed to create adjustment.");
+  let result;
+  try {
+    result = await database().query<AdjustmentRow>(
+      `INSERT INTO scenario_adjustments (workspace_id, scenario_id, cash_event_id, date_override)
+         SELECT sc.workspace_id, sc.id, ce.id, $4::date
+           FROM sessions s
+           JOIN workspaces w ON w.user_id = s.user_id
+           JOIN scenarios sc ON sc.workspace_id = w.id AND sc.id = $2
+           JOIN cash_events ce ON ce.workspace_id = w.id AND ce.id = $3
+          WHERE s.token_hash = $1 AND s.expires_at > now()
+            AND ce.status = 'expected' AND ce.amount > 0
+            AND $4::date > ce.expected_date
+         RETURNING id, scenario_id, cash_event_id,
+                   date_override::text AS date_override, status`,
+      [tokenHash(token), scenario.data, event.data, override],
+    );
+  } catch (error) {
+    if (postgresCode(error) === "23505") throw new DuplicateDelayAdjustmentError();
+    throw error;
+  }
+  if (result.rowCount !== 1) {
+    if (!await hasValidSession(token)) throw new Error("Authentication required.");
+    throw new Error(
+      "A delay adjustment requires an owned scenario and an expected income event with a later date.",
+    );
+  }
   return rowToAdjustment(result.rows[0]);
 }
 
@@ -237,7 +252,8 @@ export async function invalidateAdjustment(
     `UPDATE scenario_adjustments sa
         SET status = 'invalid', updated_at = now()
        FROM scenarios sc
-       JOIN sessions s ON s.user_id = sc.user_id
+       JOIN workspaces w ON w.id = sc.workspace_id
+       JOIN sessions s ON s.user_id = w.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sa.scenario_id = sc.id
         AND sa.id = $2`,

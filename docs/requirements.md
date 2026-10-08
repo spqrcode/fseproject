@@ -94,6 +94,17 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 - Received, paid and cancelled events cannot be edited or deleted; corrections are made with a new event.
 - A workspace can store an optional danger threshold.
 
+## US-12 Delayed-invoice scenarios
+
+As a signed-in user, I can delay an expected customer invoice in a scenario so that I can compare the liquidity impact without changing the real cash event or base forecast.
+
+- A delay applies only to an expected positive cash event and uses a strictly later valid date.
+- The scenario and target event must belong to the same workspace; PostgreSQL enforces this with composite foreign keys.
+- The persisted cash event, its original date and the base forecast remain unchanged.
+- Two scenarios can delay the same event independently.
+- Missing, inaccessible, malformed and ineligible targets fail explicitly without revealing another workspace's data.
+- Deleting an expected event removes its dependent hypothetical adjustment, and deleting the user cascades all scenario data.
+
 ## Engineering acceptance criteria
 
 - At least three distinct functional views: authentication, portfolio management, and dashboard analytics.
@@ -122,6 +133,7 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 | US-11 cash accounts and events | Migration 005, `src/lib/cash-events-store.ts`, `src/lib/workspace-store.ts`, cash schemas in `src/lib/validation.ts` | Integration constraints by direct SQL, two-user ownership matrix, anonymous/unknown/expired sessions, malformed ids, status transitions, cascade, and a run as the staging role; unit amount and date validation | Foundation & Security branch; the Cash events page is separate work |
 | US-11 settled events immutable | `updateCashEvent` and `deleteCashEvent` in `src/lib/cash-events-store.ts` (status condition in the `WHERE` clause) | Integration: editing and deleting received, paid and cancelled events refused with the row unchanged; expected events still work; another user's settled event gives the same null as a missing one | Foundation & Security branch (review feedback on PR #10) |
 | US-11 forecast integration (agreed 2026-10-08) | Adapter from database statuses to engine statuses, starting balance resolved by the store, default danger threshold, overdue flag; see [decisions](decisions.md#2026-10-08--forecast-integration-statuses-danger-threshold-starting-balance-overdue-events) | Not implemented yet; tests to cover every status mapping, the starting-balance query and overdue events | Forecast integration work; not claimed as delivered |
+| US-12 delayed-invoice scenarios | Migration 007, `src/lib/scenario-store.ts`, immutable scenario projection in `src/lib/forecast/scenario.ts` | Unit immutability and delta tests; PostgreSQL ownership, composite-FK, eligibility, date-only, cascade and base-forecast isolation tests | Draft PR #9; final Forecast Engine adapter remains dependent on PR #12 |
 | US-02 workspace (renamed) | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts` | The existing ownership and origin tests, renamed | Same branch |
 
 Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.

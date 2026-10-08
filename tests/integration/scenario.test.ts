@@ -15,15 +15,19 @@ import { database } from "@/lib/db";
 import { createSession } from "@/lib/session-store";
 import { hashPassword } from "@/lib/password";
 import {
-  getCashEvents,
-  getCashEvent,
+  createCashAccount,
   createCashEvent,
   deleteCashEvent,
-} from "@/lib/cash-event-store";
+  listCashEvents,
+  setCashEventStatus,
+  type CashEvent as StoredCashEvent,
+} from "@/lib/cash-events-store";
+import { saveWorkspace } from "@/lib/workspace-store";
 import {
   getScenario,
   createScenario,
   addDelayAdjustment,
+  DuplicateDelayAdjustmentError,
   getAdjustments,
   invalidateAdjustment,
 } from "@/lib/scenario-store";
@@ -31,7 +35,8 @@ import {
   runForecast,
   runScenarioForecast,
   InvalidAdjustmentError,
-  type CashEvent,
+  parseCashEvent,
+  type CashEvent as ForecastCashEvent,
 } from "@/lib/forecast";
 
 // ---------------------------------------------------------------------------
@@ -60,6 +65,8 @@ const emails: string[] = [];
 const ids: string[] = [];
 let alice: string;
 let bob: string;
+let aliceAccountId: string;
+let bobAccountId: string;
 let passwordHash: string;
 const password = "a test-only long passphrase";
 
@@ -88,6 +95,18 @@ beforeEach(async () => {
   const bobId = await createUser(uniqueEmail());
   alice = (await createSession(aliceId)).token;
   bob = (await createSession(bobId)).token;
+  await saveWorkspace(alice, "Alice workspace");
+  await saveWorkspace(bob, "Bob workspace");
+  aliceAccountId = (await createCashAccount(alice, {
+    name: "Main",
+    currency: "EUR",
+    openingBalance: "1000",
+  }))!.id;
+  bobAccountId = (await createCashAccount(bob, {
+    name: "Main",
+    currency: "EUR",
+    openingBalance: "1000",
+  }))!.id;
 });
 
 afterEach(async () => {
@@ -106,11 +125,25 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 async function aliceEvent(amount = "500", date = "2025-03-01") {
-  return createCashEvent(alice, {
+  return (await createCashEvent(alice, aliceAccountId, {
     description: "Test invoice",
     amount,
-    currency: "EUR",
     expectedDate: date,
+  }))!;
+}
+
+async function getCashEvent(token: string, eventId: string) {
+  return (await listCashEvents(token)).find((event) => event.id === eventId) ?? null;
+}
+
+function forecastEvent(event: StoredCashEvent): ForecastCashEvent {
+  return parseCashEvent({
+    id: event.id,
+    userId: "workspace-owned",
+    description: event.description,
+    amount: event.amount,
+    currency: event.currency,
+    expectedDate: event.expectedDate,
   });
 }
 
@@ -134,11 +167,12 @@ describe("persisted CashEvent is unchanged", () => {
     expect(before?.expectedDate).toBe("2025-03-01");
 
     // Run a scenario in memory — does not touch the DB
-    const baseForecast = runForecast({ ...BASE, events: [event] });
+    const projectedEvent = forecastEvent(event);
+    const baseForecast = runForecast({ ...BASE, events: [projectedEvent] });
     runScenarioForecast({
       scenarioId: "in-memory-only",
       adjustments: [{ id: "a", scenarioId: "s", cashEventId: event.id, dateOverride: "2025-06-01", status: "active" }],
-      baseEvents: [event],
+      baseEvents: [projectedEvent],
       baseForecast,
       startDate: BASE.startDate,
       endDate: BASE.endDate,
@@ -174,14 +208,12 @@ describe("persisted CashEvent is unchanged", () => {
 
 describe("cross-workspace access rejection", () => {
   it("alice cannot see bob's cash events", async () => {
-    await createCashEvent(bob, {
+    await createCashEvent(bob, bobAccountId, {
       description: "Bob's secret invoice",
       amount: "9999",
-      currency: "EUR",
       expectedDate: "2025-05-01",
     });
-    const aliceEvents = await getCashEvents(alice);
-    expect(aliceEvents.some((e) => e.userId !== ids[0])).toBe(false);
+    const aliceEvents = await listCashEvents(alice);
     expect(aliceEvents.every((e) => e.amount !== "9999")).toBe(true);
   });
 
@@ -196,27 +228,41 @@ describe("cross-workspace access rejection", () => {
     const aliceEv = await aliceEvent();
     await expect(
       addDelayAdjustment(bob, aliceScenario.id, aliceEv.id, "2025-06-01"),
-    ).rejects.toThrow("Scenario not found or access denied");
+    ).rejects.toThrow("requires an owned scenario");
   });
 
   it("anonymous token cannot access any cash events or scenarios", async () => {
     await aliceEvent();
-    expect(await getCashEvents(undefined)).toEqual([]);
-    expect(await getCashEvents("0".repeat(64))).toEqual([]);
+    expect(await listCashEvents(undefined)).toEqual([]);
+    expect(await listCashEvents("0".repeat(64))).toEqual([]);
     expect(await getScenario(undefined, "any-id")).toBeNull();
   });
 
   it("alice cannot add an adjustment targeting bob's event to her own scenario", async () => {
     const aliceScenario = await createScenario(alice, "Alice scenario");
-    const bobEv = await createCashEvent(bob, {
+    const bobEv = (await createCashEvent(bob, bobAccountId, {
       description: "Bob event",
       amount: "100",
-      currency: "EUR",
       expectedDate: "2025-04-01",
-    });
+    }))!;
     await expect(
       addDelayAdjustment(alice, aliceScenario.id, bobEv.id, "2025-06-01"),
-    ).rejects.toThrow("Cash event not found or access denied");
+    ).rejects.toThrow("requires an owned scenario");
+  });
+
+  it("the database composite key rejects a cross-workspace event even if application checks are bypassed", async () => {
+    const aliceScenario = await createScenario(alice, "Alice scenario");
+    const bobEv = (await createCashEvent(bob, bobAccountId, {
+      description: "Bob event",
+      amount: "100",
+      expectedDate: "2025-04-01",
+    }))!;
+
+    await expect(database().query(
+      `INSERT INTO scenario_adjustments(workspace_id, scenario_id, cash_event_id, date_override)
+       VALUES ($1, $2, $3, '2025-06-01')`,
+      [aliceScenario.workspaceId, aliceScenario.id, bobEv.id],
+    )).rejects.toMatchObject({ code: "23503" });
   });
 
   it("treats malformed UUIDs like missing records instead of leaking PostgreSQL errors", async () => {
@@ -230,6 +276,39 @@ describe("cross-workspace access rejection", () => {
     await expect(
       addDelayAdjustment(alice, "not-a-uuid", event.id, "2025-06-01"),
     ).rejects.toThrow("Scenario not found or access denied");
+  });
+});
+
+describe("delayed-invoice eligibility", () => {
+  it("requires an expected income event and a strictly later valid date", async () => {
+    const scenario = await createScenario(alice, "Eligibility");
+    const invoice = await aliceEvent("200", "2025-04-01");
+    const expense = await aliceEvent("-50", "2025-04-01");
+    const settled = await aliceEvent("300", "2025-04-01");
+    await setCashEventStatus(alice, settled.id, "received");
+
+    for (const [eventId, date] of [
+      [invoice.id, "2025-04-01"],
+      [invoice.id, "2025-03-31"],
+      [expense.id, "2025-05-01"],
+      [settled.id, "2025-05-01"],
+    ]) {
+      await expect(addDelayAdjustment(alice, scenario.id, eventId, date))
+        .rejects.toThrow("requires an owned scenario");
+    }
+    await expect(addDelayAdjustment(alice, scenario.id, invoice.id, "2025-02-30"))
+      .rejects.toThrow();
+    expect(await getAdjustments(alice, scenario.id)).toEqual([]);
+  });
+
+  it("returns an explicit domain error for a duplicate event adjustment", async () => {
+    const scenario = await createScenario(alice, "Duplicate protection");
+    const invoice = await aliceEvent("200", "2025-04-01");
+    await addDelayAdjustment(alice, scenario.id, invoice.id, "2025-05-01");
+
+    await expect(addDelayAdjustment(alice, scenario.id, invoice.id, "2025-06-01"))
+      .rejects.toBeInstanceOf(DuplicateDelayAdjustmentError);
+    expect(await getAdjustments(alice, scenario.id)).toHaveLength(1);
   });
 });
 
@@ -271,14 +350,14 @@ describe("invalid adjustments and safe deletion", () => {
 
     expect(adj.status).toBe("active");
 
-    // Mark as invalid (what a cleanup job does when event is referenced by FK)
+    // Mark as invalid so callers must surface the unusable override explicitly.
     await invalidateAdjustment(alice, adj.id);
 
     const adjsAfter = await getAdjustments(alice, scenario.id);
     expect(adjsAfter[0].status).toBe("invalid");
 
     // The domain layer must throw, not silently ignore
-    const events: CashEvent[] = [event];
+    const events: ForecastCashEvent[] = [forecastEvent(event)];
     const baseForecast = runForecast({ ...BASE, events });
     expect(() =>
       runScenarioForecast({
@@ -342,15 +421,15 @@ describe("invalid adjustments and safe deletion", () => {
 describe("base forecast is unchanged when scenario store is used", () => {
   it("loading a scenario and its adjustments does not change the base event or forecast", async () => {
     const event = await aliceEvent("600", "2025-06-15");
-    const baseForecast = runForecast({ ...BASE, events: [event] });
+    const baseForecast = runForecast({ ...BASE, events: [forecastEvent(event)] });
     const closingBefore = baseForecast.closingBalance;
 
     const scenario = await createScenario(alice, "Delay scenario");
     await addDelayAdjustment(alice, scenario.id, event.id, "2025-09-30");
 
     // Reload events from DB
-    const reloaded = await getCashEvents(alice);
-    const reloadedForecast = runForecast({ ...BASE, events: reloaded });
+    const reloaded = await listCashEvents(alice);
+    const reloadedForecast = runForecast({ ...BASE, events: reloaded.map(forecastEvent) });
 
     // Base forecast (reloaded from DB, no adjustments applied) is unchanged
     expect(reloadedForecast.closingBalance).toBe(closingBefore);

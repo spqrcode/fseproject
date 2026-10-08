@@ -9,7 +9,8 @@
  *    construct a CashEvent with a zero amount or unsupported currency.
  *
  * This is a pure domain type with no database or network dependency.
- * Persistence helpers live in src/lib/cash-event-store.ts.
+ * Canonical persistence lives in src/lib/cash-events-store.ts. This domain
+ * contract remains provisional until the Forecast Engine PR is finalized.
  */
 
 import { parseDecimal, DecimalInputError } from "@/lib/forecast/decimal";
