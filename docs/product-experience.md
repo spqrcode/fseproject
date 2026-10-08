@@ -1,6 +1,6 @@
 # Product experience
 
-Owner: Product Experience (member D). Scope of this increment: the FinTwin Global interface shell, shared presentation rules, and the reporting currency preference. Forecast and scenario logic belong to the Forecast Engine and Scenarios & FX increments and are not implemented here.
+Owner: Gabriel Piraccini, Product Experience. Scope of this increment: the FinTwin Global interface shell, shared presentation rules, and the reporting currency preference. Forecast and scenario logic belong to the Forecast Engine and Scenarios & FX increments and are not implemented here.
 
 ## Information architecture
 

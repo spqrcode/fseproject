@@ -41,9 +41,9 @@ What was corrected: `.vercelignore` was added, the affected deployment deleted, 
 
 Evidence retained: the saved upload manifest showing the ignored paths, the later manifest showing them empty, the 404 for the deleted deployment ID, the failed authentication for the old credentials, and the smoke test against the rotated staging environment. See the security document for the full incident record.
 
-## Member B — Forecast money and FX foundation
+## Haina Liu — Forecast money and FX foundation
 
-- Date: 2026-09-29 to 2026-10-03. Tool: OpenAI Codex. Owner: Member B.
+- Date: 2026-09-29 to 2026-10-03. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
 - Instruction: inspect the repository first, create a separate branch, and begin the Forecast Engine foundation. The student remained responsible for reviewing, staging, committing, pushing, and opening the PR.
 - Workflow: the work was developed on `haina`, reviewed by the student, pushed to `origin/haina`, and then rebased onto the updated `main`. PR #8 was approved by a teammate on 2026-10-07; resolving its merge conflicts with main remained pending.
 - Generated work: strict Decimal parsing, immutable Money values, EUR/USD/SGD validation, direct and reciprocal FX conversion, explicit rounding, public exports, documentation, and focused domain tests.
@@ -67,7 +67,7 @@ Evidence retained: the saved upload manifest showing the ignored paths, the late
 
 ## Product experience increment: FinTwin Global shell, formatting and reporting currency
 
-Date: 2026-10-01. Tool: Claude Code. Owner: Product Experience student (member D).
+Date: 2026-10-01. Tool: Claude Code. Owner: Gabriel Piraccini, Product Experience.
 
 Request: review the open pull requests, then advance the Product Experience task while the FinTwin Global domain model is still being agreed by the team. Following the team rule, the AI did not stage, commit or push: the changes were delivered as a patch for the student to inspect, test and commit.
 
@@ -83,7 +83,7 @@ Related review work: while reviewing PR #6 with AI assistance, the same staging-
 
 ## Product experience follow-ups: home page, sessions, appearance and accessibility checks
 
-Date: 2026-10-01. Tool: Claude Code. Owner: Product Experience student (member D). Same branch and delivery as the entry above: patches inspected, tested and committed by the student.
+Date: 2026-10-01. Tool: Claude Code. Owner: Gabriel Piraccini, Product Experience. Same branch and delivery as the entry above: patches inspected, tested and committed by the student.
 
 AI-generated: the public home page; the active sessions list and the action that signs out other sessions; the appearance preference (migration 004, store, action, form, dark palette); shared Playwright fixtures; `tests/e2e/accessibility.spec.ts` with `@axe-core/playwright`; the matching documentation.
 
@@ -98,7 +98,7 @@ Validation (2026-10-01, cloud container with Node 22.22 and PostgreSQL 16; the f
 
 ## Product experience: changes requested in review and at the team meeting of 2 October
 
-Date: 2026-10-04. Tool: Claude Code. Owner: Product Experience student (member D). Same delivery as the entries above: patches inspected, tested and committed by the student.
+Date: 2026-10-04. Tool: Claude Code. Owner: Gabriel Piraccini, Product Experience. Same delivery as the entries above: patches inspected, tested and committed by the student.
 
 Request: apply what Bastian asked for before merging PR #7 and what the team decided on 2 October: report only in EUR, USD and SGD; rename the sections to the agreed MVP views (Liquidity overview, Cash events, Scenario lab) and Portfolio to Workspace; write down why SGD and dark mode stay. While reviewing Haina's forecast PR (#8) the AI also noticed that the screen rounded half away from zero while the forecast engine rounds half to even, so the same amount could show a different cent.
 
