@@ -2,10 +2,10 @@ import { beforeAll, beforeEach, afterEach, afterAll, describe, it, expect, vi } 
 import { randomUUID } from "node:crypto";
 import { database } from "@/lib/db";
 import { createSession, findSession, revokeSession, tokenHash } from "@/lib/session-store";
-import { savePortfolio, getPortfolio } from "@/lib/portfolio-store";
+import { saveWorkspace, getWorkspace } from "@/lib/workspace-store";
 import { allowAuthAttempt, authLimitKey, recordFailedAuth } from "@/lib/rate-limit";
 import { register, login, logout } from "@/app/actions/auth";
-import { updatePortfolio } from "@/app/actions/portfolio";
+import { updateWorkspace } from "@/app/actions/workspace";
 import { requireUser, SESSION_COOKIE } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 
@@ -77,49 +77,49 @@ describe("database-backed authentication and ownership", () => {
     expect(await findSession(alice)).toEqual({ id: ids[0], email: emails[0] });
     expect(await findSession("bad")).toBeNull();
   });
-  it("isolates the existing portfolio operations across two users", async () => {
-    await savePortfolio(alice, "Alice portfolio");
-    expect(await getPortfolio(bob)).toBeNull();
-    await savePortfolio(bob, "Bob portfolio");
-    await savePortfolio(bob, "Bob renamed");
-    expect((await getPortfolio(alice))?.name).toBe("Alice portfolio");
-    expect((await getPortfolio(bob))?.name).toBe("Bob renamed");
-    const count = await database().query("SELECT count(*)::int AS count FROM portfolios WHERE user_id = $1", [ids[1]]);
+  it("isolates the existing workspace operations across two users", async () => {
+    await saveWorkspace(alice, "Alice portfolio");
+    expect(await getWorkspace(bob)).toBeNull();
+    await saveWorkspace(bob, "Bob portfolio");
+    await saveWorkspace(bob, "Bob renamed");
+    expect((await getWorkspace(alice))?.name).toBe("Alice portfolio");
+    expect((await getWorkspace(bob))?.name).toBe("Bob renamed");
+    const count = await database().query("SELECT count(*)::int AS count FROM workspaces WHERE user_id = $1", [ids[1]]);
     expect(count.rows[0].count).toBe(1);
   });
   it("rejects anonymous, unknown-token and invalid writes", async () => {
-    expect(await getPortfolio(undefined)).toBeNull();
-    expect(await getPortfolio("0".repeat(64))).toBeNull();
-    await expect(savePortfolio(undefined, "forged")).rejects.toThrow();
-    await expect(savePortfolio("0".repeat(64), "forged")).rejects.toThrow();
-    await expect(savePortfolio(alice, " ")).rejects.toThrow();
+    expect(await getWorkspace(undefined)).toBeNull();
+    expect(await getWorkspace("0".repeat(64))).toBeNull();
+    await expect(saveWorkspace(undefined, "forged")).rejects.toThrow();
+    await expect(saveWorkspace("0".repeat(64), "forged")).rejects.toThrow();
+    await expect(saveWorkspace(alice, " ")).rejects.toThrow();
     await expect(requireUser()).rejects.toThrow("redirect:/login");
   });
-  it("enforces email uniqueness and portfolio constraints in SQL", async () => {
+  it("enforces email uniqueness and workspace constraints in SQL", async () => {
     await expect(database().query("INSERT INTO users(email,password_hash) VALUES($1,$2)", [emails[0], passwordHash])).rejects.toMatchObject({ code: "23505" });
-    await savePortfolio(alice, "Valid");
-    await expect(database().query("INSERT INTO portfolios(user_id,name) VALUES($1,'duplicate')", [ids[0]])).rejects.toMatchObject({ code: "23505" });
-    await expect(database().query("UPDATE portfolios SET name = ' ' WHERE user_id = $1", [ids[0]])).rejects.toMatchObject({ code: "23514" });
+    await saveWorkspace(alice, "Valid");
+    await expect(database().query("INSERT INTO workspaces(user_id,name) VALUES($1,'duplicate')", [ids[0]])).rejects.toMatchObject({ code: "23505" });
+    await expect(database().query("UPDATE workspaces SET name = ' ' WHERE user_id = $1", [ids[0]])).rejects.toMatchObject({ code: "23514" });
   });
   it("treats SQL-looking input as data", async () => {
     const name = "Robert'); DROP TABLE users; --";
-    await savePortfolio(alice, name);
-    expect((await getPortfolio(alice))?.name).toBe(name);
+    await saveWorkspace(alice, name);
+    expect((await getWorkspace(alice))?.name).toBe(name);
     expect(await findSession(bob)).not.toBeNull();
   });
   it("expiry blocks identity, reads, and writes despite an existing cookie", async () => {
-    await savePortfolio(alice, "Private");
+    await saveWorkspace(alice, "Private");
     await database().query("UPDATE sessions SET expires_at = now() - interval '1 second' WHERE token_hash = $1", [tokenHash(alice)]);
     request.cookies.set(SESSION_COOKIE, alice);
     expect(await findSession(alice)).toBeNull();
-    expect(await getPortfolio(alice)).toBeNull();
-    await expect(savePortfolio(alice, "forged")).rejects.toThrow();
+    expect(await getWorkspace(alice)).toBeNull();
+    await expect(saveWorkspace(alice, "forged")).rejects.toThrow();
     await expect(requireUser()).rejects.toThrow("redirect:/login");
   });
   it("revocation prevents replay without revoking another user's session", async () => {
     await revokeSession(alice);
     expect(await findSession(alice)).toBeNull();
-    await expect(savePortfolio(alice, "replay")).rejects.toThrow();
+    await expect(saveWorkspace(alice, "replay")).rejects.toThrow();
     expect(await findSession(bob)).not.toBeNull();
   });
 });
@@ -170,15 +170,15 @@ describe("server actions with a real database", () => {
     expect((await login({}, credentials(emails[0]))).error).toBeTruthy();
     expect(query).not.toHaveBeenCalled();
   });
-  it.each([null, "https://untrusted.example"])("rejects missing or foreign origin for logout and updatePortfolio without changing data: %s", async origin => {
-    await savePortfolio(alice, "Original name");
+  it.each([null, "https://untrusted.example"])("rejects missing or foreign origin for logout and updateWorkspace without changing data: %s", async origin => {
+    await saveWorkspace(alice, "Original name");
     request.cookies.set(SESSION_COOKIE, alice);
     request.origin = origin;
     const form = new FormData();
     form.set("name", "Changed by forged request");
     expect((await logout()).error).toBeTruthy();
-    expect((await updatePortfolio({}, form)).error).toBeTruthy();
-    expect((await getPortfolio(alice))?.name).toBe("Original name");
+    expect((await updateWorkspace({}, form)).error).toBeTruthy();
+    expect((await getWorkspace(alice))?.name).toBe("Original name");
     expect(await findSession(alice)).toEqual({ id: ids[0], email: emails[0] });
     expect(request.cookies.get(SESSION_COOKIE)).toBe(alice);
   });
@@ -203,15 +203,15 @@ describe("server actions with a real database", () => {
     expect(await findSession(alice)).toBeNull();
   });
   it("checks authorization inside the existing mutation, ignoring submitted owner IDs", async () => {
-    await savePortfolio(alice, "Alice private");
+    await saveWorkspace(alice, "Alice private");
     const form = new FormData();
     form.set("name", "Attempted change");
     form.set("user_id", ids[0]);
-    await expect(updatePortfolio({}, form)).rejects.toThrow("redirect:/login");
+    await expect(updateWorkspace({}, form)).rejects.toThrow("redirect:/login");
     request.cookies.set(SESSION_COOKIE, bob);
-    expect((await updatePortfolio({}, form)).success).toBeTruthy();
-    expect((await getPortfolio(alice))?.name).toBe("Alice private");
-    expect((await getPortfolio(bob))?.name).toBe("Attempted change");
+    expect((await updateWorkspace({}, form)).success).toBeTruthy();
+    expect((await getWorkspace(alice))?.name).toBe("Alice private");
+    expect((await getWorkspace(bob))?.name).toBe("Attempted change");
   });
   it("sanitizes database errors and fails closed", async () => {
     vi.spyOn(database(), "query").mockRejectedValueOnce(new Error("private connection details"));
