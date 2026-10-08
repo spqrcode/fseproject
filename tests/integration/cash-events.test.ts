@@ -149,10 +149,20 @@ describe("accounts and events through the store", () => {
     await expect(setCashEventStatus(alice.token, alice.eventId, "settled")).rejects.toThrow();
     expect((await eventRow(alice.eventId)).status).toBe("paid");
   });
-  it("refuses an amount sign that contradicts a paid or received status", async () => {
-    await setCashEventStatus(alice.token, alice.eventId, "paid");
-    await expect(updateCashEvent(alice.token, alice.eventId, { ...rent, amount: "1200" })).rejects.toBeInstanceOf(StatusConflictError);
-    expect((await eventRow(alice.eventId)).amount).toBe("-1200.00");
+  it.each([["received", salary], ["paid", rent], ["cancelled", rent]])("refuses to edit or delete a %s event and leaves it unchanged", async (status, input) => {
+    const settled = (await createCashEvent(alice.token, alice.accountId, input))!;
+    await setCashEventStatus(alice.token, settled.id, status);
+    const before = (await fixtures.query("SELECT * FROM cash_events WHERE id = $1", [settled.id])).rows[0];
+    await expect(updateCashEvent(alice.token, settled.id, { description: "Changed", amount: "5", expectedDate: "2027-01-01" })).rejects.toBeInstanceOf(StatusConflictError);
+    await expect(updateCashEvent(alice.token, settled.id, input)).rejects.toBeInstanceOf(StatusConflictError);
+    await expect(deleteCashEvent(alice.token, settled.id)).rejects.toBeInstanceOf(StatusConflictError);
+    expect((await fixtures.query("SELECT * FROM cash_events WHERE id = $1", [settled.id])).rows[0]).toEqual(before);
+    expect((await listCashEvents(alice.token)).find(e => e.id === settled.id)?.status).toBe(status);
+  });
+  it("still edits and deletes an expected event", async () => {
+    const updated = await updateCashEvent(alice.token, alice.eventId, { description: "Rent", amount: "1200", expectedDate: "2026-10-02" });
+    expect(updated).toMatchObject({ amount: "1200.00", status: "expected" });
+    expect(await deleteCashEvent(alice.token, alice.eventId)).toBe(true);
   });
   it("deletes an event and reports false the second time", async () => {
     expect(await deleteCashEvent(alice.token, alice.eventId)).toBe(true);
@@ -198,6 +208,13 @@ describe("ownership between two users", () => {
     expect((await listCashAccounts(alice.token)).map(a => a.name)).toEqual(["Main"]);
     expect(await count("cash_events", "workspace_id", alice.workspaceId)).toBe(1);
     expect(await count("cash_events", "workspace_id", bob.workspaceId)).toBe(1);
+  });
+  it("gives another user's settled event the same null as a missing one, not a status conflict", async () => {
+    await setCashEventStatus(alice.token, alice.eventId, "paid");
+    expect(await updateCashEvent(bob.token, alice.eventId, salary)).toBeNull();
+    expect(await deleteCashEvent(bob.token, alice.eventId)).toBe(false);
+    expect(await setCashEventStatus(bob.token, alice.eventId, "cancelled")).toBeNull();
+    expect((await eventRow(alice.eventId)).status).toBe("paid");
   });
   it("ignores forged owner, workspace and account ids in the input", async () => {
     const created = (await createCashEvent(bob.token, bob.accountId, { ...salary, workspaceId: alice.workspaceId, accountId: alice.accountId, userId: alice.id }))!;

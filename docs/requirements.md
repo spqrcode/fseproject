@@ -91,6 +91,7 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 - An event's currency is its account's currency; an event can never belong to another workspace's account.
 - Only the owner can list, create, change or delete accounts and events; another user's id and a non-existent id give the same result.
 - A status moves only from expected to received, paid or cancelled.
+- Received, paid and cancelled events cannot be edited or deleted; corrections are made with a new event.
 - A workspace can store an optional danger threshold.
 
 ## Engineering acceptance criteria
@@ -119,6 +120,8 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 | US-09 active sessions | `src/lib/account-sessions.ts`, `src/app/actions/account.ts`, settings page | Integration own-sessions listing, other-user isolation, expired caller, origin and redirect tests; Playwright two-browser sign-out test | Product experience branch |
 | US-08 navigation and states | `src/components/navigation.tsx`, `(protected)` loading, error, forecast, scenarios and settings pages | Playwright navigation, signed-out redirects, keyboard and phone-width tests | Product experience branch |
 | US-11 cash accounts and events | Migration 005, `src/lib/cash-events-store.ts`, `src/lib/workspace-store.ts`, cash schemas in `src/lib/validation.ts` | Integration constraints by direct SQL, two-user ownership matrix, anonymous/unknown/expired sessions, malformed ids, status transitions, cascade, and a run as the staging role; unit amount and date validation | Foundation & Security branch; the Cash events page is separate work |
+| US-11 settled events immutable | `updateCashEvent` and `deleteCashEvent` in `src/lib/cash-events-store.ts` (status condition in the `WHERE` clause) | Integration: editing and deleting received, paid and cancelled events refused with the row unchanged; expected events still work; another user's settled event gives the same null as a missing one | Foundation & Security branch (review feedback on PR #10) |
+| US-11 forecast integration (agreed 2026-10-08) | Adapter from database statuses to engine statuses, starting balance resolved by the store, default danger threshold, overdue flag; see [decisions](decisions.md#2026-10-08--forecast-integration-statuses-danger-threshold-starting-balance-overdue-events) | Not implemented yet; tests to cover every status mapping, the starting-balance query and overdue events | Forecast integration work; not claimed as delivered |
 | US-02 workspace (renamed) | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts` | The existing ownership and origin tests, renamed | Same branch |
 
 Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.

@@ -26,6 +26,13 @@ async function nothing(token: string | undefined): Promise<null> {
   if (!await hasValidSession(token)) throw new Error("Authentication required.");
   return null;
 }
+// True when the event exists and belongs to the caller, whatever its status. Used after a change touched
+// nothing, to tell "yours but not allowed" (StatusConflictError) from "not yours or not there" (null).
+async function ownsEvent(token: string, eventId: string): Promise<boolean> {
+  const result = await database().query(`SELECT 1 FROM cash_events e JOIN workspaces w ON w.id = e.workspace_id
+    JOIN sessions s ON s.user_id = w.user_id WHERE e.id = $2 AND s.token_hash = $1 AND s.expires_at > now()`, [tokenHash(token), eventId]);
+  return result.rowCount === 1;
+}
 function postgresCode(error: unknown) { return typeof error === "object" && error !== null && "code" in error ? error.code : undefined; }
 
 const ACCOUNT_COLUMNS = "id, name, currency, opening_balance::text AS opening_balance, created_at";
@@ -123,25 +130,23 @@ export async function createCashEvent(token: string | undefined, accountId: unkn
   return result.rows[0] ? event(result.rows[0]) : nothing(token);
 }
 
-// Description, amount and date only; the account and status do not change here. Flipping the sign of a
-// received or paid event breaks the database's status rule and raises StatusConflictError.
+// Description, amount and date only; the account and status do not change here. Only an "expected" event can be
+// edited: settled events (received, paid, cancelled) feed the forecast's starting balance and never change.
+// The status condition sits in the WHERE clause, so the check and the change are one atomic statement.
 export async function updateCashEvent(token: string | undefined, eventId: unknown, input: unknown): Promise<CashEvent | null> {
   const data = cashEventSchema.parse(input);
   if (!token || !validToken(token)) throw new Error("Authentication required.");
   const id = uuidSchema.safeParse(eventId);
   if (!id.success) return nothing(token);
-  try {
-    const result = await database().query<EventRow>(`WITH changed AS (
-        UPDATE cash_events e SET description = $3, amount = $4, expected_date = $5, updated_at = now()
-        FROM workspaces w, sessions s WHERE e.id = $2 AND w.id = e.workspace_id AND s.user_id = w.user_id
-        AND s.token_hash = $1 AND s.expires_at > now()
-        RETURNING ${CHANGED_COLUMNS}
-      ) ${EVENT_OF_CHANGE}`, [tokenHash(token), id.data, data.description, data.amount, data.expectedDate]);
-    return result.rows[0] ? event(result.rows[0]) : await nothing(token);
-  } catch (error) {
-    if (postgresCode(error) === "23514") throw new StatusConflictError();
-    throw error;
-  }
+  const result = await database().query<EventRow>(`WITH changed AS (
+      UPDATE cash_events e SET description = $3, amount = $4, expected_date = $5, updated_at = now()
+      FROM workspaces w, sessions s WHERE e.id = $2 AND w.id = e.workspace_id AND s.user_id = w.user_id
+      AND s.token_hash = $1 AND s.expires_at > now() AND e.status = 'expected'
+      RETURNING ${CHANGED_COLUMNS}
+    ) ${EVENT_OF_CHANGE}`, [tokenHash(token), id.data, data.description, data.amount, data.expectedDate]);
+  if (result.rows[0]) return event(result.rows[0]);
+  if (await ownsEvent(token, id.data)) throw new StatusConflictError();
+  return nothing(token);
 }
 
 // The only allowed transition is from "expected" to received, paid or cancelled; there is no undo.
@@ -165,17 +170,20 @@ export async function setCashEventStatus(token: string | undefined, eventId: unk
     throw error;
   }
   // Nothing changed: either the caller's event is not in the "expected" state, or it is not theirs.
-  const own = await database().query(`SELECT 1 FROM cash_events e JOIN workspaces w ON w.id = e.workspace_id
-    JOIN sessions s ON s.user_id = w.user_id WHERE e.id = $2 AND s.token_hash = $1 AND s.expires_at > now()`, [tokenHash(token), id.data]);
-  if (own.rowCount === 1) throw new StatusConflictError();
+  if (await ownsEvent(token, id.data)) throw new StatusConflictError();
   return nothing(token);
 }
 
+// Only an "expected" event can be deleted; a settled one throws StatusConflictError. Corrections to settled
+// events are made with a new event.
 export async function deleteCashEvent(token: string | undefined, eventId: unknown): Promise<boolean> {
   if (!token || !validToken(token)) throw new Error("Authentication required.");
   const id = uuidSchema.safeParse(eventId);
   if (!id.success) return (await nothing(token)) ?? false;
   const result = await database().query(`DELETE FROM cash_events e USING workspaces w, sessions s
-    WHERE e.id = $2 AND w.id = e.workspace_id AND s.user_id = w.user_id AND s.token_hash = $1 AND s.expires_at > now()`, [tokenHash(token), id.data]);
-  return result.rowCount === 1 ? true : (await nothing(token)) ?? false;
+    WHERE e.id = $2 AND w.id = e.workspace_id AND s.user_id = w.user_id AND s.token_hash = $1 AND s.expires_at > now()
+    AND e.status = 'expected'`, [tokenHash(token), id.data]);
+  if (result.rowCount === 1) return true;
+  if (await ownsEvent(token, id.data)) throw new StatusConflictError();
+  return (await nothing(token)) ?? false;
 }
