@@ -204,6 +204,17 @@ EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026/10/02,1.1225
       }
     });
 
+    it("rejects a well-shaped date that is not a real calendar day", () => {
+      const impossibleDate = `
+KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE
+EXR.D.SGD.EUR.SP00.A,D,SGD,EUR,SP00,A,2026-02-30,1.4366
+EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026-02-30,1.1225
+      `.trim();
+      const res = parseEcbCsv(impossibleDate);
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.reason).toContain("invalid TIME_PERIOD");
+    });
+
     it("rejects duplicate currency rows", () => {
       const duplicateUsd = `
 KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE
@@ -295,6 +306,17 @@ EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026-10-02,1.1225e0
       if (!res.ok) {
         expect(res.reason).toContain("invalid rate value");
       }
+    });
+
+    it("rejects a rate that would be rounded by numeric(30,15)", () => {
+      const excessivePrecision = `
+KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE
+EXR.D.SGD.EUR.SP00.A,D,SGD,EUR,SP00,A,2026-10-02,1.4366
+EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026-10-02,1.1234567890123456
+      `.trim();
+      const res = parseEcbCsv(excessivePrecision);
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.reason).toContain("numeric(30,15) precision");
     });
   });
 });

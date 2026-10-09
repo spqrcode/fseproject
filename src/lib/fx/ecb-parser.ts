@@ -79,7 +79,14 @@ function parsePositiveRate(raw: string, context: string): string {
     if (!d.greaterThan(0)) {
       throw new EcbParseError(`${context}: rate must be greater than zero, got ${JSON.stringify(trimmed)}`);
     }
-    return decimalString(d);
+    const normalized = decimalString(d);
+    const [integerPart, fractionPart = ""] = normalized.split(".");
+    if (integerPart.length > 15 || fractionPart.length > 15) {
+      throw new EcbParseError(
+        `${context}: rate exceeds the supported numeric(30,15) precision`,
+      );
+    }
+    return normalized;
   } catch (err) {
     if (err instanceof EcbParseError) throw err;
     if (err instanceof DecimalInputError) {
@@ -87,6 +94,47 @@ function parsePositiveRate(raw: string, context: string): string {
     }
     throw err;
   }
+}
+
+function parseCsvLine(line: string, context: string): string[] {
+  const cells: string[] = [];
+  let cell = "";
+  let quote: '"' | "'" | null = null;
+
+  for (let index = 0; index < line.length; index++) {
+    const character = line[index];
+    if (quote) {
+      if (character === quote) {
+        if (line[index + 1] === quote) {
+          cell += quote;
+          index++;
+        } else {
+          quote = null;
+        }
+      } else {
+        cell += character;
+      }
+      continue;
+    }
+    if ((character === '"' || character === "'") && cell.trim() === "") {
+      quote = character;
+    } else if (character === ",") {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += character;
+    }
+  }
+
+  if (quote) throw new EcbParseError(`${context}: unterminated quoted field`);
+  cells.push(cell.trim());
+  return cells;
+}
+
+function isRealIsoDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +177,7 @@ function _parseEcbCsv(csv: string): EcbParseResult {
   }
 
   // --- Parse header ---
-  const headers = lines[0].split(",").map((h) => h.replace(/^["']|["']$/g, "").trim());
+  const headers = parseCsvLine(lines[0].replace(/^\uFEFF/, ""), "header");
   const idx: Record<string, number> = {};
   for (const col of REQUIRED_COLUMNS) {
     const i = headers.indexOf(col);
@@ -144,7 +192,7 @@ function _parseEcbCsv(csv: string): EcbParseResult {
   const seenEffectiveDates = new Set<string>();
 
   for (let lineNum = 1; lineNum < lines.length; lineNum++) {
-    const cols = lines[lineNum].split(",").map((c) => c.replace(/^["']|["']$/g, "").trim());
+    const cols = parseCsvLine(lines[lineNum], `row ${lineNum + 1}`);
 
     const quoteCurrency = cols[idx["CURRENCY"]] ?? "";
     const baseCurrency = cols[idx["CURRENCY_DENOM"]] ?? "";
@@ -181,7 +229,7 @@ function _parseEcbCsv(csv: string): EcbParseResult {
     }
 
     // Date format
-    if (!DATE_RE.test(timePeriod)) {
+    if (!isRealIsoDate(timePeriod)) {
       throw new EcbParseError(`${ctx}: invalid TIME_PERIOD "${timePeriod}"`);
     }
 

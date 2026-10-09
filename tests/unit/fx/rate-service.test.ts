@@ -24,8 +24,6 @@ interface MockSnapshotRow {
   rate: string;
   effective_date: string;
   fetched_at: Date;
-  state: string;
-  rejection_reason: string | null;
 }
 
 const mockDbRows: MockSnapshotRow[] = [];
@@ -37,40 +35,41 @@ vi.mock("@/lib/db", () => ({
 
       // INSERT / UPSERT
       if (sqlNorm.startsWith("INSERT INTO fx_snapshots")) {
-        const [provider, base, quote, rate, effectiveDate, fetchedAt] = params as [
-          string,
-          string,
-          string,
-          string,
-          string,
-          Date,
-        ];
-        const existing = mockDbRows.find(
-          (r) =>
-            r.provider === provider &&
-            r.base_currency === base &&
-            r.quote_currency === quote &&
-            r.effective_date === effectiveDate,
-        );
-
-        if (existing) {
-          existing.fetched_at = fetchedAt;
-          return { rows: [{ ...existing }] };
-        }
-
-        const newRow: MockSnapshotRow = {
-          id: randomUUID(),
-          provider,
-          base_currency: base,
-          quote_currency: quote,
-          rate,
-          effective_date: effectiveDate,
-          fetched_at: fetchedAt,
-          state: "accepted",
-          rejection_reason: null,
-        };
-        mockDbRows.push(newRow);
-        return { rows: [{ ...newRow }] };
+        const [provider, payloadJson, fetchedAt] = params as [string, string, Date];
+        const payload = JSON.parse(payloadJson) as Array<{
+          base_currency: string;
+          quote_currency: string;
+          rate: string;
+          effective_date: string;
+        }>;
+        const rows = payload.map((input) => {
+          const existing = mockDbRows.find(
+            (row) =>
+              row.provider === provider &&
+              row.base_currency === input.base_currency &&
+              row.quote_currency === input.quote_currency &&
+              row.effective_date === input.effective_date,
+          );
+          if (existing) {
+            if (fetchedAt >= existing.fetched_at) {
+              existing.rate = input.rate;
+              existing.fetched_at = fetchedAt;
+            }
+            return { ...existing };
+          }
+          const row: MockSnapshotRow = {
+            id: randomUUID(),
+            provider,
+            base_currency: input.base_currency,
+            quote_currency: input.quote_currency,
+            rate: input.rate,
+            effective_date: input.effective_date,
+            fetched_at: fetchedAt,
+          };
+          mockDbRows.push(row);
+          return { ...row };
+        });
+        return { rows };
       }
 
       // SELECT findRecentSnapshot
@@ -82,7 +81,6 @@ vi.mock("@/lib/db", () => ({
               r.provider === provider &&
               r.base_currency === base &&
               r.quote_currency === quote &&
-              r.state === "accepted" &&
               r.fetched_at.getTime() >= cutoff.getTime(),
           )
           .sort((a, b) => b.fetched_at.getTime() - a.fetched_at.getTime());
@@ -98,8 +96,7 @@ vi.mock("@/lib/db", () => ({
             (r) =>
               r.provider === provider &&
               r.base_currency === base &&
-              r.quote_currency === quote &&
-              r.state === "accepted",
+              r.quote_currency === quote,
           )
           .sort((a, b) => b.fetched_at.getTime() - a.fetched_at.getTime());
 
@@ -157,8 +154,11 @@ describe("FX rate service", () => {
       expect(res.rate.base).toBe("EUR");
       expect(res.rate.quote).toBe("USD");
       expect(res.rate.rate).toBe("1.1225");
+      expect(res.provider).toBe(ECB_PROVIDER);
+      expect(res.snapshotIds).toHaveLength(1);
       expect(res.effectiveDate).toBe("2026-10-02");
       expect(res.fetchedAt).toEqual(now);
+      expect(res.refreshFailure).toBeNull();
 
       // Verify row persisted in DB
       expect(mockDbRows).toHaveLength(2); // Both USD and SGD were persisted
@@ -179,8 +179,6 @@ describe("FX rate service", () => {
         rate: "1.1225",
         effective_date: "2026-10-02",
         fetched_at: now,
-        state: "accepted",
-        rejection_reason: null,
       });
 
       const provider = createMockProvider({ ok: true, csv: FIXTURE_CSV, fetchedAt: new Date() });
@@ -226,8 +224,6 @@ describe("FX rate service", () => {
         rate: "1.1200",
         effective_date: "2026-10-01",
         fetched_at: staleFetchedAt,
-        state: "accepted",
-        rejection_reason: null,
       });
 
       const timeoutProvider = createMockProvider({
@@ -244,6 +240,7 @@ describe("FX rate service", () => {
       expect(res.rate.rate).toBe("1.12");
       expect(res.effectiveDate).toBe("2026-10-01");
       expect(res.fetchedAt).toEqual(staleFetchedAt);
+      expect(res.refreshFailure?.code).toBe("PROVIDER_ERROR");
     });
 
     it("provider timeout without cache returns UNAVAILABLE", async () => {
@@ -256,6 +253,25 @@ describe("FX rate service", () => {
       const res = await getEurRate("USD", timeoutProvider);
       expect(timeoutProvider.fetchCount).toBe(1);
       expect(res.status).toBe("UNAVAILABLE");
+      if (res.status !== "UNAVAILABLE") return;
+      expect(res.rate).toBeNull();
+      expect(res.effectiveDate).toBeNull();
+      expect(res.snapshotIds).toEqual([]);
+      expect(res.failure.code).toBe("PROVIDER_ERROR");
+    });
+
+    it("returns INVALID_RESPONSE when ECB data is malformed and no cache exists", async () => {
+      const provider = createMockProvider({
+        ok: true,
+        csv: "not,valid,ecb,data",
+        fetchedAt: new Date(),
+      });
+
+      const res = await getEurRate("USD", provider);
+      expect(res.status).toBe("UNAVAILABLE");
+      if (res.status !== "UNAVAILABLE") return;
+      expect(res.failure.code).toBe("INVALID_RESPONSE");
+      expect(mockDbRows).toEqual([]);
     });
 
     it("provider unexpected exception with cache returns STALE", async () => {
@@ -268,8 +284,6 @@ describe("FX rate service", () => {
         rate: "1.4300",
         effective_date: "2026-10-01",
         fetched_at: staleFetchedAt,
-        state: "accepted",
-        rejection_reason: null,
       });
 
       const throwingProvider: EcbProvider = {
@@ -330,8 +344,6 @@ describe("FX rate service", () => {
         rate: "1.1225",
         effective_date: "2026-10-02",
         fetched_at: new Date(),
-        state: "accepted",
-        rejection_reason: null,
       });
 
       // SGD is stale
@@ -342,10 +354,8 @@ describe("FX rate service", () => {
         base_currency: "EUR",
         quote_currency: "SGD",
         rate: "1.4300",
-        effective_date: "2026-10-01",
+        effective_date: "2026-10-02",
         fetched_at: staleDate,
-        state: "accepted",
-        rejection_reason: null,
       });
 
       // Provider fails on refresh attempt for SGD
@@ -359,8 +369,36 @@ describe("FX rate service", () => {
       expect(res.status).toBe("STALE");
       if (res.status === "UNAVAILABLE") return;
 
-      // Conservative effective date should pick the older date (2026-10-01)
-      expect(res.effectiveDate).toBe("2026-10-01");
+      expect(res.effectiveDate).toBe("2026-10-02");
+    });
+
+    it("does not derive a cross-rate from snapshots with different effective dates", async () => {
+      const staleFetchedAt = new Date(Date.now() - CACHE_TTL_MS - 20_000);
+      mockDbRows.push(
+        {
+          id: randomUUID(), provider: ECB_PROVIDER, base_currency: "EUR",
+          quote_currency: "USD", rate: "1.12", effective_date: "2026-10-02",
+          fetched_at: staleFetchedAt,
+        },
+        {
+          id: randomUUID(), provider: ECB_PROVIDER, base_currency: "EUR",
+          quote_currency: "SGD", rate: "1.43", effective_date: "2026-10-01",
+          fetched_at: staleFetchedAt,
+        },
+      );
+      const provider = createMockProvider({
+        ok: false,
+        reason: "503 Service Unavailable",
+        fetchedAt: new Date(),
+      });
+
+      const res = await getCrossRate("USD", "SGD", provider);
+
+      expect(res.status).toBe("UNAVAILABLE");
+      if (res.status !== "UNAVAILABLE") return;
+      expect(res.rate).toBeNull();
+      expect(res.failure.code).toBe("MISMATCHED_EFFECTIVE_DATE");
+      expect(provider.fetchCount).toBe(1);
     });
 
     it("returns UNAVAILABLE if either leg is UNAVAILABLE", async () => {
@@ -373,8 +411,6 @@ describe("FX rate service", () => {
         rate: "1.1225",
         effective_date: "2026-10-02",
         fetched_at: new Date(),
-        state: "accepted",
-        rejection_reason: null,
       });
 
       const failingProvider = createMockProvider({
@@ -385,6 +421,7 @@ describe("FX rate service", () => {
 
       const res = await getCrossRate("USD", "SGD", failingProvider);
       expect(res.status).toBe("UNAVAILABLE");
+      expect(failingProvider.fetchCount).toBe(1);
     });
 
     it("rejects same currency pair in getCrossRate", async () => {
@@ -403,8 +440,6 @@ describe("FX rate service", () => {
         rate: "1.1225",
         effective_date: "2026-10-02",
         fetched_at: now,
-        state: "accepted",
-        rejection_reason: null,
       });
 
       const res = await getRate("USD", "EUR");
@@ -430,6 +465,8 @@ describe("FX rate service", () => {
       // @ts-expect-error test unsupported currency at runtime
       const res = await getRate("GBP", "EUR");
       expect(res.status).toBe("UNAVAILABLE");
+      if (res.status !== "UNAVAILABLE") return;
+      expect(res.failure.code).toBe("UNSUPPORTED_PAIR");
     });
 
     it("getAllEcbRates fetches both currencies and leverages cache sequentially", async () => {

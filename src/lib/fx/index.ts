@@ -21,13 +21,15 @@ export {
   ECB_PROVIDER,
   FxRateError,
   type RateStatus,
+  type RateFailure,
+  type RateFailureCode,
   type RateResult,
 } from "@/lib/fx/rate-service";
 
 export {
   upsertSnapshot,
+  upsertSnapshots,
   findRecentSnapshot,
   findLatestSnapshot,
   type FxSnapshot,
-  type SnapshotState,
 } from "@/lib/fx/snapshot-store";

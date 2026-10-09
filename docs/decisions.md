@@ -11,7 +11,7 @@ Foundation choices below are implemented and awaiting student review. Financial/
 | USD instruments and current positions | Defensible valuation without FX or transaction accounting | Multi-currency ledger | No realized P/L or historical performance |
 | Decimal financial arithmetic | Predictable decimal precision | Binary floating point throughout | Additional library and explicit conversion rules |
 | Forecast money foundation uses `decimal.js` with 40 significant digits and half-even rounding | FX division needs a reviewed decimal implementation; JavaScript numbers and the dashboard's temporary scaled-integer helper are not sufficient | Extend the custom BigInt helper | New dependency; precision and rounding policy must remain explicit and tested |
-| FX rates are directed (`base`/`quote`) and conversion requires a matching direct or reciprocal rate | Prevents an ambiguous number from being interpreted in the wrong direction | Infer direction or silently find a cross-rate | Callers must supply the required pair; cross-rate policy remains an open decision |
+| FX rates are directed (`base`/`quote`); reciprocal rates are explicit and USD/SGD crosses use same-date ECB euro legs | Prevents an ambiguous number or mixed-date observations from being treated as one rate | Infer direction or combine any latest legs | Callers must supply the required pair; a cross may be unavailable even when both legs exist |
 | Allocation and absolute P/L contribution (planned) | Matches the small tracker specification | Advanced risk models | Limited analytical scope |
 | Server-side quote adapter | Keeps secrets private and isolates provider behavior | Direct browser requests | Server quota management and latency |
 
@@ -24,6 +24,14 @@ Foundation choices below are implemented and awaiting student review. Financial/
 - Staging uses a dedicated Neon PostgreSQL host with provider authentication disabled; the application still uses direct pg/SQL and internal authentication. Vercel hosts only the application.
 - Confirm available GitHub protections and hosting/database account limits.
 - Confirm whether the cash-forecast feature extends this USD-portfolio product. Define cash-event timing, forecast horizon, base currency, FX observation policy, cross-rates, minimum-balance semantics, runway threshold, and scenario-contribution semantics before implementing those calculations.
+
+## 2026-10-09 — ECB snapshots, freshness and cross-rates
+
+The ECB adapter requests the latest daily EUR/USD and EUR/SGD observations from the official SDMX data API. Only validated observations are cached. One hour after a successful fetch, the service attempts a refresh: success produces `CURRENT`; failure with a cached observation produces `STALE`; failure without one produces `UNAVAILABLE` with a `null` rate. The result includes provider, snapshot id(s), effective date, fetch time and any refresh failure so Product Experience can render one internally consistent result.
+
+Both direct observations are written atomically and older concurrent responses cannot overwrite a newer fetch. Reciprocal pairs reuse the same snapshot metadata. USD/SGD is derived with Decimal arithmetic only when its EUR/USD and EUR/SGD legs have the same effective date; otherwise it is unavailable. Alternative: combine each pair's latest row regardless of date (rejected because the displayed cross-rate would represent no real ECB observation set). Accepted costs: the service may display an old but clearly labelled stale rate during a long outage; there is no background refresh; and provider corrections update the cached provider/pair/date row rather than keeping every revision.
+
+Tests: `tests/unit/fx/*` and `tests/integration/fx.test.ts`.
 
 ## Defense record for significant changes
 

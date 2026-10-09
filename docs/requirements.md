@@ -94,6 +94,17 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 - Received, paid and cancelled events cannot be edited or deleted; corrections are made with a new event.
 - A workspace can store an optional danger threshold.
 
+## US-13 Reliable ECB exchange rates
+
+As a signed-in user, I can use EUR, USD and SGD exchange rates with visible source, effective date and freshness so that a forecast never silently uses a fabricated or mismatched rate.
+
+- The server fetches the latest EUR/USD and EUR/SGD observations from the official ECB SDMX endpoint; USD/SGD and reciprocal pairs are derived with Decimal arithmetic.
+- Only validated positive plain-decimal rates and real date-only effective dates are stored. Values that would be rounded by `numeric(30,15)` are rejected before persistence.
+- A snapshot fetched within one hour is CURRENT and avoids a provider call. After a refresh failure, an older snapshot may be returned only as STALE with its effective date and failure metadata.
+- With no usable snapshot, the result is UNAVAILABLE with a null rate and an explicit failure code; zero and hard-coded fallback numbers are forbidden.
+- A cross-rate uses two ECB legs from the same effective date. Different dates return UNAVAILABLE instead of a mixed-date number.
+- Results include provider, source snapshot IDs, effective date and fetch timestamp for the Scenario Lab.
+
 ## Engineering acceptance criteria
 
 - At least three distinct functional views: authentication, portfolio management, and dashboard analytics.
@@ -110,7 +121,7 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 | --- | --- | --- | --- |
 | US-01 registration, login, logout | `src/app/actions/auth.ts`, password/session modules | Unit security tests; integration server-action tests; all four E2E scenarios | `feat/auth-foundation`; staging record in deployment document |
 | US-01 session expiration/revocation | Session SQL and protected page/action checks | Integration expiry/replay; browser expiry, logout replay, expired open form | Same branch and deployment |
-| US-07 existing ownership boundary | `src/lib/portfolio-store.ts`, `requireUser` | Real database two-user, anonymous, forged-owner and expired-token tests | Existing foundation only; no holdings claims |
+| US-07 existing ownership boundary | `src/lib/workspace-store.ts`, `src/lib/cash-events-store.ts`, `requireUser` | Real database two-user, anonymous, forged-owner and expired-token tests | Existing foundation only; no holdings claims |
 | Reproducible automated checks | `scripts/test.mjs`, `.github/workflows/ci.yml` | Migration rerun; full `npm run verify` | GitHub PR CI |
 | US-02 portfolio setup | Existing create/read/rename implementation | Existing behavior checked as an authentication regression | Issue 2 not started or declared complete |
 | US-03–06 | Not implemented | Pending | Later increments |
@@ -122,6 +133,7 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 | US-11 cash accounts and events | Migration 005, `src/lib/cash-events-store.ts`, `src/lib/workspace-store.ts`, cash schemas in `src/lib/validation.ts` | Integration constraints by direct SQL, two-user ownership matrix, anonymous/unknown/expired sessions, malformed ids, status transitions, cascade, and a run as the staging role; unit amount and date validation | Foundation & Security branch; the Cash events page is separate work |
 | US-11 settled events immutable | `updateCashEvent` and `deleteCashEvent` in `src/lib/cash-events-store.ts` (status condition in the `WHERE` clause) | Integration: editing and deleting received, paid and cancelled events refused with the row unchanged; expected events still work; another user's settled event gives the same null as a missing one | Foundation & Security branch (review feedback on PR #10) |
 | US-11 forecast integration (agreed 2026-10-08) | Adapter from database statuses to engine statuses, starting balance resolved by the store, default danger threshold, overdue flag; see [decisions](decisions.md#2026-10-08--forecast-integration-statuses-danger-threshold-starting-balance-overdue-events) | Not implemented yet; tests to cover every status mapping, the starting-balance query and overdue events | Forecast integration work; not claimed as delivered |
+| US-13 reliable ECB exchange rates | Migration 006 and `src/lib/fx/*` | Parser/provider/cache unit tests; PostgreSQL constraints, atomic persistence, stale fallback and restricted-role integration tests | Scenarios & Exchange Rates Phase 2 branch; no UI in this increment |
 | US-02 workspace (renamed) | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts` | The existing ownership and origin tests, renamed | Same branch |
 
 Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.

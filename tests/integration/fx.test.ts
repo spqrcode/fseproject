@@ -12,9 +12,11 @@
  */
 
 import { beforeEach, afterEach, afterAll, describe, it, expect, vi } from "vitest";
+import { Pool } from "pg";
 import { database } from "@/lib/db";
 import {
   upsertSnapshot,
+  upsertSnapshots,
   findRecentSnapshot,
 } from "@/lib/fx/snapshot-store";
 import {
@@ -28,10 +30,17 @@ import { convertMoney, money, roundMoney } from "@/lib/forecast";
 // ---------------------------------------------------------------------------
 // Guard: must run against the isolated test database
 // ---------------------------------------------------------------------------
-const url = process.env.TEST_DATABASE_URL;
-if (!url || !new URL(url).pathname.endsWith("_test") || process.env.DATABASE_URL !== url) {
+const testDatabase = (value: string | undefined) =>
+  !!value && new URL(value).pathname.endsWith("_test");
+const fixturesUrl = process.env.TEST_FIXTURES_DATABASE_URL ?? process.env.TEST_DATABASE_URL;
+if (
+  !testDatabase(process.env.DATABASE_URL) ||
+  !testDatabase(fixturesUrl) ||
+  (!process.env.TEST_FIXTURES_DATABASE_URL && process.env.DATABASE_URL !== process.env.TEST_DATABASE_URL)
+) {
   throw new Error("Run npm run test:integration against an isolated _test database.");
 }
+const fixtures = new Pool({ connectionString: fixturesUrl, max: 2 });
 
 // ---------------------------------------------------------------------------
 // Mock Next.js headers (required by server-only imports)
@@ -71,19 +80,20 @@ function createMockProvider(result: EcbFetchResult): EcbProvider & { fetchCount:
 describe("FX snapshot persistence & cache (PostgreSQL)", () => {
   beforeEach(async () => {
     // Clean test snapshots before each test
-    await database().query("DELETE FROM fx_snapshots WHERE provider = $1", [TEST_PROVIDER]);
+    await fixtures.query("DELETE FROM fx_snapshots WHERE provider = $1", [TEST_PROVIDER]);
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await database().query("DELETE FROM fx_snapshots WHERE provider = $1", [TEST_PROVIDER]);
+    await fixtures.query("DELETE FROM fx_snapshots WHERE provider = $1", [TEST_PROVIDER]);
   });
 
   afterAll(async () => {
+    await fixtures.end();
     await database().end();
   });
 
-  it("persists snapshot with full precision, effective date, and accepted state", async () => {
+  it("persists a validated snapshot with full precision and effective date", async () => {
     const fetchedAt = new Date();
     const snapshot = await upsertSnapshot(
       TEST_PROVIDER,
@@ -102,11 +112,8 @@ describe("FX snapshot persistence & cache (PostgreSQL)", () => {
     expect(snapshot.quoteCurrency).toBe("USD");
     expect(snapshot.rate).toBe("1.1225");
     expect(snapshot.effectiveDate).toBe("2026-10-02");
-    expect(snapshot.state).toBe("accepted");
-    expect(snapshot.rejectionReason).toBeNull();
-
     // Verify row directly in PostgreSQL
-    const dbCheck = await database().query(
+    const dbCheck = await fixtures.query(
       "SELECT id, rate::text, effective_date::text FROM fx_snapshots WHERE id = $1",
       [snapshot.id],
     );
@@ -131,6 +138,39 @@ describe("FX snapshot persistence & cache (PostgreSQL)", () => {
     const found = await findRecentSnapshot(TEST_PROVIDER, "EUR", "SGD", CACHE_TTL_MS);
     expect(found).not.toBeNull();
     expect(found?.effectiveDate).toBe("2026-10-02");
+  });
+
+  it("rejects NaN, infinite dates, unsupported pairs and padded providers", async () => {
+    const invalidRows = [
+      ["ecb ", "EUR", "USD", "1.1", "2026-10-02", new Date()],
+      ["ecb", "USD", "SGD", "1.1", "2026-10-02", new Date()],
+      ["ecb", "EUR", "EUR", "1.1", "2026-10-02", new Date()],
+      ["ecb", "EUR", "USD", "NaN", "2026-10-02", new Date()],
+      ["ecb", "EUR", "USD", "1.1", "infinity", new Date()],
+      ["ecb", "EUR", "USD", "1.1", "2026-10-02", "infinity"],
+    ];
+
+    for (const row of invalidRows) {
+      await expect(fixtures.query(
+        `INSERT INTO fx_snapshots
+           (provider, base_currency, quote_currency, rate, effective_date, fetched_at)
+         VALUES ($1, $2, $3, $4::numeric, $5::date, $6::timestamptz)`,
+        row,
+      )).rejects.toMatchObject({ code: "23514" });
+    }
+  });
+
+  it("writes a complete ECB response atomically", async () => {
+    await expect(upsertSnapshots(TEST_PROVIDER, [
+      { baseCurrency: "EUR", quoteCurrency: "USD", rate: "1.1225", effectiveDate: "2026-10-02" },
+      { baseCurrency: "EUR", quoteCurrency: "JPY", rate: "170", effectiveDate: "2026-10-02" },
+    ], new Date())).rejects.toMatchObject({ code: "23514" });
+
+    const count = await fixtures.query(
+      "SELECT count(*)::int AS count FROM fx_snapshots WHERE provider = $1",
+      [TEST_PROVIDER],
+    );
+    expect(count.rows[0].count).toBe(0);
   });
 
   it("duplicate fetch is idempotent and updates fetched_at without creating duplicate rows", async () => {
@@ -162,11 +202,30 @@ describe("FX snapshot persistence & cache (PostgreSQL)", () => {
     expect(new Date(s2.fetchedAt).getTime()).toBeGreaterThanOrEqual(new Date(s1.fetchedAt).getTime());
 
     // Only one row exists in PostgreSQL
-    const countRes = await database().query(
+    const countRes = await fixtures.query(
       "SELECT COUNT(*)::int AS count FROM fx_snapshots WHERE provider = $1 AND quote_currency = 'USD'",
       [TEST_PROVIDER],
     );
     expect(countRes.rows[0].count).toBe(1);
+  });
+
+  it("does not let an older response overwrite a newer correction", async () => {
+    const effectiveDate = "2026-10-02";
+    const newer = new Date("2026-10-08T12:00:00Z");
+    const older = new Date("2026-10-08T11:00:00Z");
+    await upsertSnapshot(
+      TEST_PROVIDER,
+      { baseCurrency: "EUR", quoteCurrency: "USD", rate: "1.2", effectiveDate },
+      newer,
+    );
+    const result = await upsertSnapshot(
+      TEST_PROVIDER,
+      { baseCurrency: "EUR", quoteCurrency: "USD", rate: "9.9", effectiveDate },
+      older,
+    );
+
+    expect(result.rate).toBe("1.2");
+    expect(result.fetchedAt).toEqual(newer);
   });
 
   it("cache hit avoids calling provider on subsequent getEurRate calls", async () => {
@@ -190,10 +249,10 @@ describe("FX snapshot persistence & cache (PostgreSQL)", () => {
   it("provider timeout with cached snapshot returns STALE", async () => {
     // Seed an expired snapshot directly into Postgres
     const staleFetchedAt = new Date(Date.now() - CACHE_TTL_MS - 30_000);
-    await database().query(
+    await fixtures.query(
       `INSERT INTO fx_snapshots
-         (provider, base_currency, quote_currency, rate, effective_date, fetched_at, state)
-       VALUES ($1, 'EUR', 'USD', 1.1200, '2026-10-01', $2, 'accepted')`,
+         (provider, base_currency, quote_currency, rate, effective_date, fetched_at)
+       VALUES ($1, 'EUR', 'USD', 1.1200, '2026-10-01', $2)`,
       [TEST_PROVIDER, staleFetchedAt],
     );
 
@@ -210,6 +269,7 @@ describe("FX snapshot persistence & cache (PostgreSQL)", () => {
 
     expect(res.rate.rate).toBe("1.12");
     expect(res.effectiveDate).toBe("2026-10-01");
+    expect(res.refreshFailure?.code).toBe("PROVIDER_ERROR");
   });
 
   it("provider timeout without cache returns UNAVAILABLE", async () => {
@@ -221,6 +281,9 @@ describe("FX snapshot persistence & cache (PostgreSQL)", () => {
 
     const res = await getEurRate("USD", timeoutProvider);
     expect(res.status).toBe("UNAVAILABLE");
+    if (res.status !== "UNAVAILABLE") return;
+    expect(res.rate).toBeNull();
+    expect(res.failure.code).toBe("PROVIDER_ERROR");
   });
 
   it("derives accurate cross rates and performs money conversions with DB-backed rates", async () => {

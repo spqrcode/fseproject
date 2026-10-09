@@ -45,7 +45,6 @@ const FETCH_TIMEOUT_MS = 10_000;
  */
 export const liveEcbProvider: EcbProvider = {
   async fetchRates(): Promise<EcbFetchResult> {
-    const fetchedAt = new Date();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
@@ -60,11 +59,13 @@ export const liveEcbProvider: EcbProvider = {
         return {
           ok: false,
           reason: `ECB returned HTTP ${response.status} ${response.statusText}`,
-          fetchedAt,
+          fetchedAt: new Date(),
         };
       }
       const csv = await response.text();
-      return { ok: true, csv, fetchedAt };
+      // Freshness begins when the complete response has been received, not
+      // when the request started.
+      return { ok: true, csv, fetchedAt: new Date() };
     } catch (error: unknown) {
       const reason =
         error instanceof Error
@@ -72,7 +73,7 @@ export const liveEcbProvider: EcbProvider = {
             ? `ECB request timed out after ${FETCH_TIMEOUT_MS}ms`
             : error.message
           : "Unknown network error";
-      return { ok: false, reason, fetchedAt };
+      return { ok: false, reason, fetchedAt: new Date() };
     } finally {
       clearTimeout(timer);
     }

@@ -12,9 +12,10 @@ PostgreSQL 16, accessed through the server-only `pg` driver and parameterized SQ
 | workspaces | The user's workspace (the former `portfolios` table, renamed by 005) | UUID primary key; unique user FK, so one per user; trimmed 1–80 character name; optional `danger_threshold` numeric(20,2), NaN excluded |
 | cash_accounts | A named account in one currency | UUID primary key; workspace FK with cascade; trimmed 1–80 character name, unique per workspace; currency EUR, USD or SGD; `opening_balance` numeric(20,2), NaN excluded; `UNIQUE (id, workspace_id)` |
 | cash_events | One expected income (positive) or expense (negative) on an account | UUID primary key; workspace FK with cascade; composite FK `(account_id, workspace_id)` to `cash_accounts`; trimmed 1–200 character description; amount numeric(20,2), not zero, not NaN; finite date-only `expected_date`; status expected, received, paid or cancelled; received needs amount > 0 and paid needs amount < 0; `UNIQUE (id, workspace_id)` |
+| fx_snapshots | Validated ECB EUR/USD and EUR/SGD observations | UUID primary key; provider and supported pair checks; positive non-NaN numeric(30,15) rate; finite effective date and fetch timestamp; one row per provider, pair and effective date |
 | schema_migrations | Applied migration history | Unique migration filename |
 
-Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. `004_appearance.sql` does the same for the appearance preference. `005_workspace_cash_events.sql` renames `portfolios` to `workspaces`, adds `danger_threshold`, creates `cash_accounts` and `cash_events`, and grants the staging runtime role what the application needs on them (see [deployment](deployment.md)). Holdings are not present.
+Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. `004_appearance.sql` does the same for the appearance preference. `005_workspace_cash_events.sql` renames `portfolios` to `workspaces`, adds `danger_threshold`, creates `cash_accounts` and `cash_events`, and grants the staging runtime role what the application needs on them. `006_fx_snapshots.sql` creates the global validated ECB cache with narrow runtime grants (see [deployment](deployment.md)). Holdings are not present.
 
 ## Migrations
 
@@ -45,3 +46,9 @@ Ownership runs user → workspace → account → event. The chain is enforced t
 - **Two decimals.** The application rejects amounts with more than two decimals. The database would round them silently on assignment, so the stores never pass such a value.
 - **Cascade.** Deleting a user removes the workspace, its accounts and its events. Events also cascade from the workspace directly. The account foreign key keeps the default `NO ACTION`: an account that still has events cannot be deleted on its own.
 - **Indexes.** `cash_events (workspace_id, expected_date)` serves the per-workspace date-range list. The unique constraints index accounts and the event id lookups; a separate `workspace_id` index would repeat the first column of the composite one.
+
+## ECB exchange-rate snapshots (migration 006)
+
+FX snapshots are global reference data rather than user-owned rows. Only validated EUR/USD and EUR/SGD observations are stored. USD/SGD is derived in memory from two snapshots with the same effective date; snapshots from different dates are never mixed. The store reads `date` as text, returns normalized decimal strings and exposes both the ECB effective date and server fetch time.
+
+One provider response is inserted in one SQL statement, so USD and SGD cannot be partially written. A later response for the same effective date refreshes the rate and fetch time; an older response arriving late cannot overwrite a newer one. The database explicitly rejects `NaN`, infinite dates/timestamps, unsupported currency pairs and padded provider names.
