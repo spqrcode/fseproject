@@ -3,6 +3,7 @@ import type { FxSnapshot } from "@/lib/fx/snapshot-store";
 import {
   calculateShockedRate,
   evaluateFxShock,
+  buildScenarioFxResult,
   convertWithShock,
   InvalidShockPercentageError,
   MissingSnapshotError,
@@ -25,8 +26,6 @@ const BASE_SNAPSHOT: FxSnapshot = Object.freeze({
   rate: "1.1225",
   effectiveDate: "2026-10-02",
   fetchedAt: new Date("2026-10-02T16:05:00Z"),
-  state: "accepted",
-  rejectionReason: null,
 });
 
 describe("Percentage-based FX shock domain logic", () => {
@@ -109,15 +108,8 @@ describe("Percentage-based FX shock domain logic", () => {
     expect(() => evaluateFxShock(undefined, "5")).toThrow(MissingSnapshotError);
   });
 
-  // 9. Unusable snapshot state
-  it("throws UnusableSnapshotError when snapshot state is rejected or invalid", () => {
-    const rejectedSnapshot: FxSnapshot = {
-      ...BASE_SNAPSHOT,
-      state: "rejected",
-      rejectionReason: "Provider validation failed",
-    };
-    expect(() => evaluateFxShock(rejectedSnapshot, "5")).toThrow(UnusableSnapshotError);
-
+  // 9. Unusable snapshot rate
+  it("throws UnusableSnapshotError when the persisted rate is non-positive", () => {
     const zeroRateSnapshot: FxSnapshot = {
       ...BASE_SNAPSHOT,
       rate: "0",
@@ -193,9 +185,49 @@ describe("Percentage-based FX shock domain logic", () => {
     expect(evaluated.sourceSnapshotId).toBe(BASE_SNAPSHOT.id);
     expect(evaluated.provider).toBe("ecb");
     expect(evaluated.effectiveDate).toBe("2026-10-02");
-    expect(evaluated.sourceState).toBe("accepted");
     expect(evaluated.baseCurrency).toBe("EUR");
     expect(evaluated.quoteCurrency).toBe("USD");
+  });
+
+  it("builds the Scenario Lab result from an already-resolved inverse rate", () => {
+    const result = buildScenarioFxResult(
+      {
+        status: "STALE",
+        rate: { base: "SGD", quote: "EUR", rate: "0.6734" },
+        provider: "ecb",
+        snapshotIds: [BASE_SNAPSHOT.id],
+        effectiveDate: "2026-10-02",
+        fetchedAt: BASE_SNAPSHOT.fetchedAt,
+        refreshFailure: { code: "PROVIDER_ERROR", message: "Exchange rates are temporarily unavailable." },
+      },
+      { baseCurrency: "SGD", quoteCurrency: "EUR" },
+      "-10",
+    );
+
+    expect(result.freshness).toBe("STALE");
+    expect(result.sourceRate).toBe("0.6734");
+    expect(result.adjustedRate).toBe("0.60606");
+    expect(result.sourceSnapshotIds).toEqual([BASE_SNAPSHOT.id]);
+  });
+
+  it("returns null rates when the FX service reports UNAVAILABLE", () => {
+    const result = buildScenarioFxResult(
+      {
+        status: "UNAVAILABLE",
+        rate: null,
+        provider: "ecb",
+        snapshotIds: [],
+        effectiveDate: null,
+        fetchedAt: null,
+        failure: { code: "MISSING_RATE", message: "A required exchange rate is missing." },
+      },
+      { baseCurrency: "USD", quoteCurrency: "SGD" },
+      "5",
+    );
+
+    expect(result.sourceRate).toBeNull();
+    expect(result.adjustedRate).toBeNull();
+    expect(result.sourceSnapshotIds).toEqual([]);
   });
 
   // 16. Hypothetical state is explicitly labelled

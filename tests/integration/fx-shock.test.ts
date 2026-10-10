@@ -2,7 +2,7 @@
  * Integration tests for Scenario FX shock persistence and resolution against real PostgreSQL.
  *
  * Verifies:
- *  1. Persisting FX shock adjustments in `scenario_fx_shocks` (migration 007).
+ *  1. Persisting FX shock adjustments in `scenario_fx_shocks` (migration 008).
  *  2. Database CHECK constraint enforces shock_percent > -100%.
  *  3. Unique constraint UNIQUE(scenario_id, snapshot_id) prevents conflicting duplicate shocks.
  *  4. ON DELETE RESTRICT on fx_snapshots prevents deletion of referenced historical rates.
@@ -14,6 +14,7 @@ import { beforeEach, afterEach, afterAll, describe, it, expect, vi } from "vites
 import { database } from "@/lib/db";
 import { createSession } from "@/lib/session-store";
 import { createScenario } from "@/lib/scenario-store";
+import { saveWorkspace } from "@/lib/workspace-store";
 import { upsertSnapshot } from "@/lib/fx/snapshot-store";
 import {
   addScenarioFxShock,
@@ -50,6 +51,7 @@ const emails: string[] = [];
 let token: string;
 let scenarioId: string;
 let snapshotId: string;
+let workspaceId: string;
 
 async function createTestUser(email: string) {
   const result = await database().query(
@@ -66,8 +68,10 @@ describe("Scenario FX shock persistence (PostgreSQL)", () => {
     const session = await createSession(userId);
     token = session.token;
 
+    await saveWorkspace(token, "FX shock test workspace");
     const scenario = await createScenario(token, "Stress Test USD Depreciation");
     scenarioId = scenario.id;
+    workspaceId = scenario.workspaceId;
 
     // Seed a persisted snapshot
     const snap = await upsertSnapshot(
@@ -110,22 +114,29 @@ describe("Scenario FX shock persistence (PostgreSQL)", () => {
       [shock.id],
     );
     expect(dbRow.rows).toHaveLength(1);
-    expect(dbRow.rows[0].shock_percent).toBe("5.000000"); // NUMERIC(18,6)
+    expect(dbRow.rows[0].shock_percent).toBe("5");
     expect(dbRow.rows[0].status).toBe("active");
   });
 
   it("enforces database CHECK constraint rejecting shock_percent <= -100", async () => {
     await expect(
       database().query(
-        "INSERT INTO scenario_fx_shocks (scenario_id, snapshot_id, shock_percent) VALUES ($1, $2, -100)",
-        [scenarioId, snapshotId],
+        "INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent) VALUES ($1, $2, $3, -100)",
+        [workspaceId, scenarioId, snapshotId],
       ),
     ).rejects.toThrow();
 
     await expect(
       database().query(
-        "INSERT INTO scenario_fx_shocks (scenario_id, snapshot_id, shock_percent) VALUES ($1, $2, -105)",
-        [scenarioId, snapshotId],
+        "INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent) VALUES ($1, $2, $3, -105)",
+        [workspaceId, scenarioId, snapshotId],
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      database().query(
+        "INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent) VALUES ($1, $2, $3, 'NaN')",
+        [workspaceId, scenarioId, snapshotId],
       ),
     ).rejects.toThrow();
   });
@@ -176,5 +187,27 @@ describe("Scenario FX shock persistence (PostgreSQL)", () => {
     await expect(evaluateScenarioFxShock(token, scenarioId, shock.id)).rejects.toThrow(
       UnusableSnapshotError,
     );
+  });
+
+  it("does not expose or mutate another workspace's FX shocks", async () => {
+    const shock = await addScenarioFxShock(token, scenarioId, snapshotId, "5");
+    const otherUserId = await createTestUser(`fx-shock-other-${Date.now()}@example.com`);
+    const otherSession = await createSession(otherUserId);
+    await saveWorkspace(otherSession.token, "Other FX workspace");
+    const otherScenario = await createScenario(otherSession.token, "Other scenario");
+
+    expect(await getScenarioFxShocks(otherSession.token, scenarioId)).toEqual([]);
+    expect(await invalidateScenarioFxShock(otherSession.token, shock.id)).toBe(false);
+    await expect(
+      evaluateScenarioFxShock(otherSession.token, otherScenario.id, shock.id),
+    ).rejects.toThrow("FX shock not found or access denied.");
+  });
+
+  it("handles malformed ids without PostgreSQL cast errors", async () => {
+    await expect(
+      addScenarioFxShock(token, "not-a-uuid", snapshotId, "5"),
+    ).rejects.toThrow("Scenario or FX snapshot not found or access denied.");
+    expect(await getScenarioFxShocks(token, "not-a-uuid")).toEqual([]);
+    expect(await invalidateScenarioFxShock(token, "not-a-uuid")).toBe(false);
   });
 });

@@ -12,15 +12,29 @@
 --
 CREATE TABLE scenario_fx_shocks (
   id              uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
-  scenario_id     uuid          NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
+  workspace_id    uuid          NOT NULL,
+  scenario_id     uuid          NOT NULL,
   snapshot_id     uuid          NOT NULL REFERENCES fx_snapshots(id) ON DELETE RESTRICT,
-  shock_percent   numeric(18,6) NOT NULL CHECK (shock_percent > -100),
+  shock_percent   numeric       NOT NULL CHECK (shock_percent <> 'NaN' AND shock_percent > -100),
   status          text          NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'invalid')),
   created_at      timestamptz   NOT NULL DEFAULT now(),
   updated_at      timestamptz   NOT NULL DEFAULT now(),
+  FOREIGN KEY (scenario_id, workspace_id)
+    REFERENCES scenarios(id, workspace_id) ON DELETE CASCADE,
   CONSTRAINT scenario_fx_shocks_unique_scenario_snapshot
     UNIQUE (scenario_id, snapshot_id)
 );
 
 CREATE INDEX scenario_fx_shocks_scenario_id_idx ON scenario_fx_shocks(scenario_id);
 CREATE INDEX scenario_fx_shocks_snapshot_id_idx ON scenario_fx_shocks(snapshot_id);
+
+-- The runtime can create/read shocks and invalidate them, but cannot move a
+-- shock to another workspace/scenario or rewrite its snapshot and percentage.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fse_runtime') THEN
+    GRANT SELECT, INSERT ON scenario_fx_shocks TO fse_runtime;
+    GRANT UPDATE (status, updated_at) ON scenario_fx_shocks TO fse_runtime;
+  END IF;
+END
+$$;

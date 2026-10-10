@@ -12,11 +12,11 @@
  *  - No JavaScript floating-point arithmetic is used (uses ForecastDecimal).
  *  - No rounding is performed during internal calculations.
  *  - Both sourceRate and shockedRate are returned.
- *  - Source snapshot ID, effective date, provider, and source state are preserved.
+ *  - Source snapshot IDs, effective date, provider, and freshness are preserved.
  *  - Clearly labelled as hypothetical.
  *  - Re-evaluating the same adjustment against the same snapshot produces the exact same result.
  *  - Inverse conversion uses the reciprocal of the shocked rate, not a separately shocked inverse rate.
- *  - If snapshot is missing or unusable (rejected / non-positive), an explicit error state is returned.
+ *  - UNAVAILABLE results never fabricate a source or adjusted rate.
  *
  * This module has NO database, network, or UI dependencies.
  */
@@ -25,7 +25,8 @@ import { parseDecimal, decimalString, DecimalInputError } from "@/lib/forecast/d
 import { fxRate, convertMoney, type FxRate } from "@/lib/forecast/fx";
 import type { Currency, Money } from "@/lib/forecast/money";
 import { parseCurrency } from "@/lib/forecast/money";
-import type { FxSnapshot, SnapshotState } from "@/lib/fx/snapshot-store";
+import type { RateFailure, RateResult } from "@/lib/fx/rate-service";
+import type { FxSnapshot } from "@/lib/fx/snapshot-store";
 
 // ---------------------------------------------------------------------------
 // Error classes
@@ -85,8 +86,6 @@ export type EvaluatedFxShock = Readonly<{
   shockPercent: string;
   /** Resulting shocked rate as a full-precision decimal string. */
   shockedRate: string;
-  /** State of the underlying snapshot (must be 'accepted'). */
-  sourceState: SnapshotState;
   /** Explicitly identifies the rate as a scenario shock. */
   isHypothetical: true;
   /** User-facing label. */
@@ -99,6 +98,37 @@ export type EvaluatedFxShock = Readonly<{
    */
   reciprocalRate: string;
 }>;
+
+/** Result contract consumed by Scenario Lab. */
+export type ScenarioFxResult =
+  | Readonly<{
+      freshness: "CURRENT" | "STALE";
+      sourceRate: string;
+      adjustedRate: string;
+      baseCurrency: Currency;
+      quoteCurrency: Currency;
+      shockPercent: string;
+      effectiveDate: string;
+      provider: string;
+      sourceSnapshotIds: readonly string[];
+      refreshFailure: RateFailure | null;
+      adjustedFxRate: FxRate;
+      isHypothetical: true;
+    }>
+  | Readonly<{
+      freshness: "UNAVAILABLE";
+      sourceRate: null;
+      adjustedRate: null;
+      baseCurrency: Currency;
+      quoteCurrency: Currency;
+      shockPercent: string;
+      effectiveDate: null;
+      provider: string;
+      sourceSnapshotIds: readonly [];
+      failure: RateFailure;
+      adjustedFxRate: null;
+      isHypothetical: true;
+    }>;
 
 // ---------------------------------------------------------------------------
 // Calculation functions
@@ -169,7 +199,7 @@ export function calculateShockedRate(sourceRate: string, shockPercent: string): 
  * Pure function: does not modify the snapshot and does not make network calls.
  *
  * Throws MissingSnapshotError if snapshot is null or undefined.
- * Throws UnusableSnapshotError if snapshot state is not 'accepted' or rate is invalid.
+ * Throws UnusableSnapshotError if the persisted rate is invalid.
  * Throws InvalidShockPercentageError if shockPercent <= -100 or malformed.
  */
 export function evaluateFxShock(
@@ -180,17 +210,11 @@ export function evaluateFxShock(
     throw new MissingSnapshotError();
   }
 
-  if (snapshot.state !== "accepted") {
-    throw new UnusableSnapshotError(
-      `snapshot state is "${snapshot.state}"`,
-      snapshot.id,
-    );
-  }
-
   const baseCurrency = parseCurrency(snapshot.baseCurrency);
   const quoteCurrency = parseCurrency(snapshot.quoteCurrency);
 
-  const shockedRate = calculateShockedRate(snapshot.rate, shockPercent);
+  const sourceRate = decimalString(parseDecimal(snapshot.rate));
+  const shockedRate = calculateShockedRate(sourceRate, shockPercent);
   const shockedFxRate = fxRate(baseCurrency, quoteCurrency, shockedRate);
 
   // Reciprocal = 1 / shockedRate
@@ -202,15 +226,80 @@ export function evaluateFxShock(
     baseCurrency,
     quoteCurrency,
     effectiveDate: snapshot.effectiveDate,
-    sourceRate: snapshot.rate,
+    sourceRate,
     shockPercent: decimalString(parseDecimal(shockPercent)),
     shockedRate,
-    sourceState: snapshot.state,
     isHypothetical: true,
     label: "hypothetical",
     shockedFxRate,
     reciprocalRate,
   });
+}
+
+/**
+ * Apply a percentage shock to a rate already resolved by the FX service.
+ * The service owns direct, reciprocal and cross-rate calculation; this
+ * function never derives a currency pair or reads the clock/network.
+ */
+export function buildScenarioFxResult(
+  rateResult: RateResult,
+  currencies: Readonly<{ baseCurrency: Currency; quoteCurrency: Currency }>,
+  shockPercent: string,
+): ScenarioFxResult {
+  const normalizedShock = decimalString(parseShockPercent(shockPercent));
+  const baseCurrency = parseCurrency(currencies.baseCurrency);
+  const quoteCurrency = parseCurrency(currencies.quoteCurrency);
+
+  if (rateResult.status === "UNAVAILABLE") {
+    return Object.freeze({
+      freshness: "UNAVAILABLE",
+      sourceRate: null,
+      adjustedRate: null,
+      baseCurrency,
+      quoteCurrency,
+      shockPercent: normalizedShock,
+      effectiveDate: null,
+      provider: rateResult.provider,
+      sourceSnapshotIds: Object.freeze([]) as readonly [],
+      failure: rateResult.failure,
+      adjustedFxRate: null,
+      isHypothetical: true,
+    });
+  }
+
+  if (rateResult.rate.base !== baseCurrency || rateResult.rate.quote !== quoteCurrency) {
+    throw new UnusableSnapshotError(
+      `resolved rate ${rateResult.rate.base}/${rateResult.rate.quote} does not match requested pair ${baseCurrency}/${quoteCurrency}`,
+    );
+  }
+
+  const adjustedRate = calculateShockedRate(rateResult.rate.rate, normalizedShock);
+  return Object.freeze({
+    freshness: rateResult.status,
+    sourceRate: rateResult.rate.rate,
+    adjustedRate,
+    baseCurrency,
+    quoteCurrency,
+    shockPercent: normalizedShock,
+    effectiveDate: rateResult.effectiveDate,
+    provider: rateResult.provider,
+    sourceSnapshotIds: Object.freeze([...rateResult.snapshotIds]),
+    refreshFailure: rateResult.refreshFailure,
+    adjustedFxRate: fxRate(baseCurrency, quoteCurrency, adjustedRate),
+    isHypothetical: true,
+  });
+}
+
+function parseShockPercent(value: string) {
+  let parsed;
+  try {
+    parsed = parseDecimal(value);
+  } catch (error) {
+    if (error instanceof DecimalInputError) throw new InvalidShockPercentageError(value);
+    throw error;
+  }
+  if (parsed.lessThanOrEqualTo(-100)) throw new InvalidShockPercentageError(value);
+  return parsed;
 }
 
 /**

@@ -37,11 +37,13 @@ export {
 export {
   calculateShockedRate,
   evaluateFxShock,
+  buildScenarioFxResult,
   convertWithShock,
   InvalidShockPercentageError,
   MissingSnapshotError,
   UnusableSnapshotError,
   type EvaluatedFxShock,
+  type ScenarioFxResult,
 } from "@/lib/fx/fx-shock";
 
 export {
@@ -51,4 +53,3 @@ export {
   invalidateScenarioFxShock,
   type PersistedFxShock,
 } from "@/lib/fx/shock-store";
-

@@ -117,6 +117,17 @@ As a signed-in user, I can delay an expected customer invoice in a scenario so t
 - Missing, inaccessible, malformed and ineligible targets fail explicitly without revealing another workspace's data.
 - Deleting an expected event removes its dependent hypothetical adjustment, and deleting the user cascades all scenario data.
 
+## US-14 Percentage-based FX shocks
+
+As a signed-in user, I can apply a percentage shock to a resolved EUR, USD or SGD rate and see the hypothetical rate without changing the stored ECB observation.
+
+- `-10` means minus 10%, not a ratio of `-0.1`; percentages must be plain decimals greater than -100.
+- The FX service resolves direct, reciprocal and cross rates before the Forecast Engine consumes them. The engine does not derive SGD/EUR or USD/SGD itself.
+- Calculations use Decimal arithmetic with no implicit display rounding and leave snapshots unchanged.
+- CURRENT and STALE results include source and adjusted decimal strings, requested pair, effective date, provider and source snapshot IDs.
+- UNAVAILABLE returns null source and adjusted rates with an explicit failure; it never fabricates a fallback number.
+- Persisted shocks are workspace-isolated and keep their immutable snapshot provenance.
+
 ## Engineering acceptance criteria
 
 - At least three distinct functional views: authentication, portfolio management, and dashboard analytics.
@@ -147,6 +158,7 @@ As a signed-in user, I can delay an expected customer invoice in a scenario so t
 | US-11 forecast integration (agreed 2026-10-08) | Adapter from database statuses to engine statuses, starting balance resolved by the store, default danger threshold, overdue flag; see [decisions](decisions.md#2026-10-08--forecast-integration-statuses-danger-threshold-starting-balance-overdue-events) | Not implemented yet; tests to cover every status mapping, the starting-balance query and overdue events | Forecast integration work; not claimed as delivered |
 | US-13 reliable ECB exchange rates | Migration 006 and `src/lib/fx/*` | Parser/provider/cache unit tests; PostgreSQL constraints, atomic persistence, stale fallback and restricted-role integration tests | Scenarios & Exchange Rates Phase 2 branch; no UI in this increment |
 | US-12 delayed-invoice scenarios | Migration 007, `src/lib/scenario-store.ts`, immutable scenario projection in `src/lib/forecast/scenario.ts` | Unit immutability and delta tests; PostgreSQL ownership, composite-FK, eligibility, date-only, cascade and base-forecast isolation tests | Draft PR #9; final Forecast Engine adapter remains dependent on PR #12 |
+| US-14 percentage-based FX shocks | Migration 008, `src/lib/fx/fx-shock.ts`, `src/lib/fx/shock-store.ts` | Decimal shock/result-contract unit tests; PostgreSQL constraint, provenance, invalidation, malformed-id and cross-workspace tests | Scenarios & Exchange Rates Phase 3 branch; no UI in this increment |
 | US-02 workspace (renamed) | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts` | The existing ownership and origin tests, renamed | Same branch |
 
 Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.

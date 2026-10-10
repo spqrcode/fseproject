@@ -25,6 +25,8 @@ Migration 006 creates the global ECB snapshot cache. If `fse_runtime` exists whe
 
 Migration 007 adds the delayed-invoice scenario tables. If `fse_runtime` exists when the owner applies it, the role receives SELECT and INSERT on `scenarios` and `scenario_adjustments`, plus UPDATE only on `scenario_adjustments.status` and `updated_at`. The application exposes no scenario deletion operation, so the runtime role has no direct DELETE grant; owner-side user/workspace cleanup still follows the foreign-key cascades. Migration 006 is intentionally reserved for the ECB snapshot cache. Migration 007 is additive and may be applied before the scenario code is deployed.
 
+Migration 008 adds `scenario_fx_shocks`. The guarded runtime grants allow SELECT and INSERT plus UPDATE only on `status` and `updated_at`; the role cannot change ownership, snapshot provenance or the stored percentage, and receives no DELETE permission.
+
 Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `APP_ORIGIN` (exact canonical HTTPS staging origin). No production or development connection to staging is intended. Do not overwrite local `.env.local` with staging credentials.
 
 ## Delivery and manual checks

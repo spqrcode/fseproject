@@ -20,6 +20,7 @@ import {
   UnusableSnapshotError,
 } from "@/lib/fx/fx-shock";
 import type { FxSnapshot } from "@/lib/fx/snapshot-store";
+import { uuidSchema } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,8 +53,6 @@ interface JoinedShockRow extends ShockRow {
   rate: string | null;
   effective_date: string | Date | null;
   fetched_at: Date | null;
-  state: string | null;
-  rejection_reason: string | null;
 }
 
 function rowToPersistedShock(row: ShockRow): PersistedFxShock {
@@ -83,11 +82,16 @@ function rowToPersistedShock(row: ShockRow): PersistedFxShock {
  */
 export async function addScenarioFxShock(
   token: string | undefined,
-  scenarioId: string,
-  snapshotId: string,
+  scenarioId: unknown,
+  snapshotId: unknown,
   shockPercent: string,
 ): Promise<PersistedFxShock> {
   if (!token || !validToken(token)) throw new Error("Authentication required.");
+  const scenario = uuidSchema.safeParse(scenarioId);
+  const snapshot = uuidSchema.safeParse(snapshotId);
+  if (!scenario.success || !snapshot.success) {
+    throw new Error("Scenario or FX snapshot not found or access denied.");
+  }
 
   // Validate percentage before DB insert
   let shockDec;
@@ -104,36 +108,22 @@ export async function addScenarioFxShock(
     );
   }
 
-  // Verify ownership of the scenario and existence of the snapshot
-  const check = await database().query<{ scenario_ok: boolean; snapshot_ok: boolean; snapshot_state: string | null }>(
-    `SELECT
-       EXISTS (
-         SELECT 1 FROM scenarios sc
-           JOIN sessions s ON s.user_id = sc.user_id
-          WHERE s.token_hash = $1 AND s.expires_at > now() AND sc.id = $2
-       ) AS scenario_ok,
-       EXISTS (
-         SELECT 1 FROM fx_snapshots fx WHERE fx.id = $3
-       ) AS snapshot_ok,
-       (SELECT fx.state FROM fx_snapshots fx WHERE fx.id = $3) AS snapshot_state`,
-    [tokenHash(token), scenarioId, snapshotId],
-  );
-
-  const { scenario_ok, snapshot_ok, snapshot_state } = check.rows[0];
-  if (!scenario_ok) throw new Error("Scenario not found or access denied.");
-  if (!snapshot_ok) throw new MissingSnapshotError(snapshotId);
-  if (snapshot_state !== "accepted") {
-    throw new UnusableSnapshotError(`snapshot state is "${snapshot_state}"`, snapshotId);
-  }
-
   const result = await database().query<ShockRow>(
-    `INSERT INTO scenario_fx_shocks (scenario_id, snapshot_id, shock_percent)
-       VALUES ($1, $2, $3::numeric)
+    `INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent)
+       SELECT sc.workspace_id, sc.id, fx.id, $4::numeric
+         FROM sessions s
+         JOIN workspaces w ON w.user_id = s.user_id
+         JOIN scenarios sc ON sc.workspace_id = w.id AND sc.id = $2
+         CROSS JOIN fx_snapshots fx
+        WHERE s.token_hash = $1 AND s.expires_at > now()
+          AND fx.id = $3
        RETURNING id, scenario_id, snapshot_id, shock_percent::text, status, created_at, updated_at`,
-    [scenarioId, snapshotId, decimalString(shockDec)],
+    [tokenHash(token), scenario.data, snapshot.data, decimalString(shockDec)],
   );
 
-  if (result.rowCount !== 1) throw new Error("Failed to create FX shock adjustment.");
+  if (result.rowCount !== 1) {
+    throw new Error("Scenario or FX snapshot not found or access denied.");
+  }
   return rowToPersistedShock(result.rows[0]);
 }
 
@@ -142,18 +132,21 @@ export async function addScenarioFxShock(
  */
 export async function invalidateScenarioFxShock(
   token: string | undefined,
-  shockId: string,
+  shockId: unknown,
 ): Promise<boolean> {
   if (!token || !validToken(token)) return false;
+  const id = uuidSchema.safeParse(shockId);
+  if (!id.success) return false;
   const result = await database().query(
     `UPDATE scenario_fx_shocks sfs
         SET status = 'invalid', updated_at = now()
        FROM scenarios sc
-       JOIN sessions s ON s.user_id = sc.user_id
+       JOIN workspaces w ON w.id = sc.workspace_id
+       JOIN sessions s ON s.user_id = w.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sfs.scenario_id = sc.id
         AND sfs.id = $2`,
-    [tokenHash(token), shockId],
+    [tokenHash(token), id.data],
   );
   return (result.rowCount ?? 0) > 0;
 }
@@ -167,19 +160,22 @@ export async function invalidateScenarioFxShock(
  */
 export async function getScenarioFxShocks(
   token: string | undefined,
-  scenarioId: string,
+  scenarioId: unknown,
 ): Promise<PersistedFxShock[]> {
   if (!token || !validToken(token)) return [];
+  const id = uuidSchema.safeParse(scenarioId);
+  if (!id.success) return [];
   const result = await database().query<ShockRow>(
     `SELECT sfs.id, sfs.scenario_id, sfs.snapshot_id, sfs.shock_percent::text,
             sfs.status, sfs.created_at, sfs.updated_at
        FROM scenario_fx_shocks sfs
        JOIN scenarios sc ON sc.id = sfs.scenario_id
-       JOIN sessions s ON s.user_id = sc.user_id
+       JOIN workspaces w ON w.id = sc.workspace_id
+       JOIN sessions s ON s.user_id = w.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sfs.scenario_id = $2
       ORDER BY sfs.created_at ASC`,
-    [tokenHash(token), scenarioId],
+    [tokenHash(token), id.data],
   );
   return result.rows.map(rowToPersistedShock);
 }
@@ -191,24 +187,30 @@ export async function getScenarioFxShocks(
  */
 export async function evaluateScenarioFxShock(
   token: string | undefined,
-  scenarioId: string,
-  shockId: string,
+  scenarioId: unknown,
+  shockId: unknown,
 ): Promise<EvaluatedFxShock> {
   if (!token || !validToken(token)) throw new Error("Authentication required.");
+  const scenario = uuidSchema.safeParse(scenarioId);
+  const shock = uuidSchema.safeParse(shockId);
+  if (!scenario.success || !shock.success) {
+    throw new Error("FX shock not found or access denied.");
+  }
 
   const result = await database().query<JoinedShockRow>(
     `SELECT sfs.id, sfs.scenario_id, sfs.snapshot_id, sfs.shock_percent::text, sfs.status,
             sfs.created_at, sfs.updated_at,
             fx.provider, fx.base_currency, fx.quote_currency, fx.rate::text AS rate,
-            fx.effective_date::text AS effective_date, fx.fetched_at, fx.state, fx.rejection_reason
+            fx.effective_date::text AS effective_date, fx.fetched_at
        FROM scenario_fx_shocks sfs
        JOIN scenarios sc ON sc.id = sfs.scenario_id
-       JOIN sessions s ON s.user_id = sc.user_id
-  LEFT JOIN fx_snapshots fx ON fx.id = sfs.snapshot_id
+       JOIN workspaces w ON w.id = sc.workspace_id
+       JOIN sessions s ON s.user_id = w.user_id
+       JOIN fx_snapshots fx ON fx.id = sfs.snapshot_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sfs.scenario_id = $2
         AND sfs.id = $3`,
-    [tokenHash(token), scenarioId, shockId],
+    [tokenHash(token), scenario.data, shock.data],
   );
 
   if (result.rows.length === 0) {
@@ -220,7 +222,7 @@ export async function evaluateScenarioFxShock(
     throw new UnusableSnapshotError("FX shock adjustment has status 'invalid'");
   }
 
-  if (!row.snapshot_id || !row.rate || !row.provider || !row.base_currency || !row.quote_currency || !row.effective_date || !row.fetched_at || !row.state) {
+  if (!row.snapshot_id || !row.rate || !row.provider || !row.base_currency || !row.quote_currency || !row.effective_date || !row.fetched_at) {
     throw new MissingSnapshotError(row.snapshot_id);
   }
 
@@ -232,8 +234,6 @@ export async function evaluateScenarioFxShock(
     rate: row.rate,
     effectiveDate: typeof row.effective_date === "string" ? row.effective_date.slice(0, 10) : row.effective_date.toISOString().slice(0, 10),
     fetchedAt: row.fetched_at,
-    state: row.state === "accepted" ? "accepted" : "rejected",
-    rejectionReason: row.rejection_reason,
   });
 
   return evaluateFxShock(snapshot, row.shock_percent);

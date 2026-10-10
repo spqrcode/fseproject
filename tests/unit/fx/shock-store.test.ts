@@ -8,7 +8,6 @@ import {
 } from "@/lib/fx/shock-store";
 import {
   InvalidShockPercentageError,
-  MissingSnapshotError,
   UnusableSnapshotError,
 } from "@/lib/fx/fx-shock";
 
@@ -18,7 +17,7 @@ import {
 
 interface MockScenario {
   id: string;
-  user_id: string;
+  workspace_id: string;
   name: string;
 }
 
@@ -30,8 +29,6 @@ interface MockSnapshot {
   rate: string;
   effective_date: string;
   fetched_at: Date;
-  state: string;
-  rejection_reason: string | null;
 }
 
 interface MockShock {
@@ -61,25 +58,12 @@ vi.mock("@/lib/db", () => ({
     query: async (sql: string, params: unknown[] = []) => {
       const sqlNorm = sql.replace(/\s+/g, " ").trim();
 
-      // Check ownership & snapshot existence
-      if (sqlNorm.startsWith("SELECT EXISTS ( SELECT 1 FROM scenarios sc JOIN sessions s")) {
-        const [, scenarioId, snapshotId] = params as [string, string, string];
-        const scenario = mockScenarios.find((s) => s.id === scenarioId);
-        const snapshot = mockSnapshots.find((s) => s.id === snapshotId);
-        return {
-          rows: [
-            {
-              scenario_ok: Boolean(scenario),
-              snapshot_ok: Boolean(snapshot),
-              snapshot_state: snapshot ? snapshot.state : null,
-            },
-          ],
-        };
-      }
-
       // INSERT INTO scenario_fx_shocks
       if (sqlNorm.startsWith("INSERT INTO scenario_fx_shocks")) {
-        const [scenarioId, snapshotId, shockPercent] = params as [string, string, string];
+        const [, scenarioId, snapshotId, shockPercent] = params as [string, string, string, string];
+        const scenario = mockScenarios.find((s) => s.id === scenarioId);
+        const snapshot = mockSnapshots.find((s) => s.id === snapshotId);
+        if (!scenario || !snapshot) return { rowCount: 0, rows: [] };
         const newShock: MockShock = {
           id: randomUUID(),
           scenario_id: scenarioId,
@@ -107,7 +91,7 @@ vi.mock("@/lib/db", () => ({
       }
 
       // SELECT joined shock and snapshot (evaluateScenarioFxShock)
-      if (sqlNorm.includes("LEFT JOIN fx_snapshots fx ON fx.id = sfs.snapshot_id")) {
+      if (sqlNorm.includes("JOIN fx_snapshots fx ON fx.id = sfs.snapshot_id")) {
         const [, qScenarioId, qShockId] = params as [string, string, string];
         const shock = mockShocks.find((s) => s.id === qShockId && s.scenario_id === qScenarioId);
         if (!shock) return { rows: [] };
@@ -129,8 +113,6 @@ vi.mock("@/lib/db", () => ({
               rate: snapshot ? snapshot.rate : null,
               effective_date: snapshot ? snapshot.effective_date : null,
               fetched_at: snapshot ? snapshot.fetched_at : null,
-              state: snapshot ? snapshot.state : null,
-              rejection_reason: snapshot ? snapshot.rejection_reason : null,
             },
           ],
         };
@@ -181,7 +163,7 @@ describe("Scenario FX shock database store", () => {
 
     mockScenarios.push({
       id: scenarioId,
-      user_id: "user-123",
+      workspace_id: randomUUID(),
       name: "Q4 FX Sensitivity",
     });
 
@@ -193,8 +175,6 @@ describe("Scenario FX shock database store", () => {
       rate: "1.1225",
       effective_date: "2026-10-02",
       fetched_at: new Date(),
-      state: "accepted",
-      rejection_reason: null,
     });
   });
 
@@ -224,30 +204,11 @@ describe("Scenario FX shock database store", () => {
       );
     });
 
-    it("throws MissingSnapshotError when snapshot does not exist", async () => {
+    it("rejects a missing snapshot without revealing ownership details", async () => {
       const nonExistentSnapshotId = randomUUID();
       await expect(
         addScenarioFxShock(VALID_TOKEN, scenarioId, nonExistentSnapshotId, "5"),
-      ).rejects.toThrow(MissingSnapshotError);
-    });
-
-    it("throws UnusableSnapshotError when snapshot state is rejected", async () => {
-      const rejectedSnapshotId = randomUUID();
-      mockSnapshots.push({
-        id: rejectedSnapshotId,
-        provider: "ecb",
-        base_currency: "EUR",
-        quote_currency: "USD",
-        rate: "1.1225",
-        effective_date: "2026-10-02",
-        fetched_at: new Date(),
-        state: "rejected",
-        rejection_reason: "corrupt",
-      });
-
-      await expect(
-        addScenarioFxShock(VALID_TOKEN, scenarioId, rejectedSnapshotId, "5"),
-      ).rejects.toThrow(UnusableSnapshotError);
+      ).rejects.toThrow("Scenario or FX snapshot not found or access denied.");
     });
 
     it("requires authentication", async () => {
