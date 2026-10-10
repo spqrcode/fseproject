@@ -15,3 +15,26 @@ export {
   type Currency,
   type Money,
 } from "@/lib/forecast/money";
+
+// Cash-event, forecast, and scenario domain exports
+export {
+  CashEventValidationError,
+  parseCashEvent,
+  type CashEvent,
+  type RawCashEvent,
+} from "@/lib/forecast/cash-event";
+export {
+  runForecast,
+  scenarioContribution,
+  type ForecastInput,
+  type ForecastPoint,
+  type ForecastResult,
+} from "@/lib/forecast/forecast-engine";
+export {
+  applyDelayAdjustment,
+  runScenarioForecast,
+  InvalidAdjustmentError,
+  MissingEventError,
+  type DelayAdjustment,
+  type ScenarioProjection,
+} from "@/lib/forecast/scenario";
