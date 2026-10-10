@@ -11,8 +11,9 @@
 --  - fetched_at is the server timestamp when the HTTP response was received.
 --  - only fully validated provider responses are persisted. Failures are
 --    returned by the service and never fabricated into snapshot rows.
---  - UNIQUE(provider, base_currency, quote_currency, effective_date) prevents
---    duplicate snapshots; a second fetch for the same date is idempotent.
+--  - UNIQUE(provider, base_currency, quote_currency, effective_date, rate)
+--    makes a repeated observation idempotent while preserving an ECB
+--    correction as a new immutable snapshot with its own id.
 --
 CREATE TABLE fx_snapshots (
   id                uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -25,20 +26,23 @@ CREATE TABLE fx_snapshots (
   effective_date    date           NOT NULL CHECK (isfinite(effective_date)),
   fetched_at        timestamptz    NOT NULL DEFAULT now() CHECK (isfinite(fetched_at)),
   CONSTRAINT fx_snapshots_unique_rate
-    UNIQUE (provider, base_currency, quote_currency, effective_date)
+    UNIQUE (provider, base_currency, quote_currency, effective_date, rate)
 );
 
 CREATE INDEX fx_snapshots_lookup_idx
-  ON fx_snapshots (provider, base_currency, quote_currency, fetched_at DESC);
+  ON fx_snapshots (
+    provider, base_currency, quote_currency, effective_date DESC, fetched_at DESC
+  );
 
 -- The application reads cached rows, inserts newly validated snapshots and may
--- refresh only the rate/fetch time when ECB republishes the same effective date.
+-- refresh only the fetch time when ECB repeats the same observation. A
+-- corrected rate is inserted separately so an existing snapshot id is stable.
 -- Cleanup and schema changes remain owner-only.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fse_runtime') THEN
     GRANT SELECT, INSERT ON fx_snapshots TO fse_runtime;
-    GRANT UPDATE (rate, fetched_at) ON fx_snapshots TO fse_runtime;
+    GRANT UPDATE (fetched_at) ON fx_snapshots TO fse_runtime;
   END IF;
 END
 $$;

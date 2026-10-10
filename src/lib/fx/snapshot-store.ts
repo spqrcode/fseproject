@@ -1,10 +1,12 @@
 /**
  * FX snapshot DB persistence.
  *
- * Stores validated ECB rates as snapshot rows. Duplicate fetches for the same
- * (provider, base, quote, effective_date) refresh that row idempotently. A
- * complete provider response is persisted in one SQL statement, so USD and
- * SGD cannot be partially written.
+ * Stores validated ECB rates as immutable snapshot rows. Duplicate fetches for
+ * the same (provider, base, quote, effective_date, rate) refresh only fetchedAt.
+ * If ECB corrects a rate for an existing date, a new snapshot id is inserted so
+ * results that reference the earlier id remain reproducible. A complete
+ * provider response is persisted in one SQL statement, so USD and SGD cannot
+ * be partially written.
  *
  * Ownership: FX rates are global (not user-scoped).  The snapshot table has
  * no user_id column.  Only server-side code in trusted modules may write to it.
@@ -60,8 +62,9 @@ function rowToSnapshot(row: SnapshotRow): FxSnapshot {
 
 /**
  * Persist validated ECB rates. If a snapshot for the same provider, pair and
- * effective date exists, a newer fetch may refresh its rate and fetched_at.
- * An older response arriving late cannot overwrite a newer one.
+ * effective date and rate exists, a newer fetch may refresh only fetched_at.
+ * A different rate is a new immutable snapshot, and an older response arriving
+ * late cannot make its observation the latest cached value.
  */
 export async function upsertSnapshots(
   provider: string,
@@ -88,10 +91,6 @@ export async function upsertSnapshots(
        )
      ON CONFLICT ON CONSTRAINT fx_snapshots_unique_rate
      DO UPDATE SET
-       rate = CASE
-         WHEN EXCLUDED.fetched_at >= fx_snapshots.fetched_at THEN EXCLUDED.rate
-         ELSE fx_snapshots.rate
-       END,
        fetched_at = GREATEST(fx_snapshots.fetched_at, EXCLUDED.fetched_at)
      RETURNING id, provider, base_currency, quote_currency,
                rate::text, effective_date::text AS effective_date, fetched_at`,
@@ -137,7 +136,7 @@ export async function findRecentSnapshot(
         AND base_currency  = $2
         AND quote_currency = $3
         AND fetched_at    >= $4
-      ORDER BY fetched_at DESC
+      ORDER BY effective_date DESC, fetched_at DESC
       LIMIT 1`,
     [provider, baseCurrency, quoteCurrency, cutoff],
   );
@@ -160,7 +159,7 @@ export async function findLatestSnapshot(
       WHERE provider       = $1
         AND base_currency  = $2
         AND quote_currency = $3
-      ORDER BY fetched_at DESC
+      ORDER BY effective_date DESC, fetched_at DESC
       LIMIT 1`,
     [provider, baseCurrency, quoteCurrency],
   );

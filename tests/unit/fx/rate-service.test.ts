@@ -48,11 +48,11 @@ vi.mock("@/lib/db", () => ({
               row.provider === provider &&
               row.base_currency === input.base_currency &&
               row.quote_currency === input.quote_currency &&
-              row.effective_date === input.effective_date,
+              row.effective_date === input.effective_date &&
+              row.rate === input.rate,
           );
           if (existing) {
             if (fetchedAt >= existing.fetched_at) {
-              existing.rate = input.rate;
               existing.fetched_at = fetchedAt;
             }
             return { ...existing };
@@ -83,7 +83,10 @@ vi.mock("@/lib/db", () => ({
               r.quote_currency === quote &&
               r.fetched_at.getTime() >= cutoff.getTime(),
           )
-          .sort((a, b) => b.fetched_at.getTime() - a.fetched_at.getTime());
+          .sort((a, b) =>
+            b.effective_date.localeCompare(a.effective_date) ||
+            b.fetched_at.getTime() - a.fetched_at.getTime()
+          );
 
         return { rows: matching[0] ? [{ ...matching[0] }] : [] };
       }
@@ -98,7 +101,10 @@ vi.mock("@/lib/db", () => ({
               r.base_currency === base &&
               r.quote_currency === quote,
           )
-          .sort((a, b) => b.fetched_at.getTime() - a.fetched_at.getTime());
+          .sort((a, b) =>
+            b.effective_date.localeCompare(a.effective_date) ||
+            b.fetched_at.getTime() - a.fetched_at.getTime()
+          );
 
         return { rows: matching[0] ? [{ ...matching[0] }] : [] };
       }
@@ -139,6 +145,7 @@ describe("FX rate service", () => {
   beforeEach(() => {
     mockDbRows.length = 0;
     vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   describe("caching and freshness", () => {
@@ -241,6 +248,7 @@ describe("FX rate service", () => {
       expect(res.effectiveDate).toBe("2026-10-01");
       expect(res.fetchedAt).toEqual(staleFetchedAt);
       expect(res.refreshFailure?.code).toBe("PROVIDER_ERROR");
+      expect(res.refreshFailure?.message).toBe("Exchange rates are temporarily unavailable.");
     });
 
     it("provider timeout without cache returns UNAVAILABLE", async () => {
@@ -258,6 +266,7 @@ describe("FX rate service", () => {
       expect(res.effectiveDate).toBeNull();
       expect(res.snapshotIds).toEqual([]);
       expect(res.failure.code).toBe("PROVIDER_ERROR");
+      expect(res.failure.message).toBe("Exchange rates are temporarily unavailable.");
     });
 
     it("returns INVALID_RESPONSE when ECB data is malformed and no cache exists", async () => {
@@ -271,6 +280,7 @@ describe("FX rate service", () => {
       expect(res.status).toBe("UNAVAILABLE");
       if (res.status !== "UNAVAILABLE") return;
       expect(res.failure.code).toBe("INVALID_RESPONSE");
+      expect(res.failure.message).toBe("The exchange-rate provider returned invalid data.");
       expect(mockDbRows).toEqual([]);
     });
 
@@ -297,6 +307,7 @@ describe("FX rate service", () => {
       if (res.status === "UNAVAILABLE") return;
       expect(res.rate.rate).toBe("1.43");
       expect(res.effectiveDate).toBe("2026-10-01");
+      expect(res.refreshFailure?.message).not.toContain("Network connection reset");
     });
 
     it("provider unexpected exception without cache returns UNAVAILABLE", async () => {
@@ -308,6 +319,9 @@ describe("FX rate service", () => {
 
       const res = await getEurRate("SGD", throwingProvider);
       expect(res.status).toBe("UNAVAILABLE");
+      if (res.status !== "UNAVAILABLE") return;
+      expect(res.failure.message).toBe("Exchange rates are temporarily unavailable.");
+      expect(res.failure.message).not.toContain("DNS resolution failed");
     });
   });
 

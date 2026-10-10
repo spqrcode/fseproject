@@ -18,6 +18,8 @@
  *   OBS_VALUE: rate (units of CURRENCY per 1 EUR)
  */
 
+import "server-only";
+
 /** Raw response from the network layer; not yet parsed or validated. */
 export type EcbFetchResult =
   | { ok: true; csv: string; fetchedAt: Date }
@@ -38,6 +40,45 @@ const ECB_URL =
 
 /** Milliseconds before the HTTP fetch is aborted. */
 const FETCH_TIMEOUT_MS = 10_000;
+const MAX_RESPONSE_BYTES = 64 * 1024;
+const PROVIDER_UNAVAILABLE_REASON = "ECB exchange rates are temporarily unavailable.";
+
+async function readLimitedText(response: Response): Promise<string> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+    throw new Error(`ECB response exceeded ${MAX_RESPONSE_BYTES} bytes.`);
+  }
+
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) {
+      throw new Error(`ECB response exceeded ${MAX_RESPONSE_BYTES} bytes.`);
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error(`ECB response exceeded ${MAX_RESPONSE_BYTES} bytes.`);
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
 
 /**
  * Live ECB provider.  Must only be used in server-side code.
@@ -56,24 +97,27 @@ export const liveEcbProvider: EcbProvider = {
         cache: "no-store",
       });
       if (!response.ok) {
+        console.error("ECB request returned a non-success status.", {
+          status: response.status,
+          statusText: response.statusText,
+        });
         return {
           ok: false,
-          reason: `ECB returned HTTP ${response.status} ${response.statusText}`,
+          reason: PROVIDER_UNAVAILABLE_REASON,
           fetchedAt: new Date(),
         };
       }
-      const csv = await response.text();
+      const csv = await readLimitedText(response);
       // Freshness begins when the complete response has been received, not
       // when the request started.
       return { ok: true, csv, fetchedAt: new Date() };
     } catch (error: unknown) {
-      const reason =
-        error instanceof Error
-          ? error.name === "AbortError"
-            ? `ECB request timed out after ${FETCH_TIMEOUT_MS}ms`
-            : error.message
-          : "Unknown network error";
-      return { ok: false, reason, fetchedAt: new Date() };
+      console.error("ECB request failed.", error);
+      return {
+        ok: false,
+        reason: PROVIDER_UNAVAILABLE_REASON,
+        fetchedAt: new Date(),
+      };
     } finally {
       clearTimeout(timer);
     }

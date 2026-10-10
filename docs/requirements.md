@@ -101,7 +101,8 @@ As a signed-in user, I can use EUR, USD and SGD exchange rates with visible sour
 - The server fetches the latest EUR/USD and EUR/SGD observations from the official ECB SDMX endpoint; USD/SGD and reciprocal pairs are derived with Decimal arithmetic.
 - Only validated positive plain-decimal rates and real date-only effective dates are stored. Values that would be rounded by `numeric(30,15)` are rejected before persistence.
 - A snapshot fetched within one hour is CURRENT and avoids a provider call. After a refresh failure, an older snapshot may be returned only as STALE with its effective date and failure metadata.
-- With no usable snapshot, the result is UNAVAILABLE with a null rate and an explicit failure code; zero and hard-coded fallback numbers are forbidden.
+- With no usable snapshot, the result is UNAVAILABLE with a null rate and an explicit failure code; zero and hard-coded fallback numbers are forbidden. Failure messages exposed to the UI are fixed safe text rather than raw network, proxy or database details.
+- Existing snapshot ids are immutable. A corrected ECB rate for the same effective date receives a new id, while an identical repeat updates only its fetch time.
 - A cross-rate uses two ECB legs from the same effective date. Different dates return UNAVAILABLE instead of a mixed-date number.
 - Results include provider, source snapshot IDs, effective date and fetch timestamp for the Scenario Lab.
 

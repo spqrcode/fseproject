@@ -15,7 +15,7 @@ Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and 
 
 ## Running data-store tests as the staging role
 
-`tests/integration/cash-events.test.ts` and `tests/integration/fx.test.ts` read an optional `TEST_FIXTURES_DATABASE_URL`. When it is set, the application under test connects as `DATABASE_URL` (a role with only the grants in [deployment](deployment.md)) while fixtures and cleanup use a separate owner connection. Create a `_test` database, create `fse_runtime` first so the migrations' guarded grants apply, run migrations as the owner, and supply the owner URL as `TEST_FIXTURES_DATABASE_URL`. Cash-event tests additionally need the base grants listed in `deployment.md`. The FX test verifies that migration 006 permits cache reads/inserts and only rate/fetch-time updates while refusing DELETE and immutable-column updates.
+`tests/integration/cash-events.test.ts` and `tests/integration/fx.test.ts` read an optional `TEST_FIXTURES_DATABASE_URL`. When it is set, the application under test connects as `DATABASE_URL` (a role with only the grants in [deployment](deployment.md)) while fixtures and cleanup use a separate owner connection. Create a `_test` database, create `fse_runtime` first so the migrations' guarded grants apply, run migrations as the owner, and supply the owner URL as `TEST_FIXTURES_DATABASE_URL`. Cash-event tests additionally need the base grants listed in `deployment.md`. The FX test verifies that migration 006 permits cache reads/inserts and only fetch-time updates while refusing DELETE and immutable-column updates, including changes to an existing snapshot rate.
 
 ## Test isolation
 

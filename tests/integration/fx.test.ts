@@ -18,6 +18,7 @@ import {
   upsertSnapshot,
   upsertSnapshots,
   findRecentSnapshot,
+  findLatestSnapshot,
 } from "@/lib/fx/snapshot-store";
 import {
   getEurRate,
@@ -209,23 +210,80 @@ describe("FX snapshot persistence & cache (PostgreSQL)", () => {
     expect(countRes.rows[0].count).toBe(1);
   });
 
-  it("does not let an older response overwrite a newer correction", async () => {
+  it("preserves corrected rates as separate immutable snapshot ids", async () => {
+    const effectiveDate = "2026-10-02";
+    const firstFetch = new Date("2026-10-08T11:00:00Z");
+    const correctionFetch = new Date("2026-10-08T12:00:00Z");
+    const original = await upsertSnapshot(
+      TEST_PROVIDER,
+      { baseCurrency: "EUR", quoteCurrency: "USD", rate: "1.2", effectiveDate },
+      firstFetch,
+    );
+    const correction = await upsertSnapshot(
+      TEST_PROVIDER,
+      { baseCurrency: "EUR", quoteCurrency: "USD", rate: "1.3", effectiveDate },
+      correctionFetch,
+    );
+
+    expect(correction.id).not.toBe(original.id);
+    const rows = await fixtures.query(
+      `SELECT id, rate::text FROM fx_snapshots
+        WHERE provider = $1 AND quote_currency = 'USD'
+        ORDER BY fetched_at`,
+      [TEST_PROVIDER],
+    );
+    expect(rows.rows).toEqual([
+      { id: original.id, rate: "1.200000000000000" },
+      { id: correction.id, rate: "1.300000000000000" },
+    ]);
+  });
+
+  it("does not select an older late response over a newer snapshot", async () => {
     const effectiveDate = "2026-10-02";
     const newer = new Date("2026-10-08T12:00:00Z");
     const older = new Date("2026-10-08T11:00:00Z");
-    await upsertSnapshot(
+    const current = await upsertSnapshot(
       TEST_PROVIDER,
       { baseCurrency: "EUR", quoteCurrency: "USD", rate: "1.2", effectiveDate },
       newer,
     );
-    const result = await upsertSnapshot(
+    await upsertSnapshot(
       TEST_PROVIDER,
       { baseCurrency: "EUR", quoteCurrency: "USD", rate: "9.9", effectiveDate },
       older,
     );
 
-    expect(result.rate).toBe("1.2");
-    expect(result.fetchedAt).toEqual(newer);
+    const latest = await findLatestSnapshot(TEST_PROVIDER, "EUR", "USD");
+    expect(latest?.id).toBe(current.id);
+    expect(latest?.rate).toBe("1.2");
+    expect(latest?.fetchedAt).toEqual(newer);
+  });
+
+  it("prefers the newest effective date even if an older date was fetched later", async () => {
+    await upsertSnapshot(
+      TEST_PROVIDER,
+      {
+        baseCurrency: "EUR",
+        quoteCurrency: "USD",
+        rate: "1.2",
+        effectiveDate: "2026-10-02",
+      },
+      new Date("2026-10-08T11:00:00Z"),
+    );
+    await upsertSnapshot(
+      TEST_PROVIDER,
+      {
+        baseCurrency: "EUR",
+        quoteCurrency: "USD",
+        rate: "9.9",
+        effectiveDate: "2026-10-01",
+      },
+      new Date("2026-10-08T12:00:00Z"),
+    );
+
+    const latest = await findLatestSnapshot(TEST_PROVIDER, "EUR", "USD");
+    expect(latest?.effectiveDate).toBe("2026-10-02");
+    expect(latest?.rate).toBe("1.2");
   });
 
   it("cache hit avoids calling provider on subsequent getEurRate calls", async () => {

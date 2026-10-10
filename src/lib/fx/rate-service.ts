@@ -34,6 +34,7 @@ export type RateFailureCode =
 
 export type RateFailure = Readonly<{
   code: RateFailureCode;
+  /** Fixed UI-safe text. Raw provider/database details stay in server logs. */
   message: string;
 }>;
 
@@ -62,8 +63,17 @@ type RefreshResult =
   | { ok: true; snapshots: readonly FxSnapshot[] }
   | { ok: false; failure: RateFailure };
 
-function rateFailure(code: RateFailureCode, message: string): RateFailure {
-  return Object.freeze({ code, message });
+const FAILURE_MESSAGES: Readonly<Record<RateFailureCode, string>> = Object.freeze({
+  PROVIDER_ERROR: "Exchange rates are temporarily unavailable.",
+  INVALID_RESPONSE: "The exchange-rate provider returned invalid data.",
+  PERSISTENCE_ERROR: "Exchange rates could not be cached.",
+  MISSING_RATE: "A required exchange rate is missing.",
+  MISMATCHED_EFFECTIVE_DATE: "The required rates do not share an effective date.",
+  UNSUPPORTED_PAIR: "This currency pair is not supported.",
+});
+
+function rateFailure(code: RateFailureCode): RateFailure {
+  return Object.freeze({ code, message: FAILURE_MESSAGES[code] });
 }
 
 function unavailable(failure: RateFailure): RateResult {
@@ -103,27 +113,27 @@ async function refreshEcbSnapshots(provider: EcbProvider): Promise<RefreshResult
   try {
     fetched = await provider.fetchRates();
   } catch (error) {
+    console.error("ECB provider threw unexpectedly.", error);
     return {
       ok: false,
-      failure: rateFailure(
-        "PROVIDER_ERROR",
-        error instanceof Error ? error.message : "ECB provider failed.",
-      ),
+      failure: rateFailure("PROVIDER_ERROR"),
     };
   }
 
   if (!fetched.ok) {
+    console.error("ECB provider reported a failure.", fetched.reason);
     return {
       ok: false,
-      failure: rateFailure("PROVIDER_ERROR", fetched.reason),
+      failure: rateFailure("PROVIDER_ERROR"),
     };
   }
 
   const parsed = parseEcbCsv(fetched.csv);
   if (!parsed.ok) {
+    console.error("ECB response validation failed.", parsed.reason);
     return {
       ok: false,
-      failure: rateFailure("INVALID_RESPONSE", parsed.reason),
+      failure: rateFailure("INVALID_RESPONSE"),
     };
   }
 
@@ -132,13 +142,11 @@ async function refreshEcbSnapshots(provider: EcbProvider): Promise<RefreshResult
       ok: true,
       snapshots: await upsertSnapshots(ECB_PROVIDER, parsed.rates, fetched.fetchedAt),
     };
-  } catch {
+  } catch (error) {
+    console.error("Validated ECB rates could not be stored.", error);
     return {
       ok: false,
-      failure: rateFailure(
-        "PERSISTENCE_ERROR",
-        "Validated ECB rates could not be stored.",
-      ),
+      failure: rateFailure("PERSISTENCE_ERROR"),
     };
   }
 }
@@ -173,7 +181,7 @@ export async function getEurRate(
     if (wanted) return snapshotToResult(wanted, "CURRENT");
     return staleOrUnavailable(
       quoteCurrency,
-      rateFailure("MISSING_RATE", `ECB response did not contain EUR/${quoteCurrency}.`),
+      rateFailure("MISSING_RATE"),
     );
   }
   return staleOrUnavailable(quoteCurrency, refreshed.failure);
@@ -207,10 +215,7 @@ export async function getAllEcbRates(
         SGD: snapshotToResult(sgd, "CURRENT"),
       };
     }
-    const failure = rateFailure(
-      "MISSING_RATE",
-      "ECB response did not contain both EUR/USD and EUR/SGD.",
-    );
+    const failure = rateFailure("MISSING_RATE");
     return {
       USD: cachedUsd
         ? snapshotToResult(cachedUsd, "CURRENT")
@@ -246,10 +251,7 @@ export async function getCrossRate(
   if (fromResult.status === "UNAVAILABLE") return fromResult;
   if (toResult.status === "UNAVAILABLE") return toResult;
   if (fromResult.effectiveDate !== toResult.effectiveDate) {
-    return unavailable(rateFailure(
-      "MISMATCHED_EFFECTIVE_DATE",
-      `Cannot derive ${from}/${to} from ECB snapshots with different effective dates.`,
-    ));
+    return unavailable(rateFailure("MISMATCHED_EFFECTIVE_DATE"));
   }
 
   const crossRateValue = decimalString(
@@ -304,7 +306,7 @@ export async function getRate(
     return getCrossRate(base, quote, provider);
   }
   return unavailable(
-    rateFailure("UNSUPPORTED_PAIR", `Unsupported currency pair ${base}/${quote}.`),
+    rateFailure("UNSUPPORTED_PAIR"),
   );
 }
 
