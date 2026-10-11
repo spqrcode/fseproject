@@ -1,7 +1,9 @@
 import { decimalString, parseDecimal } from "@/lib/forecast/decimal";
+import { REPORTING_CURRENCIES, type ReportingCurrency } from "@/lib/currency";
 
-export const CURRENCIES = ["EUR", "USD", "SGD"] as const;
-export type Currency = typeof CURRENCIES[number];
+/** Forecast and UI reporting currencies share one canonical list. */
+export const CURRENCIES = REPORTING_CURRENCIES;
+export type Currency = ReportingCurrency;
 
 export type Money = Readonly<{
   amount: string;
