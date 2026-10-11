@@ -6,8 +6,8 @@ Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and 
 | --- | --- |
 | `npm run lint` | ESLint with zero warnings allowed |
 | `npm run typecheck` | Strict TypeScript |
-| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens, money/percent/timestamp formatting, reporting currency, appearance validation, and Forecast Decimal/Money/FX rules |
-| `npm exec vitest -- run tests/unit/forecast` | Decimal parsing, Money arithmetic, currency isolation, half-even rounding, immutability, and direct/reciprocal EUR/USD/SGD conversion |
+| `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens, money/percent/timestamp formatting, reporting currency, appearance validation, and Forecast domain rules |
+| `npm exec vitest -- run tests/unit/forecast` | Decimal/Money/FX rules, adapter-facing cash-event validation, canonical timestamps, overdue events, bounded daily projection, status filtering, workspace/default thresholds, negative balances, minimum balance, runway, deterministic ordering and immutability |
 | `npm run db:migrate:test` | Ordered migrations against the isolated test database |
 | `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, cash accounts and events (database constraints by direct SQL, two-user ownership matrix, forged and malformed ids, status transitions, cascade, danger threshold), and server actions, including the reporting currency (two users, forged user id, anonymous/unknown/expired sessions, foreign origin, database constraint) active sessions (listing only the caller's unexpired sessions, signing out others without touching other users) and appearance (allowed values, ownership, origin, expiry, database constraint) |
 | `npm run build` | Next.js production compilation and route generation |
@@ -27,4 +27,4 @@ Fixtures use unique generated account addresses, clean up only their own rows, a
 
 Integration tests use the real PostgreSQL driver and SQL, including real password hashing. Only Next.js request adapters (cookies, headers, redirect, cache revalidation) are mocked so server actions can be invoked directly. Playwright verifies those adapters in a real application server. Neither layer substitutes mocked data for database authorization.
 
-Cash-event projection, Scenario, provider-adapter, and broader financial/API tests do not exist because those features are not implemented. The Decimal/Money/FX foundation has focused unit tests. Staging smoke checks must be recorded separately from local tests. See [Issue 1 evidence](issue-1-evidence.md) for actual results and identified corrections.
+Scenario persistence, provider-adapter and broader financial/API integration tests remain separate work. The Forecast domain has focused Decimal/Money/FX, CashEvent and projection unit tests. Staging smoke checks must be recorded separately from local tests. See [Issue 1 evidence](issue-1-evidence.md) for actual results and identified corrections.

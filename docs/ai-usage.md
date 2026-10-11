@@ -114,6 +114,15 @@ AI-flagged trade-off: check-then-increment is not atomic, so parallel wrong gues
 
 Validation (2026-09-29, local, Node 24, PostgreSQL 16): npm run verify passed. ESLint (zero warnings) and strict TypeScript clean; 8 unit tests, 26 integration tests (previously 20), 4 Chromium tests passed; production build succeeded; test migrations applied.
 
+## Member B — Cash projection and review follow-up
+
+- Date: 2026-10-07. Tool: OpenAI Codex. Owner: Member B.
+- Request: implement and review deterministic cash-event projection, minimum balance, liquidity runway and agreed forecast rules.
+- AI-assisted work: proposed code, tests and documentation for the fixed 50% warning threshold, deterministic same-day ordering, shared reporting-currency allowlist and negative half-even rounding cases.
+- Student review: inspected the diff, confirmed the business rules, ran the tests and created the commits personally.
+- Validation: 90 Forecast domain tests and 129 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.
+- Remaining team decision: confirm EUR-derived cross-rate ownership and precision with the ECB adapter owner.
+
 ## Workspace and cash events schema (migration 005)
 
 Date: 2026-10-07. Tool: Claude Code (Claude Sonnet 5.5). Owner: Foundation & Security student.
@@ -135,3 +144,12 @@ Concerns for the student's review: the status order and the immutability of sett
 Validation (2026-10-07, local, PostgreSQL 16): `npm run verify` exit code 0 — lint with zero warnings and strict TypeScript clean; 86 unit tests; migrations applied to the test database; 95 integration tests (37 of them new, in `cash-events.test.ts`); 24 Chromium tests; production build succeeded. Run as a role holding exactly the grants in `deployment.md` (migrations 003–005 plus the base grants, on a separate `_test` database): the 37 cash tests passed with the application as `fse_runtime` and fixtures as owner, and the 24 Chromium tests passed with the application server as `fse_runtime`. As that role, `UPDATE` of `cash_events.workspace_id` or `account_id`, of `cash_accounts.currency` or `workspace_id`, and `DELETE` on `cash_accounts` or `workspaces` were refused with "permission denied". Student review: pending.
 
 Review finding (PR #10, Jiaxin, 2026-10-08): the AI-generated `updateCashEvent` and `deleteCashEvent` still allowed changing and deleting received, paid and cancelled events, although they feed the forecast's starting balance; the student's own review and the AI's earlier "concerns" note had accepted this. Fixed with `status = 'expected'` in the `WHERE` clause and `StatusConflictError` for the caller's own settled events, with new tests; `npm run verify` exit code 0 afterwards (86 unit, 99 integration, 24 Chromium tests).
+
+## Member B — PR #12 review corrections
+
+- Date: 2026-10-11. Tool: OpenAI Codex. Owner: Member B.
+- Request: address the changes requested on PR #12 and align the Forecast Engine with migration 005 and the forecast-input boundary.
+- AI-assisted work: added a 366-day maximum horizon, canonical UTC timestamp precision, consistent `ForecastInputError` handling, overdue-event handling, nullable workspace-threshold support, negative opening-balance handling, documentation and regression tests.
+- Review correction: the first revision changed the Forecast Engine to use the database statuses directly. After merging the latest `main`, the existing team decision showed that PR #14 owns the adapter mapping from `expected / received / paid / cancelled` to the engine's `pending / completed / cancelled` contract. The direct-status change was therefore rejected and corrected.
+- Student action: reviewed the PR comments, resolved the AI-usage merge conflict by retaining both records, selected the business rules and ran the complete local validation.
+- Validation: 100 Forecast domain tests and 186 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.
