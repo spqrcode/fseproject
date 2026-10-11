@@ -41,9 +41,9 @@ What was corrected: `.vercelignore` was added, the affected deployment deleted, 
 
 Evidence retained: the saved upload manifest showing the ignored paths, the later manifest showing them empty, the 404 for the deleted deployment ID, the failed authentication for the old credentials, and the smoke test against the rotated staging environment. See the security document for the full incident record.
 
-## Member B — Forecast money and FX foundation
+## Haina — Forecast money and FX foundation
 
-- Date: 2026-09-29 to 2026-10-03. Tool: OpenAI Codex. Owner: Member B.
+- Date: 2026-09-29 to 2026-10-03. Tool: OpenAI Codex. Owner: Haina.
 - Instruction: inspect the repository first, create a separate branch, and begin the Forecast Engine foundation. The student remained responsible for reviewing, staging, committing, pushing, and opening the PR.
 - Workflow: the work was developed on `haina`, reviewed by the student, pushed to `origin/haina`, and then rebased onto the updated `main`. PR #8 was approved by a teammate on 2026-10-07; resolving its merge conflicts with main remained pending.
 - Generated work: strict Decimal parsing, immutable Money values, EUR/USD/SGD validation, direct and reciprocal FX conversion, explicit rounding, public exports, documentation, and focused domain tests.
@@ -52,7 +52,7 @@ Evidence retained: the saved upload manifest showing the ignored paths, the late
 
 ## Product experience increment: FinTwin Global shell, formatting and reporting currency
 
-Date: 2026-10-01. Tool: Claude Code. Owner: Product Experience student (member D).
+Date: 2026-10-01. Tool: Claude Code. Owner: Gabriel (Product Experience).
 
 Request: review the open pull requests, then advance the Product Experience task while the FinTwin Global domain model is still being agreed by the team. Following the team rule, the AI did not stage, commit or push: the changes were delivered as a patch for the student to inspect, test and commit.
 
@@ -68,7 +68,7 @@ Related review work: while reviewing PR #6 with AI assistance, the same staging-
 
 ## Product experience follow-ups: home page, sessions, appearance and accessibility checks
 
-Date: 2026-10-01. Tool: Claude Code. Owner: Product Experience student (member D). Same branch and delivery as the entry above: patches inspected, tested and committed by the student.
+Date: 2026-10-01. Tool: Claude Code. Owner: Gabriel (Product Experience). Same branch and delivery as the entry above: patches inspected, tested and committed by the student.
 
 AI-generated: the public home page; the active sessions list and the action that signs out other sessions; the appearance preference (migration 004, store, action, form, dark palette); shared Playwright fixtures; `tests/e2e/accessibility.spec.ts` with `@axe-core/playwright`; the matching documentation.
 
@@ -83,7 +83,7 @@ Validation (2026-10-01, cloud container with Node 22.22 and PostgreSQL 16; the f
 
 ## Product experience: changes requested in review and at the team meeting of 2 October
 
-Date: 2026-10-04. Tool: Claude Code. Owner: Product Experience student (member D). Same delivery as the entries above: patches inspected, tested and committed by the student.
+Date: 2026-10-04. Tool: Claude Code. Owner: Gabriel (Product Experience). Same delivery as the entries above: patches inspected, tested and committed by the student.
 
 Request: apply what Bastian asked for before merging PR #7 and what the team decided on 2 October: report only in EUR, USD and SGD; rename the sections to the agreed MVP views (Liquidity overview, Cash events, Scenario lab) and Portfolio to Workspace; write down why SGD and dark mode stay. While reviewing Haina's forecast PR (#8) the AI also noticed that the screen rounded half away from zero while the forecast engine rounds half to even, so the same amount could show a different cent.
 
@@ -144,6 +144,20 @@ Concerns for the student's review: the status order and the immutability of sett
 Validation (2026-10-07, local, PostgreSQL 16): `npm run verify` exit code 0 — lint with zero warnings and strict TypeScript clean; 86 unit tests; migrations applied to the test database; 95 integration tests (37 of them new, in `cash-events.test.ts`); 24 Chromium tests; production build succeeded. Run as a role holding exactly the grants in `deployment.md` (migrations 003–005 plus the base grants, on a separate `_test` database): the 37 cash tests passed with the application as `fse_runtime` and fixtures as owner, and the 24 Chromium tests passed with the application server as `fse_runtime`. As that role, `UPDATE` of `cash_events.workspace_id` or `account_id`, of `cash_accounts.currency` or `workspace_id`, and `DELETE` on `cash_accounts` or `workspaces` were refused with "permission denied". Student review: pending.
 
 Review finding (PR #10, Jiaxin, 2026-10-08): the AI-generated `updateCashEvent` and `deleteCashEvent` still allowed changing and deleting received, paid and cancelled events, although they feed the forecast's starting balance; the student's own review and the AI's earlier "concerns" note had accepted this. Fixed with `status = 'expected'` in the `WHERE` clause and `StatusConflictError` for the caller's own settled events, with new tests; `npm run verify` exit code 0 afterwards (86 unit, 99 integration, 24 Chromium tests).
+
+## Jiaxin — ECB snapshot cache and failure handling (migration 006)
+
+Date: 2026-10-08 to 2026-10-09. Tools: Antigravity and OpenAI Codex. Owner: Jiaxin (Scenarios & Exchange Rates).
+
+Student direction and review: Jiaxin split the work into separate scenario, ECB-cache and FX-shock phases; confirmed the contract with Haina, Bastian and Gabriel; chose decimal strings, explicit `CURRENT`/`STALE`/`UNAVAILABLE` states and `null` for an unavailable rate; kept the provider layer independent of the deterministic shock calculation; and asked for a clean branch based on main after discovering that the first local branch also contained unrelated forecast and scenario commits. Jiaxin reviewed the proposed API and database behavior before the final PR and remains responsible for accepting the diff.
+
+AI-assisted implementation and debugging: generated the initial migration, ECB parser/provider, snapshot store, rate service and focused tests; then audited them against the official ECB API and the merged workspace schema. The audit added narrow `fse_runtime` grants, strict real-date and database-precision checks, atomic persistence of both ECB legs, protection against an older response overwriting a newer fetch, normalized decimal strings, typed failure metadata, and a same-effective-date requirement for cross-rates. It also added PostgreSQL integration tests using a separate owner connection for fixtures while the application runs with the restricted runtime role.
+
+Corrections to the initial AI-assisted version: it had no runtime grants, accepted impossible calendar dates, recorded fetch time before the response body completed, persisted the two rates separately, could combine different effective dates into one cross-rate, and returned too little information for the Scenario Lab to distinguish stale from unavailable data. These issues were found during review and corrected before the PR. A live smoke request to the official ECB endpoint returned the expected CSV columns and both USD and SGD observations; deterministic automated tests still mock the provider so CI does not depend on the network.
+
+Review correction (PR #13, Bastian, 2026-10-10): the first draft updated `rate` in place when ECB republished the same pair and effective date. Because a scenario will retain `snapshotId`, that would silently change a previously reproducible result. The schema now treats provider/pair/date/rate as one observation: an identical repeat updates only `fetched_at`, while a corrected rate creates a new immutable id. The runtime role can no longer update `rate`. The same review led to fixed UI-safe failure messages with raw details only in server logs, a real `server-only` boundary in the provider, a 64 KiB response cap, and effective-date-first stale ordering. The requested parallel-refresh lock remains documented follow-up work rather than expanding this PR.
+
+Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify` exited 0 — ESLint with zero warnings, strict TypeScript, 162 unit tests, production build, 111 integration tests and 24 Chromium tests passed. Migrations 001–006 were applied successfully from an empty database. The 12 FX integration tests passed with the application connected as `fse_runtime` and fixtures connected as the database owner; direct privilege checks returned SELECT=true, INSERT=true, DELETE=false, UPDATE `fetched_at`=true, UPDATE `rate`=false and UPDATE `provider`=false. Phase 3 percentage-shock work and Scenario Lab UI are deliberately not part of this increment.
 
 ## Member B — PR #12 review corrections
 
