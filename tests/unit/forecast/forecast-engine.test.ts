@@ -116,6 +116,33 @@ describe("runForecast timeline", () => {
     expect(result.closingBalance).toBe(precisionBoundary);
   });
 
+  it("orders overdue events by their shared forecast date instead of their original dates", () => {
+    const precisionBoundary = "10000000000000000000000000000000000000000";
+    const income = cashEvent({
+      id: "a-income",
+      amount: "1",
+      expectedDate: "2025-11-01",
+      createdAt: "2025-10-01T00:00:00.000Z",
+    });
+    const expense = cashEvent({
+      id: "z-expense",
+      amount: "-1",
+      expectedDate: "2025-12-01",
+      createdAt: "2025-10-01T00:00:00.000Z",
+    });
+
+    const forward = runForecast(
+      input({ openingBalance: precisionBoundary, events: [income, expense] }),
+    );
+    const reverse = runForecast(
+      input({ openingBalance: precisionBoundary, events: [expense, income] }),
+    );
+
+    expect(forward).toEqual(reverse);
+    expect(forward.timeline[0].balance).toBe(precisionBoundary);
+    expect(forward.closingBalance).toBe(precisionBoundary);
+  });
+
   it("does not mutate the event array or its elements", () => {
     const event = cashEvent();
     const events = Object.freeze([event]);

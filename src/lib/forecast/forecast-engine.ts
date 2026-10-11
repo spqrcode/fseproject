@@ -124,16 +124,23 @@ function resolveDangerThreshold(value: string | null, openingBalance: string, cu
   }
 }
 
-function compareEvents(left: CashEvent, right: CashEvent) {
-  if (left.expectedDate !== right.expectedDate) {
-    return left.expectedDate < right.expectedDate ? -1 : 1;
+type ProjectedEvent = Readonly<{
+  event: CashEvent;
+  forecastDate: string;
+}>;
+
+function compareProjectedEvents(left: ProjectedEvent, right: ProjectedEvent) {
+  if (left.forecastDate !== right.forecastDate) {
+    return left.forecastDate < right.forecastDate ? -1 : 1;
   }
-  if (left.createdAt !== right.createdAt) return left.createdAt < right.createdAt ? -1 : 1;
-  const leftIsExpense = parseDecimal(left.amount).isNegative();
-  const rightIsExpense = parseDecimal(right.amount).isNegative();
+  if (left.event.createdAt !== right.event.createdAt) {
+    return left.event.createdAt < right.event.createdAt ? -1 : 1;
+  }
+  const leftIsExpense = parseDecimal(left.event.amount).isNegative();
+  const rightIsExpense = parseDecimal(right.event.amount).isNegative();
   if (leftIsExpense !== rightIsExpense) return leftIsExpense ? -1 : 1;
-  if (left.id === right.id) return 0;
-  return left.id < right.id ? -1 : 1;
+  if (left.event.id === right.event.id) return 0;
+  return left.event.id < right.event.id ? -1 : 1;
 }
 
 /**
@@ -175,7 +182,7 @@ export function runForecast(input: ForecastInput): ForecastResult {
       throw new CurrencyMismatchError(event.currency, currency);
     }
   }
-  eligibleEvents.sort((left, right) => compareEvents(left.event, right.event));
+  eligibleEvents.sort(compareProjectedEvents);
 
   const timeline: ForecastPoint[] = [];
   let running = opening;
