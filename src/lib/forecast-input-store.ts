@@ -24,7 +24,8 @@ type AccountRow = { id: string; name: string; currency: ReportingCurrency; dange
 type EventRow = { id: string; description: string; amount: string; expected_date: string; original_date: string; overdue: boolean; created_at: string };
 
 // Everything the engine needs for one account, resolved by the team's rules (decisions of 2026-10-08):
-// - startingBalance = opening balance + the account's received and paid events dated before startDate;
+// - startingBalance = opening balance + the account's received and paid events dated on or before startDate
+//   (money that moved on the start day is already in the balance the forecast starts from);
 // - events = the account's expected events up to endDate, overdue ones counted on startDate;
 // - cancelled events appear nowhere.
 // Both queries start at the session token and reach the account through sessions -> workspaces -> cash_accounts.
@@ -46,7 +47,7 @@ export async function getForecastInput(token: string | undefined, input: { accou
     // The sum is computed by PostgreSQL in numeric, never with JavaScript numbers.
     const account = await client.query<AccountRow>(`SELECT a.id, a.name, a.currency, w.danger_threshold::text AS danger_threshold,
         (a.opening_balance + COALESCE((SELECT sum(e.amount) FROM cash_events e WHERE e.account_id = a.id AND e.workspace_id = a.workspace_id
-          AND e.status IN ('received', 'paid') AND e.expected_date < $3::date), 0))::text AS starting_balance
+          AND e.status IN ('received', 'paid') AND e.expected_date <= $3::date), 0))::text AS starting_balance
       FROM cash_accounts a JOIN workspaces w ON w.id = a.workspace_id JOIN sessions s ON s.user_id = w.user_id
       WHERE a.id = $2 AND s.token_hash = $1 AND s.expires_at > now()`, [tokenHash(token), accountId.data, range.startDate]);
     if (account.rows[0]) {

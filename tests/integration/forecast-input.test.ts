@@ -54,17 +54,17 @@ afterEach(async () => {
 afterAll(async () => { await fixtures.end(); await database().end(); });
 
 describe("starting balance", () => {
-  it("is the opening balance plus received and paid events dated before the start date, and nothing else", async () => {
+  it("is the opening balance plus received and paid events dated on or before the start date, and nothing else", async () => {
     await insert(alice, alice.accountId, "100.00", "received", "2026-09-15");
     await insert(alice, alice.accountId, "-200.00", "paid", "2026-09-30");
-    await insert(alice, alice.accountId, "50.00", "received", START);          // on the start date: not before it
+    await insert(alice, alice.accountId, "50.00", "received", START);          // on the start date: the money has moved
     await insert(alice, alice.accountId, "-30.00", "paid", "2026-10-02");     // after the start date
     await insert(alice, alice.accountId, "-999.00", "cancelled", "2026-09-10");
     await insert(alice, alice.accountId, "-70.00", "expected", "2026-09-10");  // overdue, but not money that moved
     await insert(alice, alice.otherAccountId, "-7.00", "paid", "2026-09-10");  // another account of the same workspace
     await insert(bob, bob.accountId, "-5.00", "paid", "2026-09-10");           // another user
     const input = (await forecast(alice))!;
-    expect(input.startingBalance).toBe("900.00");
+    expect(input.startingBalance).toBe("950.00");
     expect(input.account).toEqual({ id: alice.accountId, name: "Main", currency: "EUR" });
     expect((await forecast(alice, { accountId: alice.otherAccountId }))!.startingBalance).toBe("43.00");
   });
@@ -78,6 +78,23 @@ describe("starting balance", () => {
     expect(await forecast(alice)).toMatchObject({ startingBalance: "1000.00", events: [], dangerThreshold: null });
     const negative = (await createCashAccount(alice.token, { name: "Overdrawn", currency: "EUR", openingBalance: "-50.5" }))!;
     expect((await forecast(alice, { accountId: negative.id }))!.startingBalance).toBe("-50.50");
+  });
+  it("counts money that moved on the start date, and keeps an expected event on that date in the list", async () => {
+    const received = await insert(alice, alice.accountId, "250.00", "received", START);
+    const expected = await insert(alice, alice.accountId, "-40.00", "expected", START, "Due on the start date");
+    const input = (await forecast(alice))!;
+    expect(input.startingBalance).toBe("1250.00");
+    expect(input.events.map(e => e.id)).toEqual([expected]);
+    expect(input.events[0]).toMatchObject({ expectedDate: START, originalDate: START, overdue: false });
+    expect(input.events.map(e => e.id)).not.toContain(received);
+  });
+  it("puts an event marked paid today into the starting balance of a forecast that starts today", async () => {
+    const today = await utcDay(0);
+    const planned = (await createCashEvent(alice.token, alice.accountId, { description: "Paid early", amount: "-100", expectedDate: await utcDay(5) }))!;
+    await setCashEventStatus(alice.token, planned.id, "paid");   // the future date moves to today
+    const input = (await getForecastInput(alice.token, { accountId: alice.accountId, startDate: today, endDate: await utcDay(30) }))!;
+    expect(input.startingBalance).toBe("900.00");
+    expect(input.events).toEqual([]);
   });
   it("includes an event that was settled early, because settling moves its date to today", async () => {
     const day = (offset: number) => utcDay(offset);
@@ -158,7 +175,7 @@ describe("ownership and validation", () => {
   });
   it.each([
     ["start after end", "2026-10-02", "2026-10-01"],
-    ["367 days", "2026-10-01", "2027-10-03"],
+    ["367 dates", "2026-10-01", "2027-10-02"],
     ["before 2000", "1999-12-31", "2000-01-02"],
     ["after 2100", "2100-12-30", "2101-01-01"],
     ["impossible day", "2026-02-30", "2026-03-05"],
@@ -167,8 +184,8 @@ describe("ownership and validation", () => {
     await expect(forecast(alice, { startDate, endDate })).rejects.toBeInstanceOf(ZodError);
     await expect(getForecastInput(undefined, { accountId: alice.accountId, startDate, endDate })).rejects.toBeInstanceOf(ZodError);
   });
-  it("accepts a range of exactly 366 days and a single day", async () => {
-    expect(await forecast(alice, { startDate: "2026-10-01", endDate: "2027-10-02" })).not.toBeNull();
+  it("accepts a range of exactly 366 dates and a single day", async () => {
+    expect(await forecast(alice, { startDate: "2026-10-01", endDate: "2027-10-01" })).not.toBeNull();
     expect(await forecast(alice, { startDate: "2026-10-01", endDate: "2026-10-01" })).not.toBeNull();
   });
   it("does not leave a connection in a transaction after a failure or a miss", async () => {

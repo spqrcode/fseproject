@@ -14,7 +14,7 @@ A cash event's status can only move once, from `expected` to `received`, `paid` 
 
 ## Forecast input
 
-`getForecastInput` serves one account in one currency; there is no combined view across accounts or currencies yet. Forecasts cover at most 366 days between 2000 and 2100. The starting balance can be negative, which the forecast engine in the open PR #12 does not accept yet, and that engine ignores the workspace's danger threshold. The engine is not called from the application yet.
+`getForecastInput` serves one account in one currency; there is no combined view across accounts or currencies yet. Forecasts cover at most 366 dates, counting both the first and the last day, between 2000 and 2100. The starting balance can be negative, which the forecast engine in the open PR #12 does not accept yet, and that engine ignores the workspace's danger threshold. The engine is not called from the application yet.
 
 ## Later financial scope
 

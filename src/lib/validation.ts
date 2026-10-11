@@ -30,11 +30,12 @@ export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a da
   const date = new Date(`${value}T00:00:00Z`);
   return year >= 2000 && year <= 2100 && !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }, "Enter a real date between 2000 and 2100.");
-// A forecast range: both ends valid dates, start not after end, at most 366 days (the engine loops per day).
+// A forecast range: both ends valid dates, start not after end, at most 366 dates counting both ends (the
+// engine loops per day and accepts at most 366 dates).
 export const forecastRangeSchema = z.object({ startDate: isoDateSchema, endDate: isoDateSchema }).superRefine((range, ctx) => {
   const days = (Date.parse(range.endDate) - Date.parse(range.startDate)) / 86_400_000;
   if (days < 0) ctx.addIssue({ code: "custom", path: ["endDate"], message: "The end date must not be before the start date." });
-  else if (days > 366) ctx.addIssue({ code: "custom", path: ["endDate"], message: "A forecast covers at most 366 days." });
+  else if (days + 1 > 366) ctx.addIssue({ code: "custom", path: ["endDate"], message: "A forecast covers at most 366 days, counting both the first and the last day." });
 });
 export const cashAccountSchema = z.object({ name: accountNameSchema, currency: reportingCurrencySchema, openingBalance: balanceSchema });
 export const cashEventSchema = z.object({ description: eventDescriptionSchema, amount: eventAmountSchema, expectedDate: isoDateSchema });
