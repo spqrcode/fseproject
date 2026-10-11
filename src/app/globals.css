@@ -230,6 +230,41 @@ button:disabled { opacity: .6; cursor: progress; }
 .figure .end { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
 .figure rect { fill: none; }
 .figure text { fill: var(--accent); font-family: var(--mono); font-size: 10px; letter-spacing: .12em; }
+.empty-action { margin-top: 24px; }
+.page-notice { margin: -20px 0 32px; }
+
+/* Cash accounts and events */
+.cash-layout { display: grid; grid-template-columns: minmax(280px, .72fr) minmax(0, 1.6fr); align-items: start; gap: 56px; }
+.cash-sidebar { display: grid; gap: 28px; }
+.cash-panel { padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.cash-panel h2 { margin: 10px 0 22px; font-family: var(--serif); font-size: 30px; font-weight: 400; }
+.cash-form { margin-top: 22px; }
+.cash-form .button { justify-self: start; }
+.account-list { margin: 0 0 24px; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.account-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--line); }
+.account-list li > span:first-child { display: grid; }
+.account-list small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+.editor { border-top: 1px solid var(--line); }
+.editor summary { padding-top: 18px; font-weight: 600; cursor: pointer; }
+.editor.compact { border-top: 0; }
+.editor.compact summary { padding: 4px 0; font-size: 13px; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
+.editor.compact[open] { grid-column: 1 / -1; width: 100%; margin-top: 14px; padding-top: 18px; border-top: 1px solid var(--line); }
+.event-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--ink); }
+.event-card { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; align-items: center; gap: 18px 24px; padding: 24px 0; border-bottom: 1px solid var(--line); }
+.event-date { display: grid; gap: 3px; font-family: var(--mono); font-size: 12px; }
+.event-date small { overflow: hidden; color: var(--muted); text-overflow: ellipsis; }
+.event-description { min-width: 0; }
+.event-description h3 { overflow-wrap: anywhere; }
+.event-status { margin-top: 5px; color: var(--muted); font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; }
+.status-received, .status-paid { color: var(--ready); }
+.status-cancelled { color: var(--muted); text-decoration: line-through; }
+.event-amount { font-size: 14px; font-weight: 500; text-align: right; }
+.event-amount.income { color: var(--ready); }
+.event-amount.expense { color: var(--danger); }
+.event-controls { grid-column: 2 / -1; display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; }
+.event-actions { display: flex; flex-wrap: wrap; gap: 18px; }
+.danger-text { color: var(--danger); }
+.event-empty { padding: 48px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line); }
 
 /* Settings and portfolio */
 .settings-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 56px; }
@@ -322,7 +357,7 @@ button:disabled { opacity: .6; cursor: progress; }
   .index-row { grid-template-columns: 40px minmax(0, 1fr); gap: 10px 12px; padding: 22px 0; }
   .index-row > .state, .index-row > .index-link { grid-column: 2; justify-self: start; }
   .index-number { align-self: start; padding-top: 12px; }
-  .empty-state, .settings-section { grid-template-columns: 1fr; gap: 28px; }
+  .empty-state, .settings-section, .cash-layout { grid-template-columns: 1fr; gap: 28px; }
   .choice-group { grid-template-columns: 1fr; }
   .choice { flex-direction: row; align-items: center; }
   .swatch { width: 44px; height: 28px; flex: none; }
@@ -343,6 +378,9 @@ button:disabled { opacity: .6; cursor: progress; }
   .empty-state h2 { font-size: 30px; }
   .footnote { grid-template-columns: 1fr; gap: 8px; margin-top: 48px; }
   .error-panel { padding: 32px 22px; }
+  .event-card { grid-template-columns: 110px minmax(0, 1fr); }
+  .event-amount { grid-column: 2; justify-self: start; text-align: left; }
+  .event-controls { grid-column: 2; flex-direction: column; }
   .app-footer { flex-direction: column; gap: 4px; }
 }
 @media (max-width: 480px) {

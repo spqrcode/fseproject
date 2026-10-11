@@ -3,6 +3,7 @@ import { requireUser, sessionToken } from "@/lib/auth";
 import { getWorkspace } from "@/lib/workspace-store";
 import { getReportingCurrency } from "@/lib/preferences-store";
 import { DEFAULT_REPORTING_CURRENCY, currencyLabel } from "@/lib/currency";
+import { listCashAccounts, listCashEvents } from "@/lib/cash-events-store";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyState } from "@/components/empty-state";
 import { ForecastFigure } from "@/components/placeholder-figures";
@@ -11,12 +12,17 @@ type Module = { title: string; text: string; state: string; tone: "ready" | "pen
 export default async function LiquidityOverview() {
   await requireUser();
   const token = await sessionToken();
-  const [workspace, currency] = await Promise.all([getWorkspace(token), getReportingCurrency(token)]);
+  const [workspace, currency, accounts, events] = await Promise.all([
+    getWorkspace(token),
+    getReportingCurrency(token),
+    listCashAccounts(token),
+    listCashEvents(token),
+  ]);
   const reporting = currency ?? DEFAULT_REPORTING_CURRENCY;
   const modules: Module[] = [
     { title: "Workspace", text: workspace ? "Your workspace is saved and only you can access it." : "Name your workspace to get started.", state: workspace ? "Ready" : "Not created", tone: workspace ? "ready" : "pending", href: "/workspace", action: "Open workspace" },
     { title: "Reporting currency", text: `Figures will be reported in ${currencyLabel(reporting)}.`, state: reporting, tone: "value", href: "/settings", action: "Change currency" },
-    { title: "Cash events", text: "Planned income and expenses will be listed once cash events are stored.", state: "Not connected yet", tone: "pending", href: "/cash-events", action: "Open cash events" },
+    { title: "Cash events", text: accounts.length > 0 ? "Accounts and planned income and expenses are ready for forecasting." : "Add a cash account, then record expected income and expenses.", state: accounts.length > 0 ? `${events.length} ${events.length === 1 ? "event" : "events"}` : "Set up", tone: accounts.length > 0 ? "ready" : "pending", href: "/cash-events", action: "Open cash events" },
     { title: "Scenario lab", text: "What-if scenarios, including exchange-rate shocks, will appear once scenario analysis is delivered.", state: "Not connected yet", tone: "pending", href: "/scenarios", action: "Open scenario lab" },
   ];
   return <>
@@ -41,6 +47,6 @@ export default async function LiquidityOverview() {
         </li>)}
       </ol>
     </section>
-    <aside className="footnote" aria-label="About this version"><p className="eyebrow">About this version</p><p>Account access, your workspace and the reporting currency are available. The liquidity forecast, cash events and the scenario lab are being built by other members of the team; until they are connected, no figures are estimated or simulated on these pages.</p></aside>
+    <aside className="footnote" aria-label="About this version"><p className="eyebrow">About this version</p><p>Account access, workspace settings, reporting currency and cash events are available. The liquidity forecast and scenario lab are connected only when their calculation services are ready; no result is estimated or simulated in their place.</p></aside>
   </>;
 }
