@@ -13,8 +13,8 @@ Foundation choices below are implemented and awaiting student review. Financial/
 | Forecast money foundation uses `decimal.js` with 40 significant digits and half-even rounding | FX division needs a reviewed decimal implementation; JavaScript numbers and the dashboard's temporary scaled-integer helper are not sufficient | Extend the custom BigInt helper | New dependency; precision and rounding policy must remain explicit and tested |
 | FX rates are directed (`base`/`quote`) and conversion requires a matching direct or reciprocal rate | Prevents an ambiguous number from being interpreted in the wrong direction | Infer direction or silently find a cross-rate | Callers must supply the required pair; cross-rate policy remains an open decision |
 | EUR, USD and SGD come from `REPORTING_CURRENCIES` as the single application allowlist | Prevents the UI and Forecast Engine from accepting different currencies | Maintain two equal arrays and test them | The domain currency set is coupled to the agreed reporting-currency scope |
-| Cash forecasts use signed, non-zero pending events on inclusive UTC dates and record one end-of-day balance per date | Makes projection deterministic and keeps completed/cancelled events out of future cash | Event-level or intraday points | Intraday liquidity changes are not represented |
-| Liquidity warning is the first end-of-day balance strictly below 50% of a non-negative opening balance | Gives the UI one reproducible threshold and a calendar-day runway | Configurable amount or percentage per user | Negative opening balances are rejected by this percentage-based contract |
+| Cash forecasts use signed, non-zero `expected` events on inclusive UTC dates and record one end-of-day balance per date | Matches migration 005 and keeps received, paid and cancelled events out of future cash | Maintain a separate Forecast-only status vocabulary | Intraday liquidity changes are not represented; overdue expected events are moved to the first forecast day |
+| Liquidity warning is the first end-of-day balance strictly below the workspace amount, defaulting to 50% of opening balance when unset | Uses migration 005's nullable `danger_threshold` while preserving a deterministic default | Fixed percentage only | A workspace threshold must be interpreted in the reporting currency; negative opening balances are accepted |
 | Allocation and absolute P/L contribution (planned) | Matches the small tracker specification | Advanced risk models | Limited analytical scope |
 | Server-side quote adapter | Keeps secrets private and isolates provider behavior | Direct browser requests | Server quota management and latency |
 
@@ -26,7 +26,7 @@ Foundation choices below are implemented and awaiting student review. Financial/
 - Node scrypt, `pg`, 24-hour database sessions, and per-address throttling are implemented. Recovery and email verification remain out of scope.
 - Staging uses a dedicated Neon PostgreSQL host with provider authentication disabled; the application still uses direct pg/SQL and internal authentication. Vercel hosts only the application.
 - Confirm available GitHub protections and hosting/database account limits.
-- Confirm whether the ECB adapter or Forecast Engine owns EUR-derived cross rates, define the stale-data cutoff, and agree the attribution order for scenarios with several interacting changes.
+- Define the FX stale-data cutoff and agree the attribution order for scenarios with several interacting changes. The FX service owns ECB-specific cross rates and supplies resolved decimal rates to the Forecast Engine.
 
 ## Defense record for significant changes
 

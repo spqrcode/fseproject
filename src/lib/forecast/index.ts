@@ -12,6 +12,7 @@ export { DecimalInputError } from "@/lib/forecast/decimal";
 export {
   DANGER_THRESHOLD_PERCENT,
   ForecastInputError,
+  MAX_FORECAST_DAYS,
   runForecast,
   type ForecastInput,
   type ForecastPoint,

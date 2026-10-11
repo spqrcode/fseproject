@@ -5,13 +5,11 @@ import {
   type Currency,
 } from "@/lib/forecast/money";
 
-export const CASH_EVENT_STATUSES = ["pending", "completed", "cancelled"] as const;
+export const CASH_EVENT_STATUSES = ["expected", "received", "paid", "cancelled"] as const;
 export type CashEventStatus = (typeof CASH_EVENT_STATUSES)[number];
 
 export type CashEvent = Readonly<{
   id: string;
-  userId: string;
-  description: string;
   amount: string;
   currency: Currency;
   expectedDate: string;
@@ -21,8 +19,6 @@ export type CashEvent = Readonly<{
 
 export type RawCashEvent = Readonly<{
   id: unknown;
-  userId: unknown;
-  description: unknown;
   amount: unknown;
   currency: unknown;
   expectedDate: unknown;
@@ -41,21 +37,11 @@ export class CashEventValidationError extends Error {
 
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const UTC_TIMESTAMP =
-  /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?Z$/;
+  /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(?:\.(\d{1,3}))?Z$/;
 
-function validateIdentifier(field: "id" | "userId", value: unknown) {
+function validateIdentifier(value: unknown) {
   if (typeof value !== "string" || value.length === 0 || value.trim() !== value) {
-    throw new CashEventValidationError(field, "Must be a non-empty, already-trimmed string.");
-  }
-  return value;
-}
-
-function validateDescription(value: unknown) {
-  if (typeof value !== "string" || value.length < 1 || value.length > 200 || value.trim() !== value) {
-    throw new CashEventValidationError(
-      "description",
-      "Must be 1–200 characters and already trimmed.",
-    );
+    throw new CashEventValidationError("id", "Must be a non-empty, already-trimmed string.");
   }
   return value;
 }
@@ -103,7 +89,9 @@ function validateCreatedAt(value: unknown) {
   } catch {
     throw new CashEventValidationError("createdAt", `Invalid UTC timestamp ${JSON.stringify(value)}.`);
   }
-  return value;
+
+  const milliseconds = (match[5] ?? "").padEnd(3, "0");
+  return `${match[1]}T${match[2]}:${match[3]}:${match[4]}.${milliseconds}Z`;
 }
 
 function validateAmount(value: unknown) {
@@ -141,7 +129,7 @@ function validateStatus(value: unknown): CashEventStatus {
   if (typeof value !== "string" || !CASH_EVENT_STATUSES.includes(value as CashEventStatus)) {
     throw new CashEventValidationError(
       "status",
-      "Expected one of pending, completed or cancelled.",
+      "Expected one of expected, received, paid or cancelled.",
     );
   }
   return value as CashEventStatus;
@@ -149,9 +137,7 @@ function validateStatus(value: unknown): CashEventStatus {
 
 export function parseCashEvent(raw: RawCashEvent): CashEvent {
   return Object.freeze({
-    id: validateIdentifier("id", raw.id),
-    userId: validateIdentifier("userId", raw.userId),
-    description: validateDescription(raw.description),
+    id: validateIdentifier(raw.id),
     amount: validateAmount(raw.amount),
     currency: validateCurrency(raw.currency),
     expectedDate: parseForecastDate("expectedDate", raw.expectedDate),

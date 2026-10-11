@@ -22,12 +22,18 @@ export type ForecastInput = Readonly<{
   endDate: string;
   /** Balance before events on startDate are applied. */
   openingBalance: string;
+  /** Workspace amount; null selects the 50% default. */
+  dangerThreshold: string | null;
   events: readonly CashEvent[];
   currency: Currency;
 }>;
 
 /** Warning is triggered after available cash falls below 50% of opening balance. */
 export const DANGER_THRESHOLD_PERCENT = "50";
+/** Inclusive calendar dates returned by one forecast request. */
+export const MAX_FORECAST_DAYS = 366;
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export type ForecastResult = Readonly<{
   /** One end-of-day balance for every date in the inclusive forecast range. */
@@ -38,7 +44,8 @@ export type ForecastResult = Readonly<{
   minimumBalance: string;
   /** First date on which the minimum was observed. */
   minimumDate: string;
-  dangerThresholdPercent: string;
+  /** The default percentage, or null when a workspace amount was supplied. */
+  dangerThresholdPercent: string | null;
   dangerThresholdAmount: string;
   /** First date whose balance is strictly below the threshold. */
   firstDangerDate: string | null;
@@ -50,7 +57,8 @@ export type ForecastResult = Readonly<{
 type ForecastInputField =
   | "startDate"
   | "endDate"
-  | "openingBalance";
+  | "openingBalance"
+  | "dangerThreshold";
 
 export class ForecastInputError extends Error {
   constructor(
@@ -75,15 +83,45 @@ function nextDate(value: string) {
   return date.toISOString().slice(0, 10);
 }
 
+function inclusiveDays(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00.000Z`).getTime();
+  const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
+  return (end - start) / MILLISECONDS_PER_DAY + 1;
+}
+
 function validateOpeningBalance(value: string, currency: Currency) {
-  const opening = money(value, currency);
-  if (parseDecimal(opening.amount).isNegative()) {
+  let opening;
+  try {
+    opening = money(value, currency);
+  } catch {
     throw new ForecastInputError(
       "openingBalance",
-      "Must be non-negative when the danger threshold is a percentage of opening balance.",
+      `Expected a plain decimal amount, received ${JSON.stringify(value)}.`,
     );
   }
   return opening;
+}
+
+function resolveDangerThreshold(value: string | null, openingBalance: string, currency: Currency) {
+  if (value === null) {
+    const percent = parseDecimal(DANGER_THRESHOLD_PERCENT);
+    return {
+      amount: money(
+        decimalString(parseDecimal(openingBalance).times(percent).dividedBy(100)),
+        currency,
+      ),
+      percent: decimalString(percent),
+    };
+  }
+
+  try {
+    return { amount: money(value, currency), percent: null };
+  } catch {
+    throw new ForecastInputError(
+      "dangerThreshold",
+      `Expected a plain decimal amount or null, received ${JSON.stringify(value)}.`,
+    );
+  }
 }
 
 function compareEvents(left: CashEvent, right: CashEvent) {
@@ -99,8 +137,8 @@ function compareEvents(left: CashEvent, right: CashEvent) {
 }
 
 /**
- * Projects pending cash events without mutating caller input.
- * Completed and cancelled events never affect a forecast.
+ * Projects expected cash events without mutating caller input.
+ * Received, paid and cancelled events never affect a forecast.
  */
 export function runForecast(input: ForecastInput): ForecastResult {
   const startDate = validateInputDate("startDate", input.startDate);
@@ -108,30 +146,36 @@ export function runForecast(input: ForecastInput): ForecastResult {
   if (startDate > endDate) {
     throw new ForecastInputError("endDate", "Must be on or after startDate.");
   }
+  if (inclusiveDays(startDate, endDate) > MAX_FORECAST_DAYS) {
+    throw new ForecastInputError(
+      "endDate",
+      `Forecast range must contain at most ${MAX_FORECAST_DAYS} calendar days.`,
+    );
+  }
 
   const currency = parseCurrency(input.currency);
   const opening = validateOpeningBalance(input.openingBalance, currency);
-  const thresholdPercent = parseDecimal(DANGER_THRESHOLD_PERCENT);
-  const thresholdAmount = money(
-    decimalString(parseDecimal(opening.amount).times(thresholdPercent).dividedBy(100)),
-    currency,
-  );
+  const threshold = resolveDangerThreshold(input.dangerThreshold, opening.amount, currency);
+  const thresholdAmount = threshold.amount;
 
   const eligibleEvents = input.events
     .map((event) => parseCashEvent(event))
     .filter(
       (event) =>
-        event.status === "pending" &&
-        event.expectedDate >= startDate &&
+        event.status === "expected" &&
         event.expectedDate <= endDate,
-    );
+    )
+    .map((event) => ({
+      event,
+      forecastDate: event.expectedDate < startDate ? startDate : event.expectedDate,
+    }));
 
-  for (const event of eligibleEvents) {
+  for (const { event } of eligibleEvents) {
     if (event.currency !== currency) {
       throw new CurrencyMismatchError(event.currency, currency);
     }
   }
-  eligibleEvents.sort(compareEvents);
+  eligibleEvents.sort((left, right) => compareEvents(left.event, right.event));
 
   const timeline: ForecastPoint[] = [];
   let running = opening;
@@ -145,11 +189,12 @@ export function runForecast(input: ForecastInput): ForecastResult {
   for (let date = startDate; ; date = nextDate(date)) {
     while (
       eventIndex < eligibleEvents.length &&
-      eligibleEvents[eventIndex].expectedDate === date
+      eligibleEvents[eventIndex].forecastDate === date
     ) {
+      const event = eligibleEvents[eventIndex].event;
       running = addMoney(
         running,
-        money(eligibleEvents[eventIndex].amount, eligibleEvents[eventIndex].currency),
+        money(event.amount, event.currency),
       );
       eventIndex += 1;
     }
@@ -179,7 +224,7 @@ export function runForecast(input: ForecastInput): ForecastResult {
     closingBalance: running.amount,
     minimumBalance: minimum.amount,
     minimumDate,
-    dangerThresholdPercent: decimalString(thresholdPercent),
+    dangerThresholdPercent: threshold.percent,
     dangerThresholdAmount: thresholdAmount.amount,
     firstDangerDate,
     runwayDays,

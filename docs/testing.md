@@ -7,7 +7,7 @@ Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and 
 | `npm run lint` | ESLint with zero warnings allowed |
 | `npm run typecheck` | Strict TypeScript |
 | `npm test` | Credential/name validation, salts, password verification, corrupt hashes, tokens, money/percent/timestamp formatting, reporting currency, appearance validation, and Forecast domain rules |
-| `npm exec vitest -- run tests/unit/forecast` | Decimal/Money/FX rules, cash-event validation, daily projection, status filtering, minimum balance, 50% warning threshold, runway, deterministic ordering and immutability |
+| `npm exec vitest -- run tests/unit/forecast` | Decimal/Money/FX rules, migration-aligned cash-event validation, canonical timestamps, overdue events, bounded daily projection, status filtering, workspace/default thresholds, negative balances, minimum balance, runway, deterministic ordering and immutability |
 | `npm run db:migrate:test` | Ordered migrations against the isolated test database |
 | `npm run test:integration` | Real PostgreSQL sessions, ownership, constraints, rate limits, and server actions, including the reporting currency (two users, forged user id, anonymous/unknown/expired sessions, foreign origin, database constraint) active sessions (listing only the caller's unexpired sessions, signing out others without touching other users) and appearance (allowed values, ownership, origin, expiry, database constraint) |
 | `npm run build` | Next.js production compilation and route generation |

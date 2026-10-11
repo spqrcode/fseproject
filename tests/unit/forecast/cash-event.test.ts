@@ -8,13 +8,11 @@ import {
 function rawEvent(overrides: Partial<RawCashEvent> = {}): RawCashEvent {
   return {
     id: "event-1",
-    userId: "user-1",
-    description: "Customer invoice",
     amount: "1250.5000",
     currency: "EUR",
     expectedDate: "2026-10-15",
     createdAt: "2026-10-05T09:30:00.000Z",
-    status: "pending",
+    status: "expected",
     ...overrides,
   };
 }
@@ -48,7 +46,7 @@ describe("parseCashEvent", () => {
     expect(() => parseCashEvent(rawEvent({ currency }))).toThrow(CashEventValidationError);
   });
 
-  it.each(["pending", "completed", "cancelled"])("accepts status %s", (status) => {
+  it.each(["expected", "received", "paid", "cancelled"])("accepts status %s", (status) => {
     expect(parseCashEvent(rawEvent({ status })).status).toBe(status);
   });
 
@@ -79,12 +77,15 @@ describe("parseCashEvent", () => {
   });
 
   it.each([
-    { field: "id", value: "" },
-    { field: "userId", value: " user-1" },
-    { field: "description", value: "" },
-    { field: "description", value: " Customer invoice" },
-    { field: "description", value: "x".repeat(201) },
-  ] as const)("rejects invalid $field", ({ field, value }) => {
-    expect(() => parseCashEvent(rawEvent({ [field]: value }))).toThrow(CashEventValidationError);
+    ["2026-10-05T09:30:00Z", "2026-10-05T09:30:00.000Z"],
+    ["2026-10-05T09:30:00.001Z", "2026-10-05T09:30:00.001Z"],
+    ["2026-10-05T09:30:00.1Z", "2026-10-05T09:30:00.100Z"],
+    ["2026-10-05T09:30:00.10Z", "2026-10-05T09:30:00.100Z"],
+  ])("normalizes UTC timestamp %s to %s", (createdAt, expected) => {
+    expect(parseCashEvent(rawEvent({ createdAt })).createdAt).toBe(expected);
+  });
+
+  it.each(["", " event-1"])("rejects invalid id %s", (id) => {
+    expect(() => parseCashEvent(rawEvent({ id }))).toThrow(CashEventValidationError);
   });
 });
