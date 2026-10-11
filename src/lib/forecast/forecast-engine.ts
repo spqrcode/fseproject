@@ -137,8 +137,8 @@ function compareEvents(left: CashEvent, right: CashEvent) {
 }
 
 /**
- * Projects expected cash events without mutating caller input.
- * Received, paid and cancelled events never affect a forecast.
+ * Projects pending cash events without mutating caller input.
+ * Completed and cancelled events never affect a forecast.
  */
 export function runForecast(input: ForecastInput): ForecastResult {
   const startDate = validateInputDate("startDate", input.startDate);
@@ -162,7 +162,7 @@ export function runForecast(input: ForecastInput): ForecastResult {
     .map((event) => parseCashEvent(event))
     .filter(
       (event) =>
-        event.status === "expected" &&
+        event.status === "pending" &&
         event.expectedDate <= endDate,
     )
     .map((event) => ({

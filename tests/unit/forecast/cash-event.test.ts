@@ -12,7 +12,7 @@ function rawEvent(overrides: Partial<RawCashEvent> = {}): RawCashEvent {
     currency: "EUR",
     expectedDate: "2026-10-15",
     createdAt: "2026-10-05T09:30:00.000Z",
-    status: "expected",
+    status: "pending",
     ...overrides,
   };
 }
@@ -46,7 +46,7 @@ describe("parseCashEvent", () => {
     expect(() => parseCashEvent(rawEvent({ currency }))).toThrow(CashEventValidationError);
   });
 
-  it.each(["expected", "received", "paid", "cancelled"])("accepts status %s", (status) => {
+  it.each(["pending", "completed", "cancelled"])("accepts status %s", (status) => {
     expect(parseCashEvent(rawEvent({ status })).status).toBe(status);
   });
 

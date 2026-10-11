@@ -5,7 +5,7 @@ import {
   type Currency,
 } from "@/lib/forecast/money";
 
-export const CASH_EVENT_STATUSES = ["expected", "received", "paid", "cancelled"] as const;
+export const CASH_EVENT_STATUSES = ["pending", "completed", "cancelled"] as const;
 export type CashEventStatus = (typeof CASH_EVENT_STATUSES)[number];
 
 export type CashEvent = Readonly<{
@@ -129,7 +129,7 @@ function validateStatus(value: unknown): CashEventStatus {
   if (typeof value !== "string" || !CASH_EVENT_STATUSES.includes(value as CashEventStatus)) {
     throw new CashEventValidationError(
       "status",
-      "Expected one of expected, received, paid or cancelled.",
+      "Expected one of pending, completed or cancelled.",
     );
   }
   return value as CashEventStatus;

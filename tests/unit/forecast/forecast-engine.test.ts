@@ -18,7 +18,7 @@ function cashEvent(overrides: Partial<RawCashEvent> = {}): CashEvent {
     currency: "EUR",
     expectedDate: "2026-01-02",
     createdAt: `2025-12-01T00:00:${String(eventNumber).padStart(2, "0")}.000Z`,
-    status: "expected",
+    status: "pending",
     ...overrides,
   });
 }
@@ -61,7 +61,7 @@ describe("runForecast timeline", () => {
     expect(result.closingBalance).toBe("2049");
   });
 
-  it("applies overdue expected events on startDate", () => {
+  it("applies overdue pending events on startDate", () => {
     const result = runForecast(
       input({ events: [cashEvent({ amount: "250", expectedDate: "2025-12-20" })] }),
     );
@@ -69,11 +69,10 @@ describe("runForecast timeline", () => {
     expect(result.timeline[0]).toEqual({ date: "2026-01-01", balance: "1250" });
   });
 
-  it("excludes received, paid and cancelled events", () => {
+  it("excludes completed and cancelled events", () => {
     const events = [
-      cashEvent({ amount: "100", status: "expected" }),
-      cashEvent({ amount: "500", status: "received" }),
-      cashEvent({ amount: "-200", status: "paid" }),
+      cashEvent({ amount: "100", status: "pending" }),
+      cashEvent({ amount: "500", status: "completed" }),
       cashEvent({ amount: "700", status: "cancelled" }),
     ];
 

@@ -8,7 +8,7 @@ import { DEFAULT_APPEARANCE, type Appearance } from "@/lib/appearance";
 
 export type Preferences = { reportingCurrency: ReportingCurrency; appearance: Appearance };
 
-// Like the portfolio, preferences are reached only through an unexpired session, never a submitted user id.
+// Like the workspace, preferences are reached only through an unexpired session, never a submitted user id.
 // React's cache shares one query between the layout (appearance) and the page (currency) within a request.
 export const getPreferences = cache(async (token: string | undefined): Promise<Preferences | null> => {
   if (!token || !validToken(token)) return null;

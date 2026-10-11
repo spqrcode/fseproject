@@ -96,6 +96,6 @@ test("US-01: expired session cannot submit a form already open in the browser", 
   await account.db.query("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE user_id=(SELECT id FROM users WHERE email=$1)", [account.email]);
   await page.getByRole("button", { name: "Create workspace", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
-  const result = await account.db.query("SELECT p.id FROM portfolios p JOIN users u ON u.id=p.user_id WHERE u.email=$1", [account.email]);
+  const result = await account.db.query("SELECT w.id FROM workspaces w JOIN users u ON u.id=w.user_id WHERE u.email=$1", [account.email]);
   expect(result.rowCount).toBe(0);
 });

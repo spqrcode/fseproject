@@ -22,9 +22,9 @@ The forecast module is a pure TypeScript domain layer under `src/lib/forecast`. 
 ### Cash events and dates
 
 - Amounts are signed decimal strings: income is positive, expense is negative, and zero is invalid.
-- Statuses match migration 005: `expected`, `received`, `paid`, and `cancelled`. Only `expected` events affect a projection; the other statuses are excluded.
+- Forecast statuses are `pending`, `completed`, and `cancelled`. The Input adapter maps database `expected` to `pending`, maps `received` and `paid` to `completed`, and omits database `cancelled` events. Only `pending` events affect a projection.
 - The Store/Input layer supplies the starting balance by combining account opening balances with settled `received` and `paid` events up to the forecast start. The Forecast Engine does not query persistence or add settled events again.
-- Forecast dates are real `YYYY-MM-DD` calendar dates interpreted in UTC. Both `startDate` and `endDate` are inclusive. An overdue `expected` event before `startDate` is applied on `startDate`; an event after `endDate` is ignored.
+- Forecast dates are real `YYYY-MM-DD` calendar dates interpreted in UTC. Both `startDate` and `endDate` are inclusive. An overdue `pending` event before `startDate` is applied on `startDate`; an event after `endDate` is ignored.
 - The timeline contains one end-of-day balance for every calendar date in the range.
 - Events on the same date are ordered by canonical creation time. Equal timestamps put expenses before income, then use the event ID as a stable final tie-breaker. Because the current timeline records only end-of-day balances, this order does not change the reported daily minimum; it preserves deterministic arithmetic and a future intraday extension.
 - A forecast contains at most 366 inclusive calendar dates so one request cannot create an unbounded server-side loop.
@@ -76,7 +76,7 @@ The forecast module is a pure TypeScript domain layer under `src/lib/forecast`. 
 ## Implementation status and next work
 
 1. Implemented: `CashEvent`, `ForecastInput`, `ForecastPoint`, and `ForecastResult` contracts.
-2. Implemented: immutable validation, daily balance timeline, overdue-event handling, workspace/default threshold, minimum balance, and runway.
+2. Implemented: immutable validation, daily balance timeline, overdue-pending-event handling, workspace/default threshold, minimum balance, and runway.
 3. Next: implement the agreed resolved-rate collection boundary with the ECB adapter owner.
 4. Next: expose base-versus-scenario closing delta and reconcile the later contribution breakdown.
 5. Next: connect the pure domain result to persistence and UI without moving calculations into those layers.
