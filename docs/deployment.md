@@ -21,6 +21,8 @@ Runtime role `fse_runtime` has only SELECT/INSERT on users, SELECT/INSERT/DELETE
 
 There is no DELETE on `cash_accounts`: no application function deletes accounts. Deleting a user (owner only) cascades through workspace, accounts and events with the owner's rights. It cannot create schema objects or write migration history. The database owner is used separately for migrations. Administrator connection files remain ignored and owner-readable locally; they must not be committed or provided to the application.
 
+Migration 006 creates the global ECB snapshot cache. If `fse_runtime` exists when the owner applies it, the role receives SELECT and INSERT on `fx_snapshots`, plus UPDATE only on `fetched_at` for a repeated identical observation. A corrected rate is a new immutable row. The role receives no DELETE and cannot rewrite a snapshot's provider, currencies, rate or effective date. Snapshot cleanup remains an owner maintenance operation. Migration 006 is additive and may be applied before the FX service is deployed.
+
 Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `APP_ORIGIN` (exact canonical HTTPS staging origin). No production or development connection to staging is intended. Do not overwrite local `.env.local` with staging credentials.
 
 ## Delivery and manual checks

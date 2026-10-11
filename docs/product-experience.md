@@ -1,6 +1,6 @@
 # Product experience
 
-Owner: Gabriel, with the Cash events integration completed by Jiaxin. The product layer owns presentation and user interaction; forecast and scenario calculations remain in their domain services.
+Owner: Gabriel (Product Experience), with Cash events integration by Jiaxin. The product layer owns presentation and user interaction. Forecast calculations belong to Haina's Forecast Engine, and scenario and FX calculations belong to Jiaxin's domain services.
 
 ## Information architecture
 
@@ -11,14 +11,14 @@ Owner: Gabriel, with the Cash events integration completed by Jiaxin. The produc
 | `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented; the forecast is shown as not connected until the engine is delivered |
 | `/cash-events` | Cash accounts and planned income and expenses by date | Connected to the session-scoped cash-event store; create, edit, settle, cancel and delete expected events |
 | `/scenarios` | Scenario lab: what-if and FX scenario comparison against the base case | Page and navigation ready; honest empty state until scenario analysis is connected |
-| `/workspace` | Workspace name (stored in the `portfolios` table until the workspace schema replaces it) | Existing form, renamed from `/portfolio` |
+| `/workspace` | Workspace name stored in `workspaces` | Existing form, renamed from `/portfolio` |
 | `/settings` | Reporting currency, appearance and active sessions | Implemented |
 
 Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/scenarios/compare`).
 
 Section names follow the MVP views agreed by the team on 2 October 2026: Liquidity overview, Cash events and Scenario lab, then Workspace (which replaces the Portfolio page of the earlier project) and Settings. The forecast has no page of its own, because the projected balance is the main content of the liquidity overview. Routes keep short, stable paths (`/dashboard` is where sign-in lands), so renaming a label never breaks a link.
 
-The home page lists the three MVP views as in development and names what is available today, so a visitor is never promised a feature that does not exist yet. The logo on the sign-in and registration pages links back to it.
+The home page marks Cash events as available and keeps the forecast and Scenario lab in development. The logo on the sign-in and registration pages links back to it.
 
 Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so forecast and scenario pages state what will appear and that nothing is estimated today. The Cash events page shows only persisted account and event values.
 
