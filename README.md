@@ -18,7 +18,7 @@ Status of the three business views on `main`, as of 12 October 2026. Update this
 
 | View | On `main` | Pull request |
 | --- | --- | --- |
-| Liquidity overview (`/dashboard`) | Placeholder: workspace and currency status only | #20, depends on #14 and #19 |
+| Liquidity overview (`/dashboard`) | Placeholder: workspace and currency status only. The data layer behind it (forecast input, adapter, engine) is on `main` | #20, ready for review |
 | Cash events (`/cash-events`) | Placeholder; the data layer and its tests are on `main` | #16 |
 | Scenario Lab (`/scenarios`) | Placeholder | #9, #17, #18 |
 

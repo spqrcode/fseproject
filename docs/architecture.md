@@ -2,7 +2,7 @@
 
 ## Component diagram
 
-Status as of 12 October 2026. Solid green boxes are on `main`, dashed amber boxes are in open pull requests and not merged yet, dotted grey boxes are planned and not started. The same status is given in the table below, so the diagram does not rely on colour alone.
+Status as of 12 October 2026, after PRs #14 and #19 were merged. Solid green boxes are on `main`, dashed amber boxes are in open pull requests and not merged yet, dotted grey boxes are planned and not started. The same status is given in the table below, so the diagram does not rely on colour alone.
 
 ```mermaid
 flowchart TB
@@ -25,7 +25,7 @@ flowchart TB
     direction LR
     Auth["Authentication and sessions"]:::done
     Stores["Workspace and cash-event stores"]:::done
-    Input["Forecast input store<br/>PR #14"]:::pr
+    Input["Forecast input store<br/>PR #14, merged"]:::done
     Scen["Scenario store<br/>PR #9"]:::pr
     Shock["Percentage FX shocks<br/>PR #17"]:::pr
     FX["FX service and ECB adapter"]:::done
@@ -35,7 +35,7 @@ flowchart TB
 
   subgraph Dom["Domain: pure functions"]
     direction LR
-    Adapter["Forecast input adapter<br/>PR #19"]:::pr
+    Adapter["Forecast input adapter<br/>PR #19, merged"]:::done
     Engine["Forecast Engine<br/>Decimal, runway, threshold"]:::done
   end
 
@@ -77,8 +77,8 @@ flowchart TB
 | Workspace and cash-event stores | Session-scoped reads and writes, input validation, ownership down the chain user, workspace, account, event | Implemented | `src/lib/workspace-store.ts`, `cash-events-store.ts`, `validation.ts` |
 | Forecast Engine | Deterministic projection, runway and danger threshold with Decimal arithmetic; no database, network or UI dependency | Implemented | `src/lib/forecast` |
 | FX service and ECB adapter | Fetch, strictly parse and validate ECB data, persist immutable snapshots, classify `CURRENT`, `STALE` or `UNAVAILABLE` | Implemented | `src/lib/fx` |
-| Forecast input store | One account's starting balance, overdue events and threshold in one read-only snapshot | Open PR #14 | `src/lib/forecast-input-store.ts` |
-| Forecast input adapter | Maps the stored input to the engine's input; pure | Open PR #19 | `src/lib/forecast/input-adapter.ts` |
+| Forecast input store | One account's starting balance, overdue events and threshold in one read-only snapshot | Implemented (PR #14) | `src/lib/forecast-input-store.ts` |
+| Forecast input adapter | Maps the stored input to the engine's input; pure | Implemented (PR #19) | `src/lib/forecast/input-adapter.ts` |
 | Scenario store and delay calculation | Delayed-invoice adjustments as separate rows; base events are never changed | Open PR #9 | `src/lib/scenario-store.ts`, `src/lib/forecast/scenario.ts` |
 | Percentage FX shocks | A labelled percentage applied to a stored snapshot, with provenance | Open PR #17 | `src/lib/fx/fx-shock.ts`, `shock-store.ts` |
 | Liquidity overview, Cash events, Scenario Lab pages | The three business views | Open PRs #20, #16, #18; placeholders on `main` | `src/app/(protected)` |
