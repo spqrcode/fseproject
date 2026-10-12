@@ -3,7 +3,7 @@ import { requireUser, sessionToken } from "@/lib/auth";
 import { getWorkspace } from "@/lib/workspace-store";
 import { getReportingCurrency } from "@/lib/preferences-store";
 import { DEFAULT_REPORTING_CURRENCY, currencyLabel } from "@/lib/currency";
-import { listCashAccounts, type CashAccount } from "@/lib/cash-events-store";
+import { listCashAccounts, listCashEvents, type CashAccount } from "@/lib/cash-events-store";
 import { getLiquidityForecast, type LiquidityForecast } from "@/lib/liquidity-forecast";
 import { HORIZONS, firstParam, forecastWindow, parseHorizon, type Horizon } from "@/lib/liquidity-overview";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -19,7 +19,12 @@ export default async function LiquidityOverview({ searchParams }: { searchParams
   await requireUser();
   const token = await sessionToken();
   const params = await searchParams;
-  const [workspace, currency, accounts] = await Promise.all([getWorkspace(token), getReportingCurrency(token), listCashAccounts(token)]);
+  const [workspace, currency, accounts, events] = await Promise.all([
+    getWorkspace(token),
+    getReportingCurrency(token),
+    listCashAccounts(token),
+    listCashEvents(token),
+  ]);
   const reporting = currency ?? DEFAULT_REPORTING_CURRENCY;
   const horizon = parseHorizon(params.days);
   // Only the caller's own accounts can be chosen; an unknown id in the URL falls back to the first one.
@@ -31,7 +36,7 @@ export default async function LiquidityOverview({ searchParams }: { searchParams
   const modules: Module[] = [
     { title: "Workspace", text: workspace ? "Your workspace is saved and only you can access it." : "Name your workspace to get started.", state: workspace ? "Ready" : "Not created", tone: workspace ? "ready" : "pending", href: "/workspace", action: "Open workspace" },
     { title: "Reporting currency", text: `Figures will be reported in ${currencyLabel(reporting)}. Until exchange-rate conversion is connected, each forecast is shown in its account's currency.`, state: reporting, tone: "value", href: "/settings", action: "Change currency" },
-    { title: "Cash events", text: accounts.length > 0 ? "Accounts and planned income and expenses feed the forecast above." : "Add a cash account, then record expected income and expenses.", state: accounts.length > 0 ? `${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}` : "Set up", tone: accounts.length > 0 ? "ready" : "pending", href: "/cash-events", action: "Open cash events" },
+    { title: "Cash events", text: accounts.length > 0 ? "Accounts and planned income and expenses feed the forecast above." : "Add a cash account, then record expected income and expenses.", state: accounts.length > 0 ? `${events.length} ${events.length === 1 ? "event" : "events"}` : "Set up", tone: accounts.length > 0 ? "ready" : "pending", href: "/cash-events", action: "Open cash events" },
     { title: "Scenario lab", text: "What-if scenarios, including exchange-rate shocks, will appear once scenario analysis is delivered.", state: "Not connected yet", tone: "pending", href: "/scenarios", action: "Open scenario lab" },
   ];
   return <>
