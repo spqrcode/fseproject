@@ -2,6 +2,112 @@
 
 PostgreSQL 16, accessed through the server-only `pg` driver and parameterized SQL. No ORM or database API is exposed to the browser.
 
+## Entity-relationship diagram
+
+Tables created by migrations 001 to 006, which are on `main`. Only key columns are drawn; the full constraints are in the table below. `PK` is a primary key, `FK` a foreign key and `UK` a unique constraint.
+
+```mermaid
+erDiagram
+  users ||--o{ sessions : "has"
+  users ||--o| workspaces : "owns one"
+  workspaces ||--o{ cash_accounts : "contains"
+  workspaces ||--o{ cash_events : "contains"
+  cash_accounts ||--o{ cash_events : "has"
+
+  users {
+    uuid id PK
+    text email UK "lowercase"
+    text password_hash
+    text reporting_currency "default EUR"
+    text appearance "system, light, dark"
+    timestamptz created_at
+  }
+  sessions {
+    text token_hash PK "SHA-256 of the token"
+    uuid user_id FK
+    timestamptz expires_at
+  }
+  auth_limits {
+    text key PK "throttle key with hashed address"
+    int attempts
+    timestamptz reset_at
+  }
+  workspaces {
+    uuid id PK
+    uuid user_id FK "unique"
+    text name
+    numeric danger_threshold "nullable"
+  }
+  cash_accounts {
+    uuid id PK
+    uuid workspace_id FK
+    text name "UK with workspace_id"
+    text currency "EUR, USD or SGD"
+    numeric opening_balance
+  }
+  cash_events {
+    uuid id PK
+    uuid workspace_id FK
+    uuid account_id FK "with workspace_id"
+    text description
+    numeric amount "income positive, expense negative"
+    date expected_date
+    text status "expected, received, paid, cancelled"
+  }
+  fx_snapshots {
+    uuid id PK
+    text provider
+    text base_currency "EUR"
+    text quote_currency "USD or SGD"
+    numeric rate "numeric(30,15)"
+    date effective_date
+    timestamptz fetched_at
+  }
+```
+
+Reading the diagram:
+
+- **Ownership chain.** User, workspace, account, event. `cash_events` carries `workspace_id` and a composite foreign key `(account_id, workspace_id)` to `cash_accounts`, so the database itself refuses an event whose account belongs to another workspace.
+- **Global reference data.** `fx_snapshots` has no owner and no relationship to user data. A forecast or scenario that uses a rate refers to one immutable snapshot row; a corrected ECB rate becomes a new row.
+- **No currency on events.** An event's currency is its account's currency, so the two cannot disagree.
+- **Not drawn.** `schema_migrations` (applied migration history) has no relationships.
+
+### Scenario tables (open pull requests, not on `main`)
+
+Migration `007_scenarios.sql` is in PR #9 and `008_scenario_fx_shocks.sql` in PR #17. A scenario stores only its adjustments; the base events are never copied or edited, which is what makes base and scenario comparable.
+
+```mermaid
+erDiagram
+  workspaces ||--o{ scenarios : "contains"
+  scenarios ||--o{ scenario_adjustments : "has"
+  cash_events ||--o{ scenario_adjustments : "is delayed by"
+  scenarios ||--o{ scenario_fx_shocks : "has"
+  fx_snapshots ||--o{ scenario_fx_shocks : "is shocked from"
+
+  scenarios {
+    uuid id PK
+    uuid workspace_id FK
+    text name
+  }
+  scenario_adjustments {
+    uuid id PK
+    uuid scenario_id FK "with workspace_id"
+    uuid cash_event_id FK "with workspace_id"
+    date date_override
+    text status "active or invalid"
+  }
+  scenario_fx_shocks {
+    uuid id PK
+    uuid scenario_id FK "with workspace_id"
+    uuid snapshot_id FK "restrict delete"
+    numeric shock_percent "greater than -100"
+    text status "active or invalid"
+  }
+```
+
+- `scenario_adjustments` is unique per scenario and event, and both foreign keys repeat `workspace_id`, so an adjustment cannot point at another workspace's event or scenario.
+- `scenario_fx_shocks.snapshot_id` is `ON DELETE RESTRICT`: a snapshot used by a scenario cannot be deleted, so the scenario stays reproducible.
+
 ## Implemented tables
 
 | Table | Purpose | Constraints |
