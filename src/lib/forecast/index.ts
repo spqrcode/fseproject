@@ -49,3 +49,9 @@ export {
   type DelayAdjustment,
   type ScenarioProjection,
 } from "@/lib/forecast/scenario";
+export {
+  compareScenario,
+  ContributionMismatchError,
+  type AdjustmentContribution,
+  type ScenarioComparison,
+} from "@/lib/forecast/scenario-comparison";
