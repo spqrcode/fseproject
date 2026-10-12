@@ -118,6 +118,17 @@ As a signed-in user, I can use EUR, USD and SGD exchange rates with visible sour
 - A cross-rate uses two ECB legs from the same effective date. Different dates return UNAVAILABLE instead of a mixed-date number.
 - Results include provider, source snapshot IDs, effective date and fetch timestamp for the Scenario Lab.
 
+## US-14 Percentage-based FX shocks
+
+As a signed-in user, I can apply a percentage shock to a resolved EUR, USD or SGD rate and see the hypothetical rate without changing the stored ECB observation.
+
+- `-10` means minus 10%, not a ratio of `-0.1`; percentages must be plain decimals greater than -100.
+- The FX service resolves direct, reciprocal and cross rates before the Forecast Engine consumes them. The engine does not derive SGD/EUR or USD/SGD itself.
+- Calculations use Decimal arithmetic with no implicit display rounding and leave snapshots unchanged.
+- CURRENT and STALE results include source and adjusted decimal strings, requested pair, effective date, provider and source snapshot IDs.
+- UNAVAILABLE returns null source and adjusted rates with an explicit failure; it never fabricates a fallback number.
+- Persisted shocks are workspace-isolated and keep their immutable snapshot provenance.
+
 ## Engineering acceptance criteria
 
 - At least three distinct functional views: authentication, portfolio management, and dashboard analytics.
@@ -148,6 +159,7 @@ As a signed-in user, I can use EUR, USD and SGD exchange rates with visible sour
 | US-11 forecast input (decisions of 2026-10-08, implemented 2026-10-10) | `src/lib/forecast-input-store.ts` (starting balance, overdue events, threshold), `src/lib/forecast-input.ts` (status mapping), date rule in `setCashEventStatus`; see [decisions](decisions.md#2026-10-10--forecast-input-implemented-a-settled-events-date-is-the-date-the-money-moved) | Integration: starting balance with events before, on and after the start date (on or before counts), cancelled and other accounts and users ignored, early-settled event in the balance, overdue events, ranges, ownership matrix; unit: status mapping and range; also run as the staging role | Foundation & Security branch `feat/forecast-input`. The call into the engine is not delivered: it waits for PR #12 |
 | US-12 delayed-invoice scenarios | Migration 007, `src/lib/scenario-store.ts`, immutable scenario projection in `src/lib/forecast/scenario.ts` | Unit immutability and delta tests; PostgreSQL ownership, composite-FK, eligibility, date-only, cascade and base-forecast isolation tests | PR #9; aligned to the merged PR #12 engine; adjustments that cannot apply are skipped and reported (decision of 2026-10-12) |
 | US-13 reliable ECB exchange rates | Migration 006 and `src/lib/fx/*` | Parser/provider/cache unit tests; PostgreSQL constraints, atomic persistence, stale fallback and restricted-role integration tests | Scenarios & Exchange Rates Phase 2 branch; no UI in this increment |
+| US-14 percentage-based FX shocks | Migration 008, `src/lib/fx/fx-shock.ts`, `src/lib/fx/shock-store.ts` | Decimal shock/result-contract unit tests; PostgreSQL constraint, provenance, invalidation, malformed-id and cross-workspace tests | Scenarios & Exchange Rates Phase 3 branch; no UI in this increment |
 | US-02 workspace (renamed) | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts` | The existing ownership and origin tests, renamed | Same branch |
 
 Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.

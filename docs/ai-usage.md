@@ -67,6 +67,13 @@ Evidence retained: the saved upload manifest showing the ignored paths, the late
 - Post-review alignment on 2026-10-08: after Jiaxin reviewed and approved Bastian's PR #10, its workspace/account/event schema was merged into `main`. The duplicate cash-event migration and store were removed from this Draft; scenario persistence now uses migration 007, the canonical cash-event store and workspace-safe composite foreign keys. Jiaxin retained migration 006 for the separate ECB snapshot work and kept the Forecast Engine adapter deferred until PR #12 is finalized. Final local checks covered 143 unit tests, 115 PostgreSQL integration tests and 24 Chromium tests. A separate fresh database containing the staging role confirmed that it can select and insert scenario data and update only adjustment status metadata, but cannot delete scenario rows or rewrite their ownership columns.
 - Follow-up on 2026-10-12: after PR #12 was merged, OpenAI Codex resolved PR #9's conflicts by retaining Haina's canonical cash-event and forecast-engine files and adapting only Jiaxin's scenario module and tests. The old scenario tests had assumed event-only timeline points and ignored overdue events; they now assert the engine's daily timeline and overdue-on-start rule. This follow-up remains subject to Jiaxin's review before merge.
 
+## Jiaxin Huang — Percentage-based FX shocks
+
+- Date: 2026-10-10 to 2026-10-12. Tool: OpenAI Codex. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
+- Student decisions: Jiaxin set the ownership boundary: the FX service resolves direct, reciprocal and cross rates, while the Forecast Engine receives resolved rates and remains deterministic. Jiaxin also confirmed that `-10` means minus 10%, unavailable results contain no fallback rate, and Scenario Lab receives freshness and snapshot metadata with the adjusted result.
+- AI assistance: inspected and adapted the Phase 3 work to the merged forecast and scenario contracts, including test events with canonical timestamps and statuses. This work remains subject to Jiaxin's review before GitHub delivery or merge.
+- Validation: focused unit tests and PostgreSQL integration tests passed after the 2026-10-12 alignment; the full-suite result is recorded separately once complete. No staging or production deployment is claimed.
+
 ## Product experience increment: FinTwin Global shell, formatting and reporting currency
 
 Date: 2026-10-01. Tool: Claude Code. Owner: Gabriel Piraccini, Product Experience.
