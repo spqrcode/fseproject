@@ -3,7 +3,7 @@ import { parseCashEvent, runForecast, type CashEvent } from "@/lib/forecast";
 import { compareScenario, ContributionMismatchError } from "@/lib/forecast/scenario-comparison";
 import type { DelayAdjustment } from "@/lib/forecast/scenario";
 
-// US-05: the difference between the scenario and the base equals the sum of the per-adjustment contributions.
+// Proposal US-05 (US-12 in requirements.md): the difference between the scenario and the base equals the sum of the per-adjustment contributions.
 
 function event(id: string, amount: string, expectedDate: string): CashEvent {
   return parseCashEvent({ id, amount, currency: "EUR", expectedDate, createdAt: "2025-01-01T00:00:00.000Z", status: "pending" });

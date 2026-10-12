@@ -6,7 +6,7 @@
  * runs the scenario, reports what was skipped, and splits the difference in
  * closing balance into one contribution per applied adjustment.
  *
- * Rule (US-05): the displayed difference equals the sum of the contributions.
+ * Rule (proposal US-05, US-12 in requirements.md): the displayed difference equals the sum of the contributions.
  * It holds exactly, because the closing balance is the opening balance plus
  * the sum of the events dated inside the forecast range, so it is additive
  * across events and each event has at most one adjustment per scenario.
