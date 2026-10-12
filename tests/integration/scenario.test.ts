@@ -20,6 +20,7 @@ import {
   deleteCashEvent,
   listCashEvents,
   setCashEventStatus,
+  updateCashEvent,
   type CashEvent as StoredCashEvent,
 } from "@/lib/cash-events-store";
 import { saveWorkspace } from "@/lib/workspace-store";
@@ -401,6 +402,29 @@ describe("invalid adjustments and safe deletion", () => {
     expect(on(baseForecast, "2025-06-01")).toBe("1100");
     expect(on(projection.result, "2025-06-01")).toBe("1000");
     expect(on(projection.result, "2025-08-01")).toBe("1100");
+  });
+
+  it("editing an expected event so the delay no longer makes sense makes the adjustment not applicable", async () => {
+    const asIncome = await aliceEvent("200", "2025-04-01");
+    const asDate = await aliceEvent("300", "2025-04-01");
+    const untouched = await aliceEvent("50", "2025-04-01");
+    const scenario = await createScenario(alice, "Edited after delay");
+    const adjIncome = await addDelayAdjustment(alice, scenario.id, asIncome.id, "2025-07-01");
+    const adjDate = await addDelayAdjustment(alice, scenario.id, asDate.id, "2025-07-01");
+    const adjUntouched = await addDelayAdjustment(alice, scenario.id, untouched.id, "2025-07-01");
+
+    // The income becomes an expense: delaying an expense is not what the adjustment was allowed to do.
+    await updateCashEvent(alice, asIncome.id, { description: "Now an expense", amount: "-200", expectedDate: "2025-04-01" });
+    // The event is moved to the same day as, then after, the override: the override is no longer a delay.
+    await updateCashEvent(alice, asDate.id, { description: "Moved later", amount: "300", expectedDate: "2025-07-01" });
+
+    const statuses = Object.fromEntries((await getAdjustments(alice, scenario.id)).map((item) => [item.id, item.status]));
+    expect(statuses).toEqual({ [adjIncome.id]: "not_applicable", [adjDate.id]: "not_applicable", [adjUntouched.id]: "active" });
+
+    // Moving it back earlier makes the same stored adjustment applicable again; nothing was written meanwhile.
+    await updateCashEvent(alice, asDate.id, { description: "Back", amount: "300", expectedDate: "2025-04-01" });
+    expect((await getAdjustments(alice, scenario.id)).find((item) => item.id === adjDate.id)?.status).toBe("active");
+    expect((await database().query("SELECT status FROM scenario_adjustments WHERE id = $1", [adjIncome.id])).rows[0].status).toBe("active");
   });
 
   it("an adjustment on another account's event is skipped for this account's forecast, not a failure", async () => {
