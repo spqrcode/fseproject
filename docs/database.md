@@ -46,6 +46,7 @@ Ownership runs user → workspace → account → event. The chain is enforced t
 - **Signed amounts.** Income is positive, expense negative, zero is invalid. `received` requires a positive and `paid` a negative amount. `cancelled` and `expected` allow either sign.
 - **NaN and infinity.** PostgreSQL accepts `'NaN'` in a `numeric` column and `NaN > 0` is true, so each numeric column has an explicit `<> 'NaN'` check. `numeric(20,2)` already rejects infinity and anything over 18 integer digits. `expected_date` rejects `'infinity'` with `isfinite`. The 2000–2100 date range is an application rule only.
 - **Two decimals.** The application rejects amounts with more than two decimals. The database would round them silently on assignment, so the stores never pass such a value.
+- **Settled dates.** A settled event's date is the date the money moved: `setCashEventStatus` moves a future date to today (UTC) when the event becomes `received` or `paid`, in the same `UPDATE`. The forecast's starting balance relies on this.
 - **Cascade.** Deleting a user removes the workspace, its accounts and its events. Events also cascade from the workspace directly. The account foreign key keeps the default `NO ACTION`: an account that still has events cannot be deleted on its own.
 - **Indexes.** `cash_events (workspace_id, expected_date)` serves the per-workspace date-range list. The unique constraints index accounts and the event id lookups; a separate `workspace_id` index would repeat the first column of the composite one.
 
