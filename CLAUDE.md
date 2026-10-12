@@ -24,7 +24,7 @@ Node 24 (`.nvmrc`), PostgreSQL 16. Copy `.env.example` to `.env.local` for your 
 - One Next.js modular monolith. Pages and server actions in `src/app`, server-only logic in `src/lib`, shared UI in `src/components`.
 - `src/lib/forecast` is pure: no database, network, framework or UI imports. Keep it that way.
 - Presentation code does not calculate financial results; it formats what the engine returns.
-- Only server-side code reaches PostgreSQL and the ECB. Store modules start with `import "server-only"`.
+- Only server-side code reaches PostgreSQL and the ECB. The database driver in `src/lib/db.ts` imports `server-only`; a new store or provider module should import it too, so a client component cannot bundle it.
 - Forecasts and scenarios read persisted FX snapshots, never a live price. Show `CURRENT`, `STALE` and `UNAVAILABLE` honestly; never invent or hard-code a rate.
 - Scenarios store adjustments and never change base cash events.
 
