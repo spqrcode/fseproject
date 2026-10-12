@@ -4,7 +4,7 @@ Investment portfolio tracker for the Financial Software Engineering course at Fr
 
 ## Current scope
 
-Issue 1 provides account registration, login/logout, database-backed sessions, protected `/dashboard` and `/portfolio` pages, and the existing portfolio create/rename form. Holdings, quotes, financial calculations, and `/analytics` are not implemented. No Supabase or hosted authentication service is used.
+The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. This increment adds a server-only ECB exchange-rate provider and validated PostgreSQL snapshot cache for EUR, USD and SGD. The FX data layer is not yet connected to Scenario Lab on this branch. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
 
 The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the three MVP views, Liquidity overview, Cash events and Scenario lab, which show a not-connected state until their parts are delivered, a Workspace page, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
 

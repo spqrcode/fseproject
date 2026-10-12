@@ -41,6 +41,9 @@ describe("forecast money", () => {
     expect(money("1.245", "USD").amount).toBe("1.245");
     expect(roundMoney(money("1.245", "USD"))).toEqual({ amount: "1.24", currency: "USD" });
     expect(roundMoney(money("1.255", "USD"))).toEqual({ amount: "1.26", currency: "USD" });
+    expect(roundMoney(money("-1.245", "USD"))).toEqual({ amount: "-1.24", currency: "USD" });
+    expect(roundMoney(money("-1.255", "USD"))).toEqual({ amount: "-1.26", currency: "USD" });
+    expect(roundMoney(money("-0.004", "USD"))).toEqual({ amount: "0", currency: "USD" });
   });
 
   it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(

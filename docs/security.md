@@ -39,6 +39,12 @@ Cash accounts and events belong to a workspace, and a workspace to one user. `sr
 
 `.env*` files, `.local/`, `.vercel/`, and test outputs are ignored; only `.env.example` is committed. No `NEXT_PUBLIC_` credential variables are used. The database driver, hashing code, and session/data-access modules import `server-only`. Do not put privileged migration credentials in the runtime environment. Use certificate-verified TLS for hosted PostgreSQL. Passwords, session tokens, and database URLs must not appear in logs, PRs, or test reports; browser traces are disabled because form payloads contain credentials.
 
+## ECB exchange-rate data
+
+The ECB data API is public and needs no API key. Fetching and caching remain server-only so that browser code does not become coupled to a third-party response format. Only strictly parsed EUR/USD and EUR/SGD observations are stored; invalid dates, non-positive/NaN rates, missing currencies and mismatched effective dates are rejected before persistence.
+
+`fx_snapshots` is global reference data and contains no user identifier. Migration 006 gives `fse_runtime` only SELECT, INSERT, and UPDATE of `fetched_at`; it cannot delete a snapshot or rewrite its provider, currency pair, rate or effective date. A corrected ECB rate is inserted with a new snapshot id, preserving results that reference the previous row. A two-rate refresh is one database statement, so a partial ECB response cannot leave half a refresh behind, and an older late response is not selected over a newer fetch. The provider has a 64 KiB response cap. Provider, validation and persistence failures are returned as typed states with fixed UI-safe messages; raw details are written only to server logs. `UNAVAILABLE` has a `null` rate rather than a fabricated number; `STALE` retains the effective date and refresh failure so the UI can label it honestly.
+
 ## Explicit limitations
 
 No email verification, password reset, MFA, breached-password check, periodic expired-row cleanup, or independent penetration test. No PostgreSQL RLS: the application and runtime database credential are the authorization boundary. Basic headers are not a complete CSP. The database can still be queried by its administrator. See deployment evidence for controls actually verified on staging.
