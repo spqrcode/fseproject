@@ -7,6 +7,7 @@ import { createSession } from "@/lib/session-store";
 import { saveDangerThreshold, saveWorkspace } from "@/lib/workspace-store";
 import { createCashAccount, createCashEvent, setCashEventStatus } from "@/lib/cash-events-store";
 import { getForecastInput } from "@/lib/forecast-input-store";
+import { runForecast, toForecastInput } from "@/lib/forecast";
 
 // Same connection rules as cash-events.test.ts: fixtures may use an owner connection while the application
 // connects as the restricted staging role. Every connection must point at a _test database.
@@ -143,6 +144,24 @@ describe("forecast events", () => {
     const overdue = await insert(alice, alice.accountId, "-1.00", "expected", "2026-08-01");
     const early = await insert(alice, alice.accountId, "-1.00", "expected", "2026-10-05");
     expect((await forecast(alice))!.events.map(e => e.id)).toEqual([overdue, early, late]);
+  });
+});
+
+describe("through the adapter and the forecast engine", () => {
+  it("projects a small account from the stored balance, with an overdue event on the start date", async () => {
+    await insert(alice, alice.accountId, "-100.00", "paid", "2026-09-20");               // already in the starting balance
+    await insert(alice, alice.accountId, "-300.00", "expected", "2026-09-25", "Late");   // overdue: counted on the start date
+    await insert(alice, alice.accountId, "250.00", "expected", "2026-10-08", "Invoice"); // still ahead
+    const stored = (await forecast(alice))!;
+    expect(stored.startingBalance).toBe("900.00");
+    expect(stored.events.map(e => [e.originalDate, e.expectedDate, e.overdue])).toEqual([["2026-09-25", START, true], ["2026-10-08", "2026-10-08", false]]);
+
+    const result = runForecast(toForecastInput(stored));
+    expect(result.openingBalance).toBe("900");
+    expect(result.timeline[0]).toEqual({ date: START, balance: "600" });         // 900 minus the overdue 300 on day one
+    expect(result.timeline.find(point => point.date === "2026-10-08")?.balance).toBe("850");
+    expect(result.closingBalance).toBe("850");
+    expect(result).toMatchObject({ minimumBalance: "600", minimumDate: START, dangerThresholdPercent: "50", firstDangerDate: null, currency: "EUR" });
   });
 });
 

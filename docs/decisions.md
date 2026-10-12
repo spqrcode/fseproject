@@ -113,11 +113,11 @@ Agreed by the team for connecting the cash events to the forecast engine. PR #12
 
 ## 2026-10-10 — Forecast input implemented; a settled event's date is the date the money moved
 
-Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`) and `src/lib/forecast-input.ts` (`toEngineStatus`). The engine itself is not called yet: PR #12 is open and its contract may still change, and nothing is imported from it.
+Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`) and `src/lib/forecast-input.ts` (`toEngineStatus`). Since PR #12 (engine) and PR #19 (`toForecastInput`) are merged, the store's output goes through `toForecastInput` into `runForecast`; an integration test in `tests/integration/forecast-input.test.ts` runs the whole path.
 
 **Status of the 2026-10-08 decisions**
-1. Status mapping: implemented as `toEngineStatus` (expected → pending, received and paid → completed, cancelled → excluded, checked for every status at compile time). The call into the engine is pending PR #12.
-2. Default danger threshold: the store returns the workspace value as stored (`null` when none is set). The 50% default belongs to the engine and is not applied by the store; see the open points below.
+1. Status mapping: implemented as `toEngineStatus` (expected → pending, received and paid → completed, cancelled → excluded, checked for every status at compile time). The adapter from PR #19 marks every returned event `pending`; that is the same mapping, because the store only returns `expected` events.
+2. Default danger threshold: the store returns the workspace value as stored (`null` when none is set). The 50% default belongs to the engine (PR #12) and is not applied by the store.
 3. Starting balance: implemented, with one correction found in review (PR #14, 2026-10-11). It is the account's opening balance plus its `received` and `paid` events dated **on or before** the start date, summed by PostgreSQL in `numeric`. The first version used "before", which left money that moved on the start day in neither the balance nor the event list, because the engine ignores completed events. Decision 3 of 2026-10-08 is read as "on or before" from here on.
 4. Overdue events: implemented as decided. An `expected` event dated before the start date is returned with `expectedDate` set to the start date, its stored date kept as `originalDate`, and `overdue: true`.
 
@@ -125,10 +125,7 @@ Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`) and `src/l
 
 **Other choices.** Both queries run in one read-only `REPEATABLE READ` transaction, so an event that changes status in between cannot fall out of both the balance and the list; the connection is released in `finally`, and discarded if the transaction failed. The range is validated before the session is checked (valid dates between 2000 and 2100, start not after end, at most 366 dates counting both the first and the last day, because the engine loops per day and accepts at most 366 dates; a range from 2026-10-01 to 2027-10-01 is accepted, one day more is not). `createdAt` is formatted in SQL as UTC text with milliseconds and a `Z`, which avoids `Date` conversions.
 
-**Open integration points with PR #12** (to settle with Haina; none blocks the store)
-- *Threshold input.* The engine fixes the threshold at 50% of the opening balance and accepts no `dangerThreshold`, so a workspace value would be ignored until the engine takes one (decision 2).
-- *Negative starting balance.* The engine throws when the opening balance is negative, but the starting balance can be negative after large paid events. The behaviour (a message in the interface, or an engine that allows it) is undecided.
-- *`userId` and per-event currency.* The engine's `CashEvent` requires a `userId` and a currency per event. The store returns neither: the currency is the account's, and no user id is exposed. The adapter or the engine contract has to supply or drop them.
+**Integration points with PR #12, resolved** (PRs #12 and #19, merged 2026-10-11/12): the engine takes a nullable `dangerThreshold` and defaults to 50% of the opening balance; it accepts a negative opening balance, and with the default threshold an overdraft warns on the first forecast day; its events carry no `userId`, and `toForecastInput` copies the account currency onto each event.
 
 Tests: `tests/integration/forecast-input.test.ts`, the settling tests in `tests/integration/cash-events.test.ts`, `tests/unit/forecast-input.test.ts`.
 
