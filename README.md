@@ -4,9 +4,9 @@ Investment portfolio tracker for the Financial Software Engineering course at Fr
 
 ## Current scope
 
-The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. This increment adds a server-only ECB exchange-rate provider and validated PostgreSQL snapshot cache for EUR, USD and SGD. The FX data layer is not yet connected to Scenario Lab on this branch. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
+The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. The foundation also has a server-only ECB exchange-rate provider with a validated PostgreSQL snapshot cache for EUR, USD and SGD, the deterministic Forecast Engine, forecast input for one account, and the data layer for delayed-invoice scenarios and percentage FX shocks. The Scenario Lab page uses them: it delays invoices and previews and saves ECB exchange-rate shocks. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
 
-The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the three MVP views, Liquidity overview, Cash events and Scenario lab, which show a not-connected state until their parts are delivered, a Workspace page, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
+The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the three MVP views, Liquidity overview, Cash events and Scenario lab, all three live on `main` (see the status table below for what is still in review), a Workspace page, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
 
 ## Deployed application and demo access
 
@@ -18,9 +18,9 @@ Status of the three business views on `main`, as of 12 October 2026. Update this
 
 | View | On `main` | Pull request |
 | --- | --- | --- |
-| Liquidity overview (`/dashboard`) | Placeholder: workspace and currency status only. The data layer behind it (forecast input, adapter, engine) is on `main` | #20, ready for review |
-| Cash events (`/cash-events`) | Placeholder; the data layer and its tests are on `main` | #16 |
-| Scenario Lab (`/scenarios`) | Placeholder | #9, #17, #18 |
+| Liquidity overview (`/dashboard`) | Live: one account's forecast for 30 to 365 days with chart, runway and danger threshold, in the account's currency | #20, merged; reporting-currency conversion in #26 |
+| Cash events (`/cash-events`) | Live: accounts and expected events; create, edit, settle, cancel and delete | #16, merged |
+| Scenario Lab (`/scenarios`) | Live: delayed invoices, ECB shock preview and saved shocks with their snapshot | #18, merged; base versus scenario comparison in #23; shock bounds in #24 |
 
 A seeded demo dataset is not provided yet; see [presentation feedback](docs/presentation-feedback.md) for open work.
 

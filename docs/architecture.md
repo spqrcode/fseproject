@@ -2,7 +2,7 @@
 
 ## Component diagram
 
-Status as of 12 October 2026, after PRs #14 and #19 were merged. Solid green boxes are on `main`, dashed amber boxes are in open pull requests and not merged yet, dotted grey boxes are planned and not started. The same status is given in the table below, so the diagram does not rely on colour alone.
+Status as of 13 October 2026, after PRs #9, #14, #16, #17, #18, #19, #20 and #25 were merged. Solid green boxes are on `main`, dashed amber boxes are in open pull requests and not merged yet, dotted grey boxes are planned and not started. The same status is given in the table below, so the diagram does not rely on colour alone.
 
 ```mermaid
 flowchart TB
@@ -16,9 +16,9 @@ flowchart TB
   subgraph Pres["Presentation: Next.js pages and server actions"]
     direction LR
     UI["Login, workspace, settings"]:::done
-    Overview["Liquidity overview<br/>PR #20"]:::pr
-    Events["Cash events<br/>PR #16"]:::pr
-    Lab["Scenario Lab<br/>PR #18"]:::pr
+    Overview["Liquidity overview<br/>PR #20, merged"]:::done
+    Events["Cash events<br/>PR #16, merged"]:::done
+    Lab["Scenario Lab<br/>PR #18, merged"]:::done
   end
 
   subgraph Svc["Application services: server-only, session-checked"]
@@ -26,11 +26,11 @@ flowchart TB
     Auth["Authentication and sessions"]:::done
     Stores["Workspace and cash-event stores"]:::done
     Input["Forecast input store<br/>PR #14, merged"]:::done
-    Scen["Scenario store<br/>PR #9"]:::pr
-    Shock["Percentage FX shocks<br/>PR #17"]:::pr
+    Scen["Scenario store<br/>PR #9, merged"]:::done
+    Shock["Percentage FX shocks<br/>PR #17, merged"]:::done
     FX["FX service and ECB adapter"]:::done
-    Conv["Currency conversion<br/>planned"]:::plan
-    Cmp["Base versus scenario comparison<br/>planned"]:::plan
+    Conv["Currency conversion<br/>PR #26"]:::pr
+    Cmp["Base versus scenario comparison<br/>PR #23"]:::pr
   end
 
   subgraph Dom["Domain: pure functions"]
@@ -79,11 +79,13 @@ flowchart TB
 | FX service and ECB adapter | Fetch, strictly parse and validate ECB data, persist immutable snapshots, classify `CURRENT`, `STALE` or `UNAVAILABLE` | Implemented | `src/lib/fx` |
 | Forecast input store | One account's starting balance, overdue events and threshold in one read-only snapshot | Implemented (PR #14) | `src/lib/forecast-input-store.ts` |
 | Forecast input adapter | Maps the stored input to the engine's input; pure | Implemented (PR #19) | `src/lib/forecast/input-adapter.ts` |
-| Scenario store and delay calculation | Delayed-invoice adjustments as separate rows; base events are never changed | Open PR #9 | `src/lib/scenario-store.ts`, `src/lib/forecast/scenario.ts` |
-| Percentage FX shocks | A labelled percentage applied to a stored snapshot, with provenance | Open PR #17 | `src/lib/fx/fx-shock.ts`, `shock-store.ts` |
-| Liquidity overview, Cash events, Scenario Lab pages | The three business views | Open PRs #20, #16, #18; placeholders on `main` | `src/app/(protected)` |
-| Conversion into the reporting currency | Convert events and the workspace threshold with a persisted snapshot; mark the total unavailable when no usable rate exists | Planned | not started |
-| Base versus scenario comparison | Delta between base and scenario with a contribution breakdown that sums to the delta | Planned | not started |
+| Scenario store and delay calculation | Delayed-invoice adjustments as separate rows; base events are never changed | Implemented (PR #9) | `src/lib/scenario-store.ts`, `src/lib/forecast/scenario.ts` |
+| Percentage FX shocks | A labelled percentage applied to a stored snapshot, with provenance | Implemented (PR #17) | `src/lib/fx/fx-shock.ts`, `shock-store.ts` |
+| Cash events page | Accounts and expected events: create, edit, settle, cancel, delete | Implemented (PR #16) |
+| Liquidity overview page | One account's deterministic forecast with chart, runway and danger threshold | Implemented (PR #20) |
+| Scenario Lab page | Delayed invoices and percentage FX shocks | Implemented (PR #18) | `src/app/(protected)` |
+| Conversion into the reporting currency | Convert an account's forecast with one persisted snapshot; no figures when no usable rate exists | Open PR #26 | `src/lib/forecast/reporting-currency.ts`, `src/lib/forecast-reporting.ts` |
+| Base versus scenario comparison | Delta between base and scenario with a contribution breakdown that sums to the delta | Open PR #23 (delayed invoices only) | `src/lib/forecast/scenario-comparison.ts` |
 
 Dependency rules that keep the structure maintainable: the Forecast Engine imports nothing from the database, the framework or the UI; presentation code does not calculate financial results; only server-side code reaches PostgreSQL and the ECB; forecasts read persisted snapshots, never a live market price, so a result can be reproduced.
 

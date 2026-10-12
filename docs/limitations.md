@@ -2,7 +2,7 @@
 
 ## Current application
 
-The product is FinTwin Global, a multi-currency cash-flow and liquidity scenario tool. On `main`, account registration and sessions, workspaces, cash accounts and events (data layer and tests), the deterministic Forecast Engine and the ECB exchange-rate snapshot cache are implemented. The three business views are not complete on `main`: the Liquidity overview, Cash events and Scenario Lab pages are placeholders until their pull requests merge, and the snapshot cache is not yet used by a forecast. The README status table lists the pull requests. Passing foundation tests does not mean the whole course specification is complete.
+The product is FinTwin Global, a multi-currency cash-flow and liquidity scenario tool. On `main`, account registration and sessions, workspaces, the Cash events page, forecast input for one account, the deterministic Forecast Engine, the delayed-invoice scenario and percentage FX-shock data layer, and the ECB exchange-rate snapshot cache are implemented. All three business views are on `main`. Still in review: the base-versus-scenario comparison (#23) and showing forecasts in the reporting currency (#26); until #26 merges, a forecast is shown in its account's own currency. The README status table lists the pull requests. Passing foundation tests does not mean the whole course specification is complete.
 
 Email addresses are not verified. Password recovery, MFA, compromised-password screening, network-level abuse protection, and session housekeeping are absent. Per-address throttling can lock out a targeted address temporarily and does not stop attackers rotating addresses.
 

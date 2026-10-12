@@ -51,6 +51,7 @@ Node 24 (`.nvmrc`), PostgreSQL 16. Copy `.env.example` to `.env.local` for your 
 ## Git workflow
 
 - Feature branch, small commits, pull request, a genuine review from another team member, green CI, then merge. No direct pushes to `main`; do not merge your own pull request without a review.
+- AI agents may help write or review code, but must not stage, commit or push changes for us: the team member inspects the diff, runs the tests and commits. Leave the changes in the working tree and say what was changed and how it was checked.
 - State dependencies between pull requests in the description. Do not claim a deployment succeeded when Vercel reports it as blocked or failed.
 - Do not publish the project with `vercel deploy` from a working tree; deployments come from the GitHub integration (see `docs/deployment.md`).
 
