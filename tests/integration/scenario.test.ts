@@ -139,11 +139,11 @@ async function getCashEvent(token: string, eventId: string) {
 function forecastEvent(event: StoredCashEvent): ForecastCashEvent {
   return parseCashEvent({
     id: event.id,
-    userId: "workspace-owned",
-    description: event.description,
     amount: event.amount,
     currency: event.currency,
     expectedDate: event.expectedDate,
+    createdAt: event.createdAt.toISOString(),
+    status: event.status === "expected" ? "pending" : event.status === "cancelled" ? "cancelled" : "completed",
   });
 }
 
@@ -151,6 +151,7 @@ const BASE = {
   startDate: "2025-01-01",
   endDate: "2025-12-31",
   openingBalance: "1000",
+  dangerThreshold: null,
   currency: "EUR" as const,
 };
 

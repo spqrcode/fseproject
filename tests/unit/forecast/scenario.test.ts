@@ -6,12 +6,12 @@ import {
 } from "@/lib/forecast/cash-event";
 import {
   runForecast,
-  scenarioContribution,
   type ForecastResult,
 } from "@/lib/forecast/forecast-engine";
 import {
   applyDelayAdjustment,
   runScenarioForecast,
+  scenarioContribution,
   InvalidAdjustmentError,
   MissingEventError,
   type DelayAdjustment,
@@ -26,7 +26,6 @@ function makeEvent(
   overrides: Partial<{
     id: string;
     userId: string;
-    description: string;
     amount: string;
     currency: string;
     expectedDate: string;
@@ -35,11 +34,11 @@ function makeEvent(
   const id = overrides.id ?? `event-${nextId++}`;
   return parseCashEvent({
     id,
-    userId: overrides.userId ?? "user-1",
-    description: overrides.description ?? "Test event",
     amount: overrides.amount ?? "100",
     currency: overrides.currency ?? "EUR",
     expectedDate: overrides.expectedDate ?? "2025-01-15",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    status: "pending",
   });
 }
 
@@ -47,6 +46,7 @@ const BASE_INPUT = {
   startDate: "2025-01-01",
   endDate: "2025-12-31",
   openingBalance: "1000",
+  dangerThreshold: null,
   currency: "EUR" as const,
 };
 
@@ -76,11 +76,6 @@ describe("parseCashEvent validation", () => {
     expect(() => makeEvent({ expectedDate: "2025/01/15" })).toThrow(CashEventValidationError);
     expect(() => makeEvent({ expectedDate: "not-a-date" })).toThrow(CashEventValidationError);
     expect(() => makeEvent({ expectedDate: "2025-13-01" })).toThrow(CashEventValidationError);
-  });
-
-  it("rejects empty and untrimmed descriptions", () => {
-    expect(() => makeEvent({ description: "" })).toThrow(CashEventValidationError);
-    expect(() => makeEvent({ description: "  hello" })).toThrow(CashEventValidationError);
   });
 
   it("preserves negative amounts for expenses", () => {
@@ -231,8 +226,8 @@ describe("scenario date override produces the correct timeline", () => {
       currency: BASE_INPUT.currency,
     });
 
-    // No entry on the original date
-    expect(projection.result.timeline.find((p) => p.date === "2025-03-01")).toBeUndefined();
+    // The engine returns every day; the balance stays unchanged on the original date.
+    expect(projection.result.timeline.find((p) => p.date === "2025-03-01")?.balance).toBe("1000");
     // Balance rises on the new date
     expect(projection.result.timeline.find((p) => p.date === "2025-06-01")?.balance).toBe("1300");
     // Closing balance is the same (event still happens, just later)
@@ -318,9 +313,9 @@ describe("two scenarios are independent", () => {
     expect(projA.result.timeline.find((p) => p.date === "2025-05-01")?.balance).toBe("1400");
     expect(projB.result.timeline.find((p) => p.date === "2025-09-01")?.balance).toBe("1400");
 
-    // Neither scenario has the other's date
-    expect(projA.result.timeline.find((p) => p.date === "2025-09-01")).toBeUndefined();
-    expect(projB.result.timeline.find((p) => p.date === "2025-05-01")).toBeUndefined();
+    // Both timelines have every day, but the other scenario's date does not trigger a new receipt.
+    expect(projA.result.timeline.find((p) => p.date === "2025-09-01")?.balance).toBe("1400");
+    expect(projB.result.timeline.find((p) => p.date === "2025-05-01")?.balance).toBe("1000");
   });
 });
 
@@ -469,14 +464,15 @@ describe("runForecast determinism and same-day events", () => {
     expect(r1.timeline).toEqual(r2.timeline);
   });
 
-  it("events outside the date range are silently excluded", () => {
+  it("moves overdue pending events to the start and excludes events after the range", () => {
     const inRange = makeEvent({ id: "in", amount: "100", expectedDate: "2025-06-01" });
     const before = makeEvent({ id: "before", amount: "999", expectedDate: "2024-12-31" });
     const after = makeEvent({ id: "after", amount: "999", expectedDate: "2026-01-01" });
 
     const result = runForecast({ ...BASE_INPUT, events: [inRange, before, after] });
-    expect(result.closingBalance).toBe("1100");
-    expect(result.timeline).toHaveLength(1);
+    expect(result.closingBalance).toBe("2099");
+    expect(result.timeline[0]).toEqual({ date: "2025-01-01", balance: "1999" });
+    expect(result.timeline).toHaveLength(365);
   });
 
   it("returns frozen results that cannot be mutated", () => {
