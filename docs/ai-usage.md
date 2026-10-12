@@ -201,3 +201,9 @@ Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify`
 - Review correction: the first revision changed the Forecast Engine to use the database statuses directly. After merging the latest `main`, the existing team decision showed that PR #14 owns the adapter mapping from `expected / received / paid / cancelled` to the engine's `pending / completed / cancelled` contract. The direct-status change was therefore rejected and corrected.
 - Student action: reviewed the PR comments, resolved the AI-usage merge conflict by retaining both records, selected the business rules and ran the complete local validation.
 - Validation: 100 Forecast domain tests and 186 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.
+
+## Jiaxin — Scenario lab product integration
+
+Date: 2026-10-12. Tool: OpenAI Codex. Owner: Jiaxin (Scenarios & Exchange Rates).
+
+Jiaxin authorized taking on the unfinished Scenario lab page and set the contract boundary: use the existing session-scoped scenario and ECB services, keep cash events and snapshots unchanged, and do not show invented forecast balances while the shared forecast-input adapter is under review. Codex assisted with the server actions, forms, page layout, styling, browser test and documentation. The implementation exposes original and delayed invoice dates, a percentage-shock preview with ECB provenance and freshness, and saving only for direct EUR pairs backed by one snapshot. The first browser run exposed a currency-label mismatch and a missing wait for workspace creation; a later run found an ambiguous `alert` test locator. These were corrected and all 27 Chromium tests passed. The student will inspect the diff, review the PR and own the final merge decision. Numerical base-versus-scenario forecasts remain for a later integration.

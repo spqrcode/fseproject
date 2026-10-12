@@ -23,7 +23,7 @@ export default async function LiquidityOverview() {
     { title: "Workspace", text: workspace ? "Your workspace is saved and only you can access it." : "Name your workspace to get started.", state: workspace ? "Ready" : "Not created", tone: workspace ? "ready" : "pending", href: "/workspace", action: "Open workspace" },
     { title: "Reporting currency", text: `Figures will be reported in ${currencyLabel(reporting)}.`, state: reporting, tone: "value", href: "/settings", action: "Change currency" },
     { title: "Cash events", text: accounts.length > 0 ? "Accounts and planned income and expenses are ready for forecasting." : "Add a cash account, then record expected income and expenses.", state: accounts.length > 0 ? `${events.length} ${events.length === 1 ? "event" : "events"}` : "Set up", tone: accounts.length > 0 ? "ready" : "pending", href: "/cash-events", action: "Open cash events" },
-    { title: "Scenario lab", text: "What-if scenarios, including exchange-rate shocks, will appear once scenario analysis is delivered.", state: "Not connected yet", tone: "pending", href: "/scenarios", action: "Open scenario lab" },
+    { title: "Scenario lab", text: "Create delayed-invoice scenarios and preview ECB exchange-rate shocks. Cash-flow comparisons will follow the forecast-input adapter.", state: workspace ? "Preview available" : "Set up", tone: workspace ? "ready" : "pending", href: "/scenarios", action: "Open scenario lab" },
   ];
   return <>
     <PageHeading eyebrow="Liquidity" title="Liquidity overview" intro={workspace ? workspace.name : "Your financial twin starts here."}>
@@ -47,6 +47,6 @@ export default async function LiquidityOverview() {
         </li>)}
       </ol>
     </section>
-    <aside className="footnote" aria-label="About this version"><p className="eyebrow">About this version</p><p>Account access, workspace settings, reporting currency and cash events are available. The liquidity forecast and scenario lab are connected only when their calculation services are ready; no result is estimated or simulated in their place.</p></aside>
+    <aside className="footnote" aria-label="About this version"><p className="eyebrow">About this version</p><p>Account access, workspace settings, cash events, delayed-invoice scenarios and ECB rate previews are available. Numerical liquidity and scenario forecasts wait for the shared forecast-input adapter; no balance is fabricated in its place.</p></aside>
   </>;
 }

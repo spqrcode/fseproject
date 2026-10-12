@@ -29,14 +29,14 @@ test("main navigation reaches every section and marks only the current one", asy
   }
 });
 
-test("forecast and scenario sections say when calculations are not connected", async ({ page, account }) => {
+test("forecast stays honest and scenario setup requires a workspace", async ({ page, account }) => {
   await signUpAndIn(page, account);
   await expect(page.getByRole("link", { name: "Create your workspace", exact: true })).toBeVisible();
-  for (const path of ["/dashboard", "/scenarios"]) {
-    await page.goto(path);
-    await expect(page.getByRole("heading", { level: 2, name: /not connected yet/ })).toBeVisible();
-    await expect(page.locator("main")).not.toContainText(/[€$£¥]\s?\d|SGD\s\d/);
-  }
+  await page.goto("/dashboard");
+  await expect(page.getByRole("heading", { level: 2, name: /not connected yet/ })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/[€$£¥]\s?\d|SGD\s\d/);
+  await page.goto("/scenarios");
+  await expect(page.getByRole("heading", { level: 2, name: "Create your workspace first." })).toBeVisible();
   await page.goto("/cash-events");
   await expect(page.getByRole("heading", { level: 2, name: "Create your workspace first." })).toBeVisible();
 });
