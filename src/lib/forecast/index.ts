@@ -10,6 +10,11 @@ export {
 } from "@/lib/forecast/cash-event";
 export { DecimalInputError } from "@/lib/forecast/decimal";
 export {
+  toForecastInput,
+  type StoredForecastEvent,
+  type StoredForecastInput,
+} from "@/lib/forecast/input-adapter";
+export {
   DANGER_THRESHOLD_PERCENT,
   ForecastInputError,
   MAX_FORECAST_DAYS,
