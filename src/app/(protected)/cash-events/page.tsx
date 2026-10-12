@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser, sessionToken } from "@/lib/auth";
 import { listCashAccounts, listCashEvents } from "@/lib/cash-events-store";
 import { getWorkspace } from "@/lib/workspace-store";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyState } from "@/components/empty-state";
 import { CashEventsFigure } from "@/components/placeholder-figures";
@@ -14,11 +14,20 @@ const successMessages: Record<string, string> = {
   "account-added": "Cash account added.",
   "event-added": "Cash event added.",
   "event-updated": "Cash event updated.",
+  "event-received": "Cash event marked received.",
+  "event-paid": "Cash event marked paid.",
+  "event-cancelled": "Cash event cancelled.",
+  "event-deleted": "Cash event deleted.",
+};
+const errorMessages: Record<string, string> = {
+  "event-unavailable": "That event was already settled, cancelled or removed, so nothing was changed. The list below is up to date.",
 };
 
-export default async function CashEventsPage({ searchParams }: { searchParams: Promise<{ success?: string }> }) {
+export default async function CashEventsPage({ searchParams }: { searchParams: Promise<{ success?: string; error?: string }> }) {
   await requireUser();
-  const success = successMessages[(await searchParams).success ?? ""];
+  const query = await searchParams;
+  const success = successMessages[query.success ?? ""];
+  const failure = errorMessages[query.error ?? ""];
   const token = await sessionToken();
   const [workspace, accounts, events] = await Promise.all([
     getWorkspace(token),
@@ -31,6 +40,7 @@ export default async function CashEventsPage({ searchParams }: { searchParams: P
   return <>
     <PageHeading eyebrow="Inflows and outflows" title="Cash events" intro="Planned income and expenses by date, the input to every forecast and scenario." />
     {success && <p role="status" className="notice success page-notice">{success}</p>}
+    {failure && <p role="alert" className="notice error page-notice">{failure}</p>}
 
     {!workspace ? <EmptyState eyebrow="Workspace required" title="Create your workspace first." figure={<CashEventsFigure />}>
       <p>Cash accounts and events belong to a workspace. Set one up before recording the money you expect to receive or pay.</p>
@@ -66,13 +76,13 @@ export default async function CashEventsPage({ searchParams }: { searchParams: P
           <p className="muted">Add an expected income or expense to begin the schedule.</p>
         </div> : <ol className="event-list">
           {events.map(event => <li key={event.id} className="event-card">
-            <div className="event-date"><span>{event.expectedDate}</span><small>{accountNames.get(event.accountId) ?? "Cash account"}</small></div>
+            <div className="event-date"><span>{formatDate(event.expectedDate)}</span><small>{accountNames.get(event.accountId) ?? "Cash account"}</small></div>
             <div className="event-description"><h3>{event.description}</h3><p className={`event-status status-${event.status}`}>{event.status}</p></div>
             <p className={`event-amount amount ${event.amount.startsWith("-") ? "expense" : "income"}`}>{formatMoney(event.amount, event.currency, { signed: true })}</p>
             {event.status === "expected" && <div className="event-controls">
-              <CashEventActions eventId={event.id} amount={event.amount} />
+              <CashEventActions eventId={event.id} amount={event.amount} description={event.description} />
               <details className="editor compact">
-                <summary>Edit</summary>
+                <summary aria-label={`Edit: ${event.description}`}>Edit</summary>
                 <CashEventForm event={event} />
               </details>
             </div>}
