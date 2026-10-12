@@ -9,9 +9,18 @@
  *  - The adjustment produces a new in-memory event projection with the
  *    overridden date; the original event is excluded on its original date
  *    and re-included on the overridden date.
- *  - If an adjustment references a deleted or inaccessible event,
- *    its status is 'invalid' and applyDelayAdjustment throws
- *    InvalidAdjustmentError rather than silently ignoring the override.
+ *  - An adjustment that cannot apply to a forecast must not break the whole
+ *    scenario, and must not disappear silently either. applyDelayAdjustment
+ *    stays strict (it throws for an adjustment that is not active or whose
+ *    event is not in the list). runScenarioForecast first partitions the
+ *    adjustments with partitionAdjustments and applies only the applicable
+ *    ones; every skipped adjustment is returned with a reason so the caller
+ *    can say so. The reasons are:
+ *      invalid         - marked invalid by business validation;
+ *      not_applicable  - its event is no longer expected (received, paid or
+ *                        cancelled), so it is no longer a forecast event;
+ *      not_in_forecast - its event is not in this forecast's event list, for
+ *                        example because it belongs to another account.
  *
  * This module is pure TypeScript with no database or network dependency.
  */
@@ -39,8 +48,18 @@ export type DelayAdjustment = Readonly<{
   cashEventId: string;
   /** YYYY-MM-DD override date to project the event onto. */
   dateOverride: string;
-  /** 'active' | 'invalid'.  Callers must check this before applying. */
-  status: "active" | "invalid";
+  /**
+   * 'active': can be applied. 'invalid': marked unusable. 'not_applicable':
+   * active in the database, but its event is no longer expected (derived when
+   * the adjustments are loaded). Only 'active' adjustments are applied.
+   */
+  status: "active" | "invalid" | "not_applicable";
+}>;
+
+export type SkippedAdjustment = Readonly<{
+  adjustmentId: string;
+  cashEventId: string;
+  reason: "invalid" | "not_applicable" | "not_in_forecast";
 }>;
 
 /** The resolved projection of a scenario against the base forecast. */
@@ -53,6 +72,8 @@ export type ScenarioProjection = Readonly<{
    * Positive means the scenario ends with more cash.
    */
   contributionDelta: string;
+  /** Adjustments that were not applied to this forecast, each with its reason. */
+  skipped: readonly SkippedAdjustment[];
 }>;
 
 export function scenarioContribution(base: ForecastResult, scenario: ForecastResult): string {
@@ -83,6 +104,35 @@ export class MissingEventError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Which adjustments apply to a forecast
+// ---------------------------------------------------------------------------
+
+/**
+ * Split adjustments into those that can be applied to `events` and those that
+ * cannot, with the reason. Pure: it neither throws nor changes its input.
+ * A scenario belongs to a workspace while a forecast belongs to one account,
+ * and an event can be settled after an adjustment was saved, so some
+ * adjustments legitimately do not apply to a given forecast.
+ */
+export function partitionAdjustments(
+  adjustments: readonly DelayAdjustment[],
+  events: readonly CashEvent[],
+): { applicable: readonly DelayAdjustment[]; skipped: readonly SkippedAdjustment[] } {
+  const ids = new Set(events.map((event) => event.id));
+  const applicable: DelayAdjustment[] = [];
+  const skipped: SkippedAdjustment[] = [];
+  for (const adjustment of adjustments) {
+    const skip = (reason: SkippedAdjustment["reason"]) =>
+      skipped.push(Object.freeze({ adjustmentId: adjustment.id, cashEventId: adjustment.cashEventId, reason }));
+    if (adjustment.status === "invalid") skip("invalid");
+    else if (adjustment.status === "not_applicable") skip("not_applicable");
+    else if (!ids.has(adjustment.cashEventId)) skip("not_in_forecast");
+    else applicable.push(adjustment);
+  }
+  return Object.freeze({ applicable: Object.freeze(applicable), skipped: Object.freeze(skipped) });
+}
+
+// ---------------------------------------------------------------------------
 // Immutable projection
 // ---------------------------------------------------------------------------
 
@@ -91,14 +141,16 @@ export class MissingEventError extends Error {
  * the adjusted event.  The original `events` array and its elements are
  * never mutated.
  *
- * Throws InvalidAdjustmentError when adjustment.status is 'invalid'.
- * Throws MissingEventError when the referenced event is not in `events`.
+ * Strict: throws InvalidAdjustmentError when adjustment.status is not
+ * 'active' and MissingEventError when the referenced event is not in
+ * `events`. Use partitionAdjustments (as runScenarioForecast does) to decide
+ * which adjustments to apply to a given forecast.
  */
 export function applyDelayAdjustment(
   adjustment: DelayAdjustment,
   events: readonly CashEvent[],
 ): readonly CashEvent[] {
-  if (adjustment.status === "invalid") {
+  if (adjustment.status !== "active") {
     throw new InvalidAdjustmentError(adjustment.id);
   }
 
@@ -124,6 +176,9 @@ export function applyDelayAdjustment(
  * the *original* event list, not cumulatively, so two adjustments to the
  * same event use the last adjustment's date.
  *
+ * Adjustments that do not apply to this forecast are skipped and reported in
+ * `skipped`; they never make the scenario fail.
+ *
  * Implementation note: when the same event is adjusted by more than one
  * adjustment in the list, the last one wins.  In practice the database
  * UNIQUE(scenario_id, cash_event_id) constraint prevents this from
@@ -142,8 +197,9 @@ export function runScenarioForecast(params: {
 
   // Apply all adjustments to a working copy of the event list.
   // Each adjustment.applyDelayAdjustment returns a new array; none mutate.
+  const { applicable, skipped } = partitionAdjustments(adjustments, baseEvents);
   let scenarioEvents: readonly CashEvent[] = baseEvents;
-  for (const adjustment of adjustments) {
+  for (const adjustment of applicable) {
     scenarioEvents = applyDelayAdjustment(adjustment, scenarioEvents);
   }
 
@@ -164,5 +220,6 @@ export function runScenarioForecast(params: {
     scenarioId,
     result,
     contributionDelta: delta,
+    skipped,
   });
 }
