@@ -236,6 +236,16 @@ Validation (2026-10-10, local, PostgreSQL 16): `npm run verify` exit code 0 — 
 
 Review finding (PR #14, Haina, 2026-10-11): two defects in the AI-generated forecast input, both missed by the AI and by the student's review. (1) The starting balance counted settled events dated before the start date, so money that moved on the start day, including an event marked paid today in a forecast that starts today, was in neither the balance nor the list; fixed by counting `<=` the start date (overdue stays `<`) with two new integration tests and an updated starting-balance test. (2) The 366-day limit counted differences instead of dates, so it allowed 367 dates while the engine in PR #12 allows 366; fixed by counting both ends, with the boundary tests moved to 2026-10-01 to 2027-10-01 (accepted) and 2027-10-02 (rejected). Validation after the fix (2026-10-11, local, PostgreSQL 16): `npm run verify` exit code 0 — 124 unit, 128 integration and 24 Chromium tests; lint and TypeScript clean; production build succeeded. Student review: read the diff line by line and confirmed that only the starting-balance condition changed to `<=` while the overdue condition stays `<`.
 
+## Jiaxin (covering Product Experience) — Liquidity overview connected to the forecast (branch `feat/product-liquidity-overview`)
+
+Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin, covering Gabriel's Product Experience work.
+
+Student direction: connect the overview only to real data — the store of PR #14, the adapter of PR #19 and the engine of PR #12 — without editing those branches, and show nothing estimated. Keep amounts in the account's currency with a visible notice until FX conversion exists. While reviewing PR #19 the student and AI found that the workspace danger threshold (reporting currency) is applied unconverted to accounts in other currencies; the overview now states this and it is recorded in `limitations.md`.
+
+AI-generated: `src/lib/liquidity-overview.ts` (horizon, UTC window, chart geometry), `src/lib/liquidity-forecast.ts`, `src/components/liquidity-chart.tsx`, the overview page, `formatDate`, the forecast styles, and the unit, integration and Chromium tests. Corrections during development: the engine's minimum can be the balance before the start date's events and so lie below every end-of-day point, so the chart marker uses the engine's minimum rather than a timeline point; two existing browser assertions were updated only where the page's behaviour intentionally changed (the overview no longer shows "not connected"), and the reporting-currency sentence was kept so the original assertion still holds.
+
+Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — lint and TypeScript clean; 250 unit tests; 144 integration tests; production build; 30 Chromium tests, including WCAG 2.2 AA checks of the forecast view (with a breach, overdue events and the daily table open) in light and dark mode, and a 375 px phone width.
+
 Merge with `main` (2026-10-12, after PRs #12, #13 and #19): Claude Code resolved the conflicts in four documentation files by keeping both sides; the student compared the result line by line with `main` (no line from `main` lost except text that this branch deliberately updates) and with Gabriel's resolution on `feat/product-liquidity-overview`, and updated the 2026-10-10 decision entry now that the engine and `toForecastInput` are merged. AI-generated: one integration test that runs `getForecastInput` → `toForecastInput` → `runForecast` for an account with a settled, an overdue and a future event. Validation: TODO (`npm run verify` numbers).
 
 ## Base versus scenario comparison (branch `feat/scenario-comparison`)
@@ -249,3 +259,11 @@ AI-generated: `compareScenario`, the server composition, the comparison panel, a
 Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — lint and TypeScript clean, 318 unit tests, 173 integration tests, production build, 32 Chromium tests including WCAG 2.2 AA checks of the comparison in light and dark mode at 375 px.
 
 Follow-up merge (2026-10-12): Codex incorporated the latest Scenario Lab branch after its saved-ECB-snapshot review change. The comparison code and tests remain in this branch; the merged page now refreshes the FX preview before reading saved shocks and then computes the account comparison. Local `npm run verify` passed with 318 unit, 190 PostgreSQL integration and 36 Chromium tests, plus lint, typecheck and production build, against a fresh dedicated test database.
+
+## Product experience: exchange-rate display
+
+Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel (Product Experience). Delivered as a patch that the student inspected, tested and committed.
+
+Request: while reviewing PR #18 the student ran the Scenario lab with seeded ECB snapshots and saw cross and reciprocal rates printed with about 40 digits ("1 USD = 1.30130803242446573323507737656595431098 SGD"). AI-generated: `formatRate` in `src/lib/format.ts`, its unit tests and the presentation rule in `docs/product-experience.md`. Rates are shown with four decimals, half to even like amounts; the calculation keeps every digit and pages keep the exact value next to the text.
+
+Validation: ESLint and TypeScript clean, all unit tests passed including the new ones, production build passed. Removing the half-even rounding mode makes the rounding test fail (1.23445 becomes 1.2345).

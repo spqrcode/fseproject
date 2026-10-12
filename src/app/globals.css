@@ -217,6 +217,39 @@ button:disabled { opacity: .6; cursor: progress; }
 .footnote { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line); }
 .footnote p:not(.eyebrow) { max-width: 64ch; color: var(--muted); font-size: 14px; }
 
+/* Liquidity forecast */
+.forecast { display: grid; gap: 28px; padding: 40px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.forecast-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+.forecast-head h2 { margin: 12px 0 8px; font-family: var(--serif); font-weight: 400; font-size: 40px; line-height: 1.05; letter-spacing: -0.015em; }
+.forecast-head .muted { font-size: 14px; }
+.forecast-controls { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.forecast-controls .field { min-width: 160px; }
+.forecast-controls .button { min-height: 48px; }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border-top: 1px solid var(--ink); }
+.metrics > div { display: flex; flex-direction: column; gap: 6px; padding: 20px 20px 4px 0; }
+.metrics > div + div { padding-left: 20px; border-left: 1px solid var(--line); }
+.metrics dt { color: var(--muted); font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; }
+.metrics dd { margin: 0; color: var(--muted); font-size: 13px; }
+.metrics dd.amount { color: var(--ink); font-size: clamp(20px, 2.2vw, 28px); overflow-wrap: anywhere; }
+.forecast-chart { margin: 0; }
+.forecast-chart svg { display: block; width: 100%; height: 240px; overflow: visible; }
+.forecast-chart .balance { fill: none; stroke: var(--ink); stroke-width: 1.75; }
+.forecast-chart .threshold { stroke: var(--danger); stroke-width: 1; stroke-dasharray: 4 5; vector-effect: non-scaling-stroke; }
+.forecast-chart .zero { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.forecast-chart .breach { stroke: var(--danger); stroke-width: 1; stroke-dasharray: 2 4; vector-effect: non-scaling-stroke; }
+.forecast-chart .lowest { stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.forecast-chart figcaption { display: flex; justify-content: space-between; gap: 16px; margin-top: 10px; color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+.legend { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.key { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--ink); }
+.key-threshold { margin-left: 10px; border-top: 1px dashed var(--danger); }
+.overdue h3 { font-size: 15px; }
+.overdue > p { margin: 6px 0 12px; font-size: 14px; }
+.overdue ul { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.overdue li { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.overdue li .amount { margin-left: auto; }
+.daily summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+.daily table { margin-top: 16px; }
+
 /* Sections that are not connected yet */
 .empty-state { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: center; gap: 56px; padding: 48px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .empty-state h2 { margin: 14px 0; font-family: var(--serif); font-weight: 400; font-size: 38px; line-height: 1.06; letter-spacing: -0.015em; }
@@ -409,7 +442,12 @@ button:disabled { opacity: .6; cursor: progress; }
   .callout { flex-direction: column; align-items: flex-start; padding: 28px 24px; }
   .callout h2 { font-size: 32px; }
   .index-body h3 { font-size: 26px; }
-  .empty-state { padding: 28px 22px; }
+  .empty-state, .forecast { padding: 28px 22px; }
+  .forecast-head h2 { font-size: 32px; }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics > div:nth-child(3) { padding-left: 0; border-left: 0; }
+  .forecast-chart svg { height: 180px; }
+  .forecast-chart figcaption { flex-wrap: wrap; }
   .empty-state h2 { font-size: 30px; }
   .footnote { grid-template-columns: 1fr; gap: 8px; margin-top: 48px; }
   .error-panel { padding: 32px 22px; }
