@@ -8,6 +8,7 @@ import {
   createCashEvent,
   deleteCashEvent,
   DuplicateAccountNameError,
+  listCashEvents,
   setCashEventStatus,
   StatusConflictError,
   updateCashEvent,
@@ -99,35 +100,52 @@ export async function editCashEvent(eventId: string, _state: FormState, form: Fo
   redirect("/cash-events?success=event-updated");
 }
 
+// A status change or a delete that no longer applies (the event was settled or removed in another tab or session)
+// is reported to the person instead of being ignored. The redirect happens after the try block because
+// redirect() works by throwing.
+const UNAVAILABLE = "/cash-events?error=event-unavailable";
+
 export async function changeCashEventStatus(eventId: string, status: string, form: FormData) {
   void form;
   await requireUser();
   const id = uuidSchema.safeParse(eventId);
   const next = eventStatusSchema.safeParse(status);
-  if (!id.success || !next.success || next.data === "expected") return;
+  if (!id.success || !next.success || next.data === "expected") redirect(UNAVAILABLE);
 
+  let target = UNAVAILABLE;
   try {
     await verifyOrigin();
-    await setCashEventStatus(await sessionToken(), id.data, next.data);
+    const token = await sessionToken();
+    // Settling a future-dated event moves its date to today (the date the money moved, decided with #14). Read the
+    // date first so the message can say so; it is only used to choose the wording, never to change data.
+    const before = next.data === "received" || next.data === "paid"
+      ? (await listCashEvents(token)).find(item => item.id === id.data)?.expectedDate
+      : undefined;
+    const changed = await setCashEventStatus(token, id.data, next.data);
+    if (changed) {
+      const moved = before !== undefined && before !== changed.expectedDate;
+      target = `/cash-events?success=event-${next.data}${moved ? "-today" : ""}`;
+    }
   } catch (error) {
-    if (error instanceof StatusConflictError) return;
-    throw error;
+    if (!(error instanceof StatusConflictError)) throw error;
   }
   refreshCashPages();
+  redirect(target);
 }
 
 export async function removeCashEvent(eventId: string, form: FormData) {
   void form;
   await requireUser();
   const id = uuidSchema.safeParse(eventId);
-  if (!id.success) return;
+  if (!id.success) redirect(UNAVAILABLE);
 
+  let target = UNAVAILABLE;
   try {
     await verifyOrigin();
-    await deleteCashEvent(await sessionToken(), id.data);
+    if (await deleteCashEvent(await sessionToken(), id.data)) target = "/cash-events?success=event-deleted";
   } catch (error) {
-    if (error instanceof StatusConflictError) return;
-    throw error;
+    if (!(error instanceof StatusConflictError)) throw error;
   }
   refreshCashPages();
+  redirect(target);
 }

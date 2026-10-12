@@ -264,6 +264,10 @@ button:disabled { opacity: .6; cursor: progress; }
 .event-controls { grid-column: 2 / -1; display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; }
 .event-actions { display: flex; flex-wrap: wrap; gap: 18px; }
 .danger-text { color: var(--danger); }
+.confirm-delete summary { padding: 4px 0; font-size: 13px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; cursor: pointer; }
+.confirm-delete[open] { flex-basis: 100%; padding-top: 12px; border-top: 1px solid var(--line); }
+.confirm-delete p { max-width: 52ch; margin: 10px 0 14px; color: var(--muted); font-size: 14px; }
+.confirm-delete .button { color: var(--danger); border-color: var(--danger); min-height: 40px; }
 .event-empty { padding: 48px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line); }
 
 /* Scenario lab */

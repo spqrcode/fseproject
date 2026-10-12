@@ -24,7 +24,7 @@ The home page marks Cash events as available and keeps the complete forecast and
 
 Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the overview states that it has no projected balance yet. The Scenario lab displays persisted invoice dates and real ECB snapshot rates, but does not invent a cash-flow comparison. The Cash events page shows only persisted account and event values.
 
-## US-04: cash accounts and events
+## US-11: cash accounts and events
 
 As a signed-in user, I can record where cash is held and add dated income and expenses, so that the forecast has explicit, reviewable inputs.
 
@@ -33,6 +33,7 @@ Acceptance criteria:
 - Opening balances and event amounts remain decimal strings; income is positive, expenses negative and zero is rejected.
 - New events start as `expected`. Expected events can be edited, deleted, marked received or paid according to their sign, or cancelled.
 - Received, paid and cancelled events remain visible as an audit trail and cannot be edited or deleted.
+- Deleting takes a second step (a native disclosure with "Delete permanently"), and the confirmation points to cancelling as the way to keep a record. Each action's accessible name includes the event (for example "Delete: Office rent"), starting with the visible words. An action on an event that has already changed is answered with a message rather than ignored. Dates use the shared `formatDate`.
 - A user never supplies a workspace or user ID. Every action resolves ownership from the session and verifies the request origin.
 - Empty, validation, success and error states are announced accessibly, and the page remains usable on a phone-sized viewport.
 
