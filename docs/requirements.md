@@ -122,7 +122,7 @@ As a signed-in user, I can use EUR, USD and SGD exchange rates with visible sour
 
 As a signed-in user, I can apply a percentage shock to a resolved EUR, USD or SGD rate and see the hypothetical rate without changing the stored ECB observation.
 
-- `-10` means minus 10%, not a ratio of `-0.1`; percentages must be plain decimals greater than -100.
+- `-10` means minus 10%, not a ratio of `-0.1`; percentages must be plain decimals from -99.99 to 100 with at most four decimals, for the preview and for saving alike.
 - The FX service resolves direct, reciprocal and cross rates before the Forecast Engine consumes them. The engine does not derive SGD/EUR or USD/SGD itself.
 - Calculations use Decimal arithmetic with no implicit display rounding and leave snapshots unchanged.
 - CURRENT and STALE results include source and adjusted decimal strings, requested pair, effective date, provider and source snapshot IDs.

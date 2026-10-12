@@ -10,13 +10,14 @@
 
 import "server-only";
 import { database } from "@/lib/db";
-import { tokenHash, validToken } from "@/lib/session-store";
+import { hasValidSession, tokenHash, validToken } from "@/lib/session-store";
 import { parseDecimal, decimalString } from "@/lib/forecast/decimal";
 import type { EvaluatedFxShock } from "@/lib/fx/fx-shock";
 import {
+  DuplicateFxShockError,
   evaluateFxShock,
-  InvalidShockPercentageError,
   MissingSnapshotError,
+  parseShockPercent,
   UnusableSnapshotError,
 } from "@/lib/fx/fx-shock";
 import type { FxSnapshot } from "@/lib/fx/snapshot-store";
@@ -93,35 +94,34 @@ export async function addScenarioFxShock(
     throw new Error("Scenario or FX snapshot not found or access denied.");
   }
 
-  // Validate percentage before DB insert
-  let shockDec;
+  // Validate percentage before DB insert: the same range and precision as the database column.
+  const shockDec = parseShockPercent(shockPercent);
+
+  let result;
   try {
-    shockDec = parseDecimal(shockPercent);
-  } catch {
-    throw new InvalidShockPercentageError(shockPercent);
-  }
-
-  if (shockDec.lessThanOrEqualTo(-100)) {
-    throw new InvalidShockPercentageError(
-      shockPercent,
-      "Shock percentage must be strictly greater than -100%.",
+    result = await database().query<ShockRow>(
+      `INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent)
+         SELECT sc.workspace_id, sc.id, fx.id, $4::numeric
+           FROM sessions s
+           JOIN workspaces w ON w.user_id = s.user_id
+           JOIN scenarios sc ON sc.workspace_id = w.id AND sc.id = $2
+           CROSS JOIN fx_snapshots fx
+          WHERE s.token_hash = $1 AND s.expires_at > now()
+            AND fx.id = $3
+         RETURNING id, scenario_id, snapshot_id, shock_percent::text, status, created_at, updated_at`,
+      [tokenHash(token), scenario.data, snapshot.data, decimalString(shockDec)],
     );
+  } catch (error) {
+    // One shock per scenario and snapshot (unique constraint): a domain error, not a raw database error.
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "23505") {
+      throw new DuplicateFxShockError();
+    }
+    throw error;
   }
-
-  const result = await database().query<ShockRow>(
-    `INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent)
-       SELECT sc.workspace_id, sc.id, fx.id, $4::numeric
-         FROM sessions s
-         JOIN workspaces w ON w.user_id = s.user_id
-         JOIN scenarios sc ON sc.workspace_id = w.id AND sc.id = $2
-         CROSS JOIN fx_snapshots fx
-        WHERE s.token_hash = $1 AND s.expires_at > now()
-          AND fx.id = $3
-       RETURNING id, scenario_id, snapshot_id, shock_percent::text, status, created_at, updated_at`,
-    [tokenHash(token), scenario.data, snapshot.data, decimalString(shockDec)],
-  );
 
   if (result.rowCount !== 1) {
+    // An expired session is not "not found": say which one it is, as the scenario store does.
+    if (!(await hasValidSession(token))) throw new Error("Authentication required.");
     throw new Error("Scenario or FX snapshot not found or access denied.");
   }
   return rowToPersistedShock(result.rows[0]);

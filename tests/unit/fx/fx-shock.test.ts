@@ -7,6 +7,8 @@ import {
   convertWithShock,
   InvalidShockPercentageError,
   MissingSnapshotError,
+  parseShockPercent,
+  SHOCK_PERCENT_MESSAGE,
   UnusableSnapshotError,
 } from "@/lib/fx/fx-shock";
 import {
@@ -69,15 +71,25 @@ describe("Percentage-based FX shock domain logic", () => {
   });
 
   // 4. Decimal precision
-  it("preserves high decimal precision without intermediate rounding", () => {
-    // source: 1.4366, shock: 3.333333333333333333%
-    const shock = "3.333333333333333333";
-    const shocked = calculateShockedRate("1.4366", shock);
-    // 1.4366 * (1 + 0.03333333333333333333)
-    // 1.4366 * 1.03333333333333333333 = 1.484486666666666666661878
-    expect(shocked.startsWith("1.48448666666666666666")).toBe(true);
-    // Exact length check showing no premature 2-decimal truncation
-    expect(shocked.length).toBeGreaterThan(15);
+  it("keeps the exact result of a four-decimal shock without rounding it", () => {
+    // The shock is limited to four decimals (the database column); the shocked rate is not rounded.
+    // 1.4366 * (1 + 3.3333 / 100) = 1.48448618780000...
+    expect(calculateShockedRate("1.4366", "3.3333")).toBe("1.4844861878");
+  });
+
+  it("accepts the bounds -99.99 and 100 and refuses anything outside them or more precise than four decimals", () => {
+    expect(parseShockPercent("-99.99").toString()).toBe("-99.99");
+    expect(parseShockPercent("100").toString()).toBe("100");
+    expect(parseShockPercent("0.0001").toString()).toBe("0.0001");
+    expect(calculateShockedRate("1", "100")).toBe("2");
+    for (const value of ["-99.9901", "-99.995", "100.0001", "101", "5000", "1".repeat(40), "3.33333", "0.00001", "-0.00005"]) {
+      expect(() => parseShockPercent(value), value).toThrow(InvalidShockPercentageError);
+      expect(() => calculateShockedRate("1.1225", value), value).toThrow(InvalidShockPercentageError);
+    }
+  });
+
+  it("says what the accepted range is", () => {
+    expect(() => parseShockPercent("5000")).toThrow(SHOCK_PERCENT_MESSAGE);
   });
 
   // 5. -100% rejection

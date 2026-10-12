@@ -147,3 +147,13 @@ Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`) and `src/l
 
 Tests: `tests/integration/forecast-input.test.ts`, the settling tests in `tests/integration/cash-events.test.ts`, `tests/unit/forecast-input.test.ts`.
 
+## 2026-10-12 — FX shocks: bounded percentage, and which rate a saved shock uses (review of PR #17)
+
+**Bounded percentage.** A stored shock is a plain decimal from -99.99 to 100 with at most four decimals: `numeric(7,4)` and a range check in migration 009, and the same rule in `parseShockPercent`, which the preview and the save both use, so a value that can be previewed can also be saved. Why: the column was an unbounded `numeric` and the code only checked "> -100", so +5000% or a 40-digit value was accepted and would have produced a meaningless scenario. Trade-off: a hypothetical beyond +100% or below -99.99% cannot be entered. The database rounds silently to four decimals, so the application refuses more precise input instead of relying on that.
+
+**Two paths, one rule.** The preview (`getRate` → `buildScenarioFxResult`) takes the latest snapshot and reports `CURRENT`, `STALE` or `UNAVAILABLE`. A saved shock (`evaluateScenarioFxShock`) is evaluated against the snapshot it was saved with and has no freshness, because a snapshot is historical by definition. The Scenario Lab uses the preview to choose and the saved snapshot to compute, and shows the snapshot's pair, rate and ECB date next to every saved shock. Why: forecasts and scenarios consume persisted snapshots so that a result can be reproduced; re-pricing a saved shock against whatever ECB published last would change a scenario without anyone editing it. Alternative: re-evaluate against the latest rate each time (rejected: results move silently). Accepted cost: "USD −10%" keeps using its old rate until the person saves a new shock, so the ECB date must stay visible and a stale-looking date is the signal.
+
+**Errors.** A second shock for the same scenario and snapshot is a `DuplicateFxShockError` (like `DuplicateDelayAdjustmentError` in #9), and an expired session reports "Authentication required." instead of "not found".
+
+Tests: unit tests for the bounds, the duplicate and the expired session; integration tests that the database refuses the same values when the application is bypassed.
+

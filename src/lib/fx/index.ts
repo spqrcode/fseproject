@@ -36,6 +36,12 @@ export {
 
 export {
   calculateShockedRate,
+  DuplicateFxShockError,
+  MAX_SHOCK_PERCENT,
+  MIN_SHOCK_PERCENT,
+  parseShockPercent,
+  SHOCK_PERCENT_DECIMALS,
+  SHOCK_PERCENT_MESSAGE,
   evaluateFxShock,
   buildScenarioFxResult,
   convertWithShock,

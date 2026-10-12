@@ -7,6 +7,7 @@ import {
   invalidateScenarioFxShock,
 } from "@/lib/fx/shock-store";
 import {
+  DuplicateFxShockError,
   InvalidShockPercentageError,
   UnusableSnapshotError,
 } from "@/lib/fx/fx-shock";
@@ -48,9 +49,12 @@ const mockShocks: MockShock[] = [];
 // Fixed valid session token for mock tests
 const VALID_TOKEN = "test-token-valid-abc123456789";
 
+// A token with the right shape that is not the valid one stands for an expired or unknown session.
+const EXPIRED_TOKEN = "test-token-expired-abc12345678";
 vi.mock("@/lib/session-store", () => ({
-  validToken: (token: string) => token === VALID_TOKEN,
+  validToken: (token: string) => token === VALID_TOKEN || token === EXPIRED_TOKEN,
   tokenHash: (token: string) => `hash-${token}`,
+  hasValidSession: async (token: string | undefined) => token === VALID_TOKEN,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -60,10 +64,16 @@ vi.mock("@/lib/db", () => ({
 
       // INSERT INTO scenario_fx_shocks
       if (sqlNorm.startsWith("INSERT INTO scenario_fx_shocks")) {
-        const [, scenarioId, snapshotId, shockPercent] = params as [string, string, string, string];
+        const [hash, scenarioId, snapshotId, shockPercent] = params as [string, string, string, string];
+        // Only the valid session's token hash owns anything; an expired session inserts nothing.
+        if (hash !== `hash-${VALID_TOKEN}`) return { rowCount: 0, rows: [] };
         const scenario = mockScenarios.find((s) => s.id === scenarioId);
         const snapshot = mockSnapshots.find((s) => s.id === snapshotId);
         if (!scenario || !snapshot) return { rowCount: 0, rows: [] };
+        // UNIQUE (scenario_id, snapshot_id)
+        if (mockShocks.some((s) => s.scenario_id === scenarioId && s.snapshot_id === snapshotId)) {
+          throw Object.assign(new Error("duplicate key value violates unique constraint"), { code: "23505" });
+        }
         const newShock: MockShock = {
           id: randomUUID(),
           scenario_id: scenarioId,
@@ -196,6 +206,29 @@ describe("Scenario FX shock database store", () => {
         InvalidShockPercentageError,
       );
       expect(mockShocks).toHaveLength(0);
+    });
+
+    it("rejects a percentage outside -99.99 to 100 or with more than four decimals, before any SQL", async () => {
+      for (const value of ["5000", "100.0001", "-99.995", "1.00001"]) {
+        await expect(addScenarioFxShock(VALID_TOKEN, scenarioId, snapshotId, value)).rejects.toThrow(
+          InvalidShockPercentageError,
+        );
+      }
+      expect(mockShocks).toHaveLength(0);
+    });
+
+    it("reports a duplicate shock for the same scenario and snapshot as a domain error", async () => {
+      await addScenarioFxShock(VALID_TOKEN, scenarioId, snapshotId, "5");
+      await expect(addScenarioFxShock(VALID_TOKEN, scenarioId, snapshotId, "7")).rejects.toBeInstanceOf(
+        DuplicateFxShockError,
+      );
+      expect(mockShocks).toHaveLength(1);
+    });
+
+    it("says authentication is required for an expired session, not that the scenario was not found", async () => {
+      await expect(addScenarioFxShock(EXPIRED_TOKEN, scenarioId, snapshotId, "5")).rejects.toThrow(
+        "Authentication required.",
+      );
     });
 
     it("rejects malformed shock percentage", async () => {

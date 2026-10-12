@@ -22,7 +22,7 @@ import {
   evaluateScenarioFxShock,
   invalidateScenarioFxShock,
 } from "@/lib/fx/shock-store";
-import { convertWithShock, UnusableSnapshotError } from "@/lib/fx/fx-shock";
+import { convertWithShock, DuplicateFxShockError, InvalidShockPercentageError, UnusableSnapshotError } from "@/lib/fx/fx-shock";
 import { money, roundMoney } from "@/lib/forecast";
 
 // ---------------------------------------------------------------------------
@@ -100,6 +100,37 @@ describe("Scenario FX shock persistence (PostgreSQL)", () => {
     await database().end();
   });
 
+  it("bounds a stored shock to -99.99..100 with four decimals, in the application and in the database", async () => {
+    // The application refuses it before any SQL...
+    for (const value of ["5000", "100.0001", "-99.995", "1.00001", "1e5"]) {
+      await expect(addScenarioFxShock(token, scenarioId, snapshotId, value)).rejects.toBeInstanceOf(InvalidShockPercentageError);
+    }
+    // ...and the database refuses it even when the application is bypassed.
+    for (const value of ["100.0001", "-99.9901", "5000"]) {
+      await expect(database().query(
+        "INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent) VALUES ($1, $2, $3, $4)",
+        [workspaceId, scenarioId, snapshotId, value],
+      ), value).rejects.toMatchObject({ code: expect.stringMatching(/^(23514|22003)$/) });
+    }
+    expect(await getScenarioFxShocks(token, scenarioId)).toEqual([]);
+
+    // The bounds themselves are accepted and read back unchanged.
+    const upper = await addScenarioFxShock(token, scenarioId, snapshotId, "100");
+    expect(upper.shockPercent).toBe("100");
+    await database().query("DELETE FROM scenario_fx_shocks WHERE id = $1", [upper.id]);
+    const lower = await addScenarioFxShock(token, scenarioId, snapshotId, "-99.99");
+    expect(lower.shockPercent).toBe("-99.99");
+  });
+
+  it("reports a second shock for the same scenario and snapshot as a domain error, and an expired session as authentication", async () => {
+    await addScenarioFxShock(token, scenarioId, snapshotId, "5");
+    await expect(addScenarioFxShock(token, scenarioId, snapshotId, "7")).rejects.toBeInstanceOf(DuplicateFxShockError);
+    expect(await getScenarioFxShocks(token, scenarioId)).toHaveLength(1);
+
+    await database().query("UPDATE sessions SET expires_at = now() - interval '1 second' WHERE user_id = (SELECT user_id FROM workspaces WHERE id = $1)", [workspaceId]);
+    await expect(addScenarioFxShock(token, scenarioId, snapshotId, "9")).rejects.toThrow("Authentication required.");
+  });
+
   it("persists a scenario FX shock in PostgreSQL with correct types and status", async () => {
     const shock = await addScenarioFxShock(token, scenarioId, snapshotId, "5");
     expect(shock.id).toBeDefined();
@@ -114,7 +145,8 @@ describe("Scenario FX shock persistence (PostgreSQL)", () => {
       [shock.id],
     );
     expect(dbRow.rows).toHaveLength(1);
-    expect(dbRow.rows[0].shock_percent).toBe("5");
+    // numeric(7,4) since migration 009: the column keeps four decimals; the store trims them when it reads.
+    expect(dbRow.rows[0].shock_percent).toBe("5.0000");
     expect(dbRow.rows[0].status).toBe("active");
   });
 
