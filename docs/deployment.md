@@ -23,6 +23,8 @@ There is no DELETE on `cash_accounts`: no application function deletes accounts.
 
 Migration 006 creates the global ECB snapshot cache. If `fse_runtime` exists when the owner applies it, the role receives SELECT and INSERT on `fx_snapshots`, plus UPDATE only on `fetched_at` for a repeated identical observation. A corrected rate is a new immutable row. The role receives no DELETE and cannot rewrite a snapshot's provider, currencies, rate or effective date. Snapshot cleanup remains an owner maintenance operation. Migration 006 is additive and may be applied before the FX service is deployed.
 
+Migration 007 adds delayed-invoice scenario tables. If `fse_runtime` exists when the owner applies it, the role receives SELECT and INSERT on `scenarios` and `scenario_adjustments`, plus UPDATE only on adjustment `status` and `updated_at`. It has no direct DELETE or ownership-column UPDATE grant. Owner-side user/workspace cleanup still follows the foreign-key cascades. Apply this additive migration before deploying the scenario store.
+
 Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `APP_ORIGIN` (exact canonical HTTPS staging origin). No production or development connection to staging is intended. Do not overwrite local `.env.local` with staging credentials.
 
 ## Delivery and manual checks

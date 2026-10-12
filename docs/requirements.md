@@ -95,6 +95,17 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 - A workspace can store an optional danger threshold.
 - A settled event's date is the date the money moved: marking a future-dated event received or paid moves it to today (UTC).
 
+## US-12 Delayed-invoice scenarios
+
+As a signed-in user, I can delay an expected customer invoice in a scenario so that I can compare the liquidity impact without changing the real cash event or base forecast.
+
+- A delay applies only to an expected positive cash event and uses a strictly later valid date.
+- The scenario and target event must belong to the same workspace; PostgreSQL enforces this with composite foreign keys.
+- The persisted cash event, its original date and the base forecast remain unchanged.
+- Two scenarios can delay the same event independently.
+- Missing, inaccessible, malformed and ineligible targets fail explicitly without revealing another workspace's data.
+- Deleting an expected event removes its dependent hypothetical adjustment, and deleting the user cascades all scenario data.
+
 ## US-13 Reliable ECB exchange rates
 
 As a signed-in user, I can use EUR, USD and SGD exchange rates with visible source, effective date and freshness so that a forecast never silently uses a fabricated or mismatched rate.
@@ -135,6 +146,7 @@ As a signed-in user, I can use EUR, USD and SGD exchange rates with visible sour
 | US-11 cash accounts and events | Migration 005, `src/lib/cash-events-store.ts`, `src/lib/workspace-store.ts`, cash schemas in `src/lib/validation.ts` | Integration constraints by direct SQL, two-user ownership matrix, anonymous/unknown/expired sessions, malformed ids, status transitions, cascade, and a run as the staging role; unit amount and date validation | Foundation & Security branch; the Cash events page is separate work |
 | US-11 settled events immutable | `updateCashEvent` and `deleteCashEvent` in `src/lib/cash-events-store.ts` (status condition in the `WHERE` clause) | Integration: editing and deleting received, paid and cancelled events refused with the row unchanged; expected events still work; another user's settled event gives the same null as a missing one | Foundation & Security branch (review feedback on PR #10) |
 | US-11 forecast input (decisions of 2026-10-08, implemented 2026-10-10) | `src/lib/forecast-input-store.ts` (starting balance, overdue events, threshold), `src/lib/forecast-input.ts` (status mapping), date rule in `setCashEventStatus`; see [decisions](decisions.md#2026-10-10--forecast-input-implemented-a-settled-events-date-is-the-date-the-money-moved) | Integration: starting balance with events before, on and after the start date (on or before counts), cancelled and other accounts and users ignored, early-settled event in the balance, overdue events, ranges, ownership matrix; unit: status mapping and range; also run as the staging role | Foundation & Security branch `feat/forecast-input`. The call into the engine is not delivered: it waits for PR #12 |
+| US-12 delayed-invoice scenarios | Migration 007, `src/lib/scenario-store.ts`, immutable scenario projection in `src/lib/forecast/scenario.ts` | Unit immutability and delta tests; PostgreSQL ownership, composite-FK, eligibility, date-only, cascade and base-forecast isolation tests | PR #9; aligned to the merged PR #12 engine; adjustments that cannot apply are skipped and reported (decision of 2026-10-12) |
 | US-13 reliable ECB exchange rates | Migration 006 and `src/lib/fx/*` | Parser/provider/cache unit tests; PostgreSQL constraints, atomic persistence, stale fallback and restricted-role integration tests | Scenarios & Exchange Rates Phase 2 branch; no UI in this increment |
 | US-02 workspace (renamed) | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts` | The existing ownership and origin tests, renamed | Same branch |
 
