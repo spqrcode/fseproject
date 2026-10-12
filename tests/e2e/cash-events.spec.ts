@@ -1,6 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, signUpAndIn, type Account } from "./fixtures";
 
+// Dates are relative to today: settling a future-dated event moves it to today (UTC), so a fixed date would
+// change what this test expects once that day has passed.
+const DAY = 86_400_000;
+const iso = (offsetDays: number) => new Date(Date.now() + offsetDays * DAY).toISOString().slice(0, 10);
+const written = (isoDate: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${isoDate}T00:00:00Z`));
+
 async function createWorkspace(page: import("@playwright/test").Page) {
   await page.goto("/workspace");
   await page.getByLabel("Workspace name").fill("Demo workspace");
@@ -23,7 +29,7 @@ test("a user can create an account and manage an expected expense", async ({ pag
 
   await page.getByLabel("Description").fill("Office rent");
   await page.getByLabel("Signed amount").fill("0");
-  await page.getByLabel("Expected date").fill("2026-10-20");
+  await page.getByLabel("Expected date").fill(iso(30));
   await page.getByRole("button", { name: "Add cash event", exact: true }).click();
   await expect(page.getByRole("alert").filter({ hasText: "The amount cannot be zero." })).toBeVisible();
 
@@ -40,12 +46,16 @@ test("a user can create an account and manage an expected expense", async ({ pag
   await expect(page.getByRole("status").filter({ hasText: "Cash event updated." })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: "Office rent and utilities" })).toBeVisible();
 
+  // Dates read like the rest of the application, not as an ISO string.
+  await expect(page.getByText(written(iso(30)), { exact: true })).toBeVisible();
+
   await page.getByRole("button", { name: /^Mark paid: Office rent and utilities$/ }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Cash event marked paid." })).toBeVisible();
+  // Paying a future-dated event moves it to today, and the message says so instead of looking like a bug.
+  await expect(page.getByRole("status").filter({ hasText: "Its date was moved to today" })).toBeVisible();
   await expect(page.getByText("paid", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Mark paid/ })).toHaveCount(0);
-  // Dates read like the rest of the application, not as an ISO string.
-  await expect(page.getByText("20 Oct 2026", { exact: true })).toBeVisible();
+  await expect(page.getByText(written(iso(0)), { exact: true })).toBeVisible();
+  await expect(page.getByText(written(iso(30)), { exact: true })).toHaveCount(0);
 
   await page.goto("/dashboard");
   await expect(page.getByText("1 event", { exact: true })).toBeVisible();
@@ -60,13 +70,15 @@ test("income uses received and an expected event can be cancelled", async ({ pag
 
   await page.getByLabel("Description").fill("Customer invoice");
   await page.getByLabel("Signed amount").fill("900");
-  await page.getByLabel("Expected date").fill("2026-11-02");
+  await page.getByLabel("Expected date").fill(iso(20));
   await page.getByRole("button", { name: "Add cash event", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Mark received: Customer invoice$/ })).toBeVisible();
 
   await page.getByRole("button", { name: /^Cancel event: Customer invoice$/ }).click();
   await expect(page.getByRole("status").filter({ hasText: "Cash event cancelled." })).toBeVisible();
   await expect(page.getByText("cancelled", { exact: true })).toBeVisible();
+  // Cancelling keeps the planned date; only money that moved changes it.
+  await expect(page.getByText(written(iso(20)), { exact: true })).toBeVisible();
   await expect(page.getByText("Edit", { exact: true })).toHaveCount(0);
 });
 

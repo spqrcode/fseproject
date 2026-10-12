@@ -8,6 +8,7 @@ import {
   createCashEvent,
   deleteCashEvent,
   DuplicateAccountNameError,
+  listCashEvents,
   setCashEventStatus,
   StatusConflictError,
   updateCashEvent,
@@ -114,8 +115,17 @@ export async function changeCashEventStatus(eventId: string, status: string, for
   let target = UNAVAILABLE;
   try {
     await verifyOrigin();
-    const changed = await setCashEventStatus(await sessionToken(), id.data, next.data);
-    if (changed) target = `/cash-events?success=event-${next.data}`;
+    const token = await sessionToken();
+    // Settling a future-dated event moves its date to today (the date the money moved, decided with #14). Read the
+    // date first so the message can say so; it is only used to choose the wording, never to change data.
+    const before = next.data === "received" || next.data === "paid"
+      ? (await listCashEvents(token)).find(item => item.id === id.data)?.expectedDate
+      : undefined;
+    const changed = await setCashEventStatus(token, id.data, next.data);
+    if (changed) {
+      const moved = before !== undefined && before !== changed.expectedDate;
+      target = `/cash-events?success=event-${next.data}${moved ? "-today" : ""}`;
+    }
   } catch (error) {
     if (!(error instanceof StatusConflictError)) throw error;
   }

@@ -19,7 +19,9 @@ Use Node 24 and PostgreSQL 16. Start from `npm ci`, configure `.env.local`, and 
 
 ## Cash events product verification (2026-10-11)
 
-`npm run verify` passed on the `feat/product-cash-events` branch against PostgreSQL 16 in the isolated `portfolio_risk_test` database: ESLint with zero warnings, strict TypeScript, 120 unit tests, production build, migrations, 99 integration tests and 26 Chromium tests. The two new browser tests cover account creation, validation-error input preservation, signed expense and income display, event creation and editing, paid/received labels, cancellation, final-event immutability in the UI, and the overview event count. Existing axe-core checks also passed with the connected Cash events page in light and dark mode.
+`npm run verify` passed on the `feat/product-cash-events` branch (with `main` including #14 merged in) against PostgreSQL 16 in the isolated `portfolio_risk_test` database on 12 October 2026: ESLint with zero warnings, strict TypeScript, 240 unit tests, production build, migrations, 156 integration tests and 30 Chromium tests. The two new browser tests cover account creation, validation-error input preservation, signed expense and income display, event creation and editing, paid/received labels, cancellation, final-event immutability in the UI, and the overview event count. Existing axe-core checks also passed with the connected Cash events page in light and dark mode.
+
+The Cash events page's server actions have their own integration file, `tests/integration/cash-event-actions.test.ts`: a foreign or missing origin saves nothing, anonymous and expired sessions are sent to sign in, another user's account or event is reported as unavailable and left unchanged, a forged status (paying an income, a status other than received, paid or cancelled) ends on "nothing was changed" rather than an error page, and settling a future-dated event moves its date to today with a message that says so.
 
 ## Test isolation
 

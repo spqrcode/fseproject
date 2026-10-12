@@ -22,7 +22,7 @@ The home page marks Cash events as available and keeps the forecast and Scenario
 
 Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so forecast and scenario pages state what will appear and that nothing is estimated today. The Cash events page shows only persisted account and event values.
 
-## US-04: cash accounts and events
+## US-11: cash accounts and events
 
 As a signed-in user, I can record where cash is held and add dated income and expenses, so that the forecast has explicit, reviewable inputs.
 

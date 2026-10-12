@@ -16,6 +16,8 @@ const successMessages: Record<string, string> = {
   "event-updated": "Cash event updated.",
   "event-received": "Cash event marked received.",
   "event-paid": "Cash event marked paid.",
+  "event-received-today": "Cash event marked received. Its date was moved to today, because that is when the money moved.",
+  "event-paid-today": "Cash event marked paid. Its date was moved to today, because that is when the money moved.",
   "event-cancelled": "Cash event cancelled.",
   "event-deleted": "Cash event deleted.",
 };
