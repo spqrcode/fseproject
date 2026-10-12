@@ -149,6 +149,32 @@ describe("accounts and events through the store", () => {
     await expect(setCashEventStatus(alice.token, alice.eventId, "settled")).rejects.toThrow();
     expect((await eventRow(alice.eventId)).status).toBe("paid");
   });
+  // A settled event's date is the date the money moved: a future date becomes today (UTC) when it is received or paid.
+  async function todayUtc() { return (await fixtures.query("SELECT to_char((now() AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS today")).rows[0].today as string; }
+  it.each([["received", { description: "Early invoice", amount: "500.00", expectedDate: "2099-06-01" }], ["paid", { description: "Early rent", amount: "-500.00", expectedDate: "2099-06-01" }]])(
+    "moves a future-dated event to today (UTC) when it is marked %s", async (status, input) => {
+      const created = (await createCashEvent(alice.token, alice.accountId, input))!;
+      const settled = (await setCashEventStatus(alice.token, created.id, status))!;
+      expect(settled.expectedDate).toBe(await todayUtc());
+      expect(settled.status).toBe(status);
+      expect((await eventRow(created.id)).expected_date).toBe(settled.expectedDate);
+    });
+  it("keeps the date of a past-dated or today-dated event when it is settled", async () => {
+    const past = (await createCashEvent(alice.token, alice.accountId, { description: "Old", amount: "-5", expectedDate: "2001-02-03" }))!;
+    expect((await setCashEventStatus(alice.token, past.id, "paid"))?.expectedDate).toBe("2001-02-03");
+    const today = (await createCashEvent(alice.token, alice.accountId, { description: "Today", amount: "5", expectedDate: await todayUtc() }))!;
+    expect((await setCashEventStatus(alice.token, today.id, "received"))?.expectedDate).toBe(await todayUtc());
+  });
+  it("never changes the date of a cancelled event", async () => {
+    const future = (await createCashEvent(alice.token, alice.accountId, { description: "Maybe", amount: "-5", expectedDate: "2099-06-01" }))!;
+    expect((await setCashEventStatus(alice.token, future.id, "cancelled"))?.expectedDate).toBe("2099-06-01");
+    expect((await eventRow(future.id)).expected_date).toBe("2099-06-01");
+  });
+  it("does not touch the date of another user's event when its status is set", async () => {
+    const future = (await createCashEvent(alice.token, alice.accountId, { description: "Alice early", amount: "-5", expectedDate: "2099-06-01" }))!;
+    expect(await setCashEventStatus(bob.token, future.id, "paid")).toBeNull();
+    expect((await eventRow(future.id)).expected_date).toBe("2099-06-01");
+  });
   it.each([["received", salary], ["paid", rent], ["cancelled", rent]])("refuses to edit or delete a %s event and leaves it unchanged", async (status, input) => {
     const settled = (await createCashEvent(alice.token, alice.accountId, input))!;
     await setCashEventStatus(alice.token, settled.id, status);
