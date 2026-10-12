@@ -8,7 +8,7 @@ Owner: Gabriel (Product Experience), with Cash events and Scenario lab integrati
 | --- | --- | --- |
 | `/` | Public home page: what FinTwin Global is, which views are available or in development, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
-| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Module status is connected; numerical forecast is withheld until the shared forecast-input adapter is connected |
+| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented: one account's deterministic forecast for 30, 90, 180 or 365 days (balance today, lowest point, closing balance, runway, danger threshold, overdue events, a step chart and a day-by-day table); an empty state asks for a cash account when there is none |
 | `/cash-events` | Cash accounts and planned income and expenses by date | Connected to the session-scoped cash-event store; create, edit, settle, cancel and delete expected events |
 | `/scenarios` | Scenario lab: delayed invoices and ECB percentage-FX shocks | Connected to persisted scenarios and adjustments, with an ECB rate preview; numerical forecast comparison still awaits the shared adapter |
 | `/workspace` | Workspace name stored in `workspaces` | Existing form, renamed from `/portfolio` |
@@ -68,6 +68,7 @@ The logo is two overlapping circles: the finances as they are and their twin. He
 - Rounding happens only at display time, half to even (1.245 becomes 1.24, 1.255 becomes 1.26), using the currency's own minor units (two decimals for EUR, USD and SGD). This is the rule the forecast engine uses when it rounds, so the screen never disagrees with a rounded calculation by a cent. Unrounded engine results with 40 significant digits are accepted as they are.
 - A missing amount or an undefined ratio (for example a zero denominator) is shown as "Unavailable", never as 0, NaN or Infinity.
 - Input that is not a plain decimal (exponent notation, `NaN`, grouping separators, empty strings) throws instead of printing a guessed value, so a bug in a calculation is visible during development rather than shown to users.
+- Exchange rates are shown with four decimals, as the ECB publishes them, rounded half to even with `formatRate`. Cross and reciprocal rates keep every digit in the calculation; only the text is rounded, and the exact value stays in the page data.
 - Values that round to zero never show a minus sign. Changes can be shown with an explicit sign (`+US$25.00`).
 - Locale `en-GB` and time zone UTC are fixed so the server and the browser render the same text, and timestamps carry the "UTC" label.
 
