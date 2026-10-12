@@ -32,7 +32,10 @@ test("main navigation reaches every section and marks only the current one", asy
 test("forecast and scenario sections say when calculations are not connected", async ({ page, account }) => {
   await signUpAndIn(page, account);
   await expect(page.getByRole("link", { name: "Create your workspace", exact: true })).toBeVisible();
-  for (const path of ["/dashboard", "/scenarios"]) {
+  // The overview is connected to the forecast; without a cash account it asks for one and shows no figures.
+  await expect(page.getByRole("heading", { level: 2, name: "Add a cash account to see your forecast." })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/[€$£¥]\s?\d|SGD\s\d/);
+  for (const path of ["/scenarios"]) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 2, name: /not connected yet/ })).toBeVisible();
     await expect(page.locator("main")).not.toContainText(/[€$£¥]\s?\d|SGD\s\d/);
