@@ -77,7 +77,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
       <div className="scenario-main">
         {selected ? <section className="scenario-section" aria-labelledby="delay-heading">
           <p className="eyebrow">Selected scenario</p><h2 id="delay-heading">{selected.name}</h2>
-          <p className="muted">Original and delayed dates are shown side by side. Forecast balances wait for the shared forecast-input adapter.</p>
+          <p className="muted">Original and delayed dates are shown side by side. The real cash event keeps its date.</p>
           {adjustments.length > 0 && <table className="data-table scenario-comparison">
             <caption className="visually-hidden">Invoice delay comparison</caption>
             <thead><tr><th scope="col">Invoice</th><th scope="col">Base date</th><th scope="col">Scenario date</th></tr></thead>
@@ -88,7 +88,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
                   <th scope="row">{event ? `${event.description} · ${formatMoney(event.amount, event.currency)}` : "Original event unavailable"}</th>
                   <td>{event ? formatDate(event.expectedDate) : "Unavailable"}</td>
                   <td>{item.status === "active" ? formatDate(item.dateOverride)
-                    : item.status === "not_applicable" ? "No longer applies: the invoice was received, paid or cancelled"
+                    : item.status === "not_applicable" ? "No longer applies: the invoice was settled, cancelled or changed"
                     : "Invalid adjustment"}</td>
                 </tr>;
               })}
@@ -125,6 +125,6 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
         </section>
       </div>
     </div>}
-    <aside className="footnote" aria-label="About scenario results"><p className="eyebrow">About results</p><p>Rates are decimal strings from ECB snapshots. Stale or unavailable data is labelled. Numerical cash-flow comparisons wait for the shared starting-balance adapter; no forecast is fabricated here. Reporting currency: {currencyLabel(reporting ?? DEFAULT_REPORTING_CURRENCY)}.</p></aside>
+    <aside className="footnote" aria-label="About scenario results"><p className="eyebrow">About results</p><p>Rates are decimal strings from ECB snapshots. Stale or unavailable data is labelled. This page shows rates and dates; it does not compute a cash-flow forecast, so no balance is estimated here. Reporting currency: {currencyLabel(reporting ?? DEFAULT_REPORTING_CURRENCY)}.</p></aside>
   </>;
 }
