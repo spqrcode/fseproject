@@ -59,3 +59,16 @@ export function formatTimestamp(value: Date | string | null | undefined): string
   if (Number.isNaN(date.getTime())) throw new RangeError(`Not a valid timestamp: ${JSON.stringify(value)}`);
   return `${timestamp.format(date)} UTC`;
 }
+
+// An exchange rate as ECB publishes it: four decimals, half to even, without grouping. A rate that would round
+// to zero at four decimals keeps four significant digits instead, so a small rate is never shown as 0.0000.
+// The exact value stays available to callers, for example in a <data value> attribute.
+export function formatRate(value: string | null | undefined): string {
+  if (value === null || value === undefined) return UNAVAILABLE;
+  const exact = decimal(value);
+  const small = /^-?0\.00/.test(exact);
+  const options: Intl.NumberFormatOptions = small
+    ? { maximumSignificantDigits: 4, useGrouping: false, roundingMode: ROUNDING }
+    : { minimumFractionDigits: 4, maximumFractionDigits: 4, useGrouping: false, roundingMode: ROUNDING };
+  return formatter(options).format(exact);
+}

@@ -5,6 +5,8 @@ if (!testUrl || !new URL(testUrl).pathname.endsWith("_test") || process.env.DATA
 }
 export default defineConfig({
   testDir: "./tests/e2e", fullyParallel: false, workers: 1,
+  // Fresh cached ECB snapshots for the run, so no browser test depends on the network (see global-setup.ts).
+  globalSetup: "./tests/e2e/global-setup.ts", globalTeardown: "./tests/e2e/global-teardown.ts",
   forbidOnly: !!process.env.CI, retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: { baseURL: "http://localhost:3100", trace: "off" },

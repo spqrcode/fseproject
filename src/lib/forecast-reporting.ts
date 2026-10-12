@@ -1,11 +1,12 @@
 import "server-only";
-import { getForecastInput } from "@/lib/forecast-input-store";
+import { getForecastInput, type ForecastInput as StoredForecastInput } from "@/lib/forecast-input-store";
 import {
   appliedFactor,
   convertForecastInput,
   runForecast,
   toForecastInput,
   type Currency,
+  type ForecastInput,
   type ForecastResult,
 } from "@/lib/forecast";
 import { getRate, type RateFailure } from "@/lib/fx/rate-service";
@@ -28,6 +29,7 @@ export type ReportingForecast =
       available: true;
       account: { id: string; name: string; currency: ReportingCurrency };
       conversion: Conversion;
+      input: ForecastInput;                                                // the engine input, converted
       result: ForecastResult;                                              // in the reporting currency
     }
   | {
@@ -47,12 +49,20 @@ export async function getForecastInReportingCurrency(
   provider: EcbProvider = liveEcbProvider,
 ): Promise<ReportingForecast | null> {
   const stored = await getForecastInput(token, input);
-  if (!stored) return null;
+  return stored ? forecastStoredInReportingCurrency(stored, reporting, provider) : null;
+}
+
+// The same, for a caller that has already read the stored input (and its presentation metadata) itself.
+export async function forecastStoredInReportingCurrency(
+  stored: StoredForecastInput,
+  reporting: Currency,
+  provider: EcbProvider = liveEcbProvider,
+): Promise<ReportingForecast> {
   const engineInput = toForecastInput(stored);
   const account = stored.account;
 
   if (engineInput.currency === reporting) {
-    return { available: true, account, conversion: { status: "NONE", from: reporting, to: reporting }, result: runForecast(engineInput) };
+    return { available: true, account, conversion: { status: "NONE", from: reporting, to: reporting }, input: engineInput, result: runForecast(engineInput) };
   }
   const rate = await getRate(engineInput.currency, reporting, provider);
   if (rate.status === "UNAVAILABLE") {
@@ -69,6 +79,7 @@ export async function getForecastInReportingCurrency(
       effectiveDate: rate.effectiveDate, provider: rate.provider, fetchedAt: rate.fetchedAt,
       refreshFailure: rate.refreshFailure,
     },
+    input: converted,
     result: runForecast(converted),
   };
 }
