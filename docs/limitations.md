@@ -2,7 +2,7 @@
 
 ## Current application
 
-Issue 1 provides account/session handling and the existing portfolio setup UI. Holdings, stock quotes, valuations, P/L, and analytics are not implemented. Passing foundation tests does not mean the whole course specification is complete.
+The product is FinTwin Global, a multi-currency cash-flow and liquidity scenario tool. On `main`, account registration and sessions, workspaces, cash accounts and events (data layer and tests), the deterministic Forecast Engine and the ECB exchange-rate snapshot cache are implemented. The three business views are not complete on `main`: the Liquidity overview, Cash events and Scenario Lab pages are placeholders until their pull requests merge, and the snapshot cache is not yet used by a forecast. The README status table lists the pull requests. Passing foundation tests does not mean the whole course specification is complete.
 
 Email addresses are not verified. Password recovery, MFA, compromised-password screening, network-level abuse protection, and session housekeeping are absent. Per-address throttling can lock out a targeted address temporarily and does not stop attackers rotating addresses.
 
@@ -32,6 +32,7 @@ What would we keep? The separation of a pure Decimal-based forecast engine from 
 
 ## Later financial scope
 
-One portfolio per user, USD instruments, current positions and average purchase price. No transaction ledger, realized P/L, FX, dividends, fees, taxes, corporate-action accounting, trades, advice, or advanced risk models. Allocation and P/L contribution will be descriptive, not a complete measure of investment risk.
+Not built and not planned for this prototype: open banking or bank-statement import, payment execution, tax or financial advice, machine-learning forecasting, bank-grade regulatory metrics, microservices, complex role hierarchies, and arbitrary recurrence rules (simple monthly recurrence is a stretch goal only). Supported currencies are EUR, USD and SGD. Holdings, market quotes and portfolio analytics belong to the earlier portfolio version of the project and were removed; `/forecast` and `/portfolio` return 404.
 
-A real financial institution would need licensed data, reconciled accounting, reviewed financial methodology, stronger identity and access controls, monitoring, incident response, tested recovery, and legal/compliance assessment for its jurisdiction and use.
+The product is a treasury-oriented educational prototype, not a regulated stress-testing or asset-liability management system, and it does not give financial advice. What a real deployment would require is set out in the reflection above.
+
