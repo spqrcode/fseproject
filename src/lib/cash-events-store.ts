@@ -22,7 +22,7 @@ export class StatusConflictError extends Error { constructor() { super("This cha
 // Results: lists are empty without a session. A single row, or `false` for delete, comes back as null / false
 // when it is not the caller's, does not exist, or the id is malformed. A missing or expired session throws
 // "Authentication required." instead; that is checked only after a query found nothing.
-async function nothing(token: string | undefined): Promise<null> {
+export async function notFound(token: string | undefined): Promise<null> {
   if (!await hasValidSession(token)) throw new Error("Authentication required.");
   return null;
 }
@@ -57,7 +57,7 @@ export async function createCashAccount(token: string | undefined, input: unknow
     const result = await database().query<AccountRow>(`INSERT INTO cash_accounts(workspace_id, name, currency, opening_balance)
       SELECT w.id, $2, $3, $4 FROM sessions s JOIN workspaces w ON w.user_id = s.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now() RETURNING ${ACCOUNT_COLUMNS}`, [tokenHash(token), data.name, data.currency, data.openingBalance]);
-    return result.rows[0] ? account(result.rows[0]) : await nothing(token);
+    return result.rows[0] ? account(result.rows[0]) : await notFound(token);
   } catch (error) {
     if (postgresCode(error) === "23505") throw new DuplicateAccountNameError();
     throw error;
@@ -69,13 +69,13 @@ export async function renameCashAccount(token: string | undefined, accountId: un
   const name = accountNameSchema.parse(input);
   if (!token || !validToken(token)) throw new Error("Authentication required.");
   const id = uuidSchema.safeParse(accountId);
-  if (!id.success) return nothing(token);
+  if (!id.success) return notFound(token);
   try {
     const result = await database().query<AccountRow>(`UPDATE cash_accounts a SET name = $3, updated_at = now()
       FROM workspaces w, sessions s WHERE a.id = $2 AND w.id = a.workspace_id AND s.user_id = w.user_id
       AND s.token_hash = $1 AND s.expires_at > now()
       RETURNING a.id, a.name, a.currency, a.opening_balance::text AS opening_balance, a.created_at`, [tokenHash(token), id.data, name]);
-    return result.rows[0] ? account(result.rows[0]) : await nothing(token);
+    return result.rows[0] ? account(result.rows[0]) : await notFound(token);
   } catch (error) {
     if (postgresCode(error) === "23505") throw new DuplicateAccountNameError();
     throw error;
@@ -119,7 +119,7 @@ export async function createCashEvent(token: string | undefined, accountId: unkn
   const data = cashEventSchema.parse(input);
   if (!token || !validToken(token)) throw new Error("Authentication required.");
   const id = uuidSchema.safeParse(accountId);
-  if (!id.success) return nothing(token);
+  if (!id.success) return notFound(token);
   const result = await database().query<EventRow>(`WITH changed AS (
       INSERT INTO cash_events(workspace_id, account_id, description, amount, expected_date)
       SELECT w.id, a.id, $3, $4, $5 FROM sessions s JOIN workspaces w ON w.user_id = s.user_id
@@ -127,7 +127,7 @@ export async function createCashEvent(token: string | undefined, accountId: unkn
       WHERE s.token_hash = $1 AND s.expires_at > now() AND a.id = $2
       RETURNING id, account_id, description, amount, expected_date, status, created_at, updated_at
     ) ${EVENT_OF_CHANGE}`, [tokenHash(token), id.data, data.description, data.amount, data.expectedDate]);
-  return result.rows[0] ? event(result.rows[0]) : nothing(token);
+  return result.rows[0] ? event(result.rows[0]) : notFound(token);
 }
 
 // Description, amount and date only; the account and status do not change here. Only an "expected" event can be
@@ -137,7 +137,7 @@ export async function updateCashEvent(token: string | undefined, eventId: unknow
   const data = cashEventSchema.parse(input);
   if (!token || !validToken(token)) throw new Error("Authentication required.");
   const id = uuidSchema.safeParse(eventId);
-  if (!id.success) return nothing(token);
+  if (!id.success) return notFound(token);
   const result = await database().query<EventRow>(`WITH changed AS (
       UPDATE cash_events e SET description = $3, amount = $4, expected_date = $5, updated_at = now()
       FROM workspaces w, sessions s WHERE e.id = $2 AND w.id = e.workspace_id AND s.user_id = w.user_id
@@ -146,20 +146,25 @@ export async function updateCashEvent(token: string | undefined, eventId: unknow
     ) ${EVENT_OF_CHANGE}`, [tokenHash(token), id.data, data.description, data.amount, data.expectedDate]);
   if (result.rows[0]) return event(result.rows[0]);
   if (await ownsEvent(token, id.data)) throw new StatusConflictError();
-  return nothing(token);
+  return notFound(token);
 }
 
 // The only allowed transition is from "expected" to received, paid or cancelled; there is no undo.
+// A settled event's date is the date the money moved: marking a future-dated event received or paid moves it
+// to today (UTC, explicitly: current_date would depend on the session's time zone), in the same UPDATE. Past
+// dates and cancelled events keep their date. This keeps the forecast's starting balance complete.
 // Anything else (including setting "expected") raises StatusConflictError, as does a received expense or
 // a paid income (the database sign rule). A foreign or unknown event is null, never a conflict.
 export async function setCashEventStatus(token: string | undefined, eventId: unknown, status: unknown): Promise<CashEvent | null> {
   const next = eventStatusSchema.parse(status);
   if (!token || !validToken(token)) throw new Error("Authentication required.");
   const id = uuidSchema.safeParse(eventId);
-  if (!id.success) return nothing(token);
+  if (!id.success) return notFound(token);
   try {
     const result = await database().query<EventRow>(`WITH changed AS (
-        UPDATE cash_events e SET status = $3, updated_at = now()
+        UPDATE cash_events e SET status = $3, updated_at = now(),
+          expected_date = CASE WHEN $3 IN ('received', 'paid') AND e.expected_date > (now() AT TIME ZONE 'UTC')::date
+            THEN (now() AT TIME ZONE 'UTC')::date ELSE e.expected_date END
         FROM workspaces w, sessions s WHERE e.id = $2 AND w.id = e.workspace_id AND s.user_id = w.user_id
         AND s.token_hash = $1 AND s.expires_at > now() AND e.status = 'expected' AND $3 <> 'expected'
         RETURNING ${CHANGED_COLUMNS}
@@ -171,7 +176,7 @@ export async function setCashEventStatus(token: string | undefined, eventId: unk
   }
   // Nothing changed: either the caller's event is not in the "expected" state, or it is not theirs.
   if (await ownsEvent(token, id.data)) throw new StatusConflictError();
-  return nothing(token);
+  return notFound(token);
 }
 
 // Only an "expected" event can be deleted; a settled one throws StatusConflictError. Corrections to settled
@@ -179,11 +184,11 @@ export async function setCashEventStatus(token: string | undefined, eventId: unk
 export async function deleteCashEvent(token: string | undefined, eventId: unknown): Promise<boolean> {
   if (!token || !validToken(token)) throw new Error("Authentication required.");
   const id = uuidSchema.safeParse(eventId);
-  if (!id.success) return (await nothing(token)) ?? false;
+  if (!id.success) return (await notFound(token)) ?? false;
   const result = await database().query(`DELETE FROM cash_events e USING workspaces w, sessions s
     WHERE e.id = $2 AND w.id = e.workspace_id AND s.user_id = w.user_id AND s.token_hash = $1 AND s.expires_at > now()
     AND e.status = 'expected'`, [tokenHash(token), id.data]);
   if (result.rowCount === 1) return true;
   if (await ownsEvent(token, id.data)) throw new StatusConflictError();
-  return (await nothing(token)) ?? false;
+  return (await notFound(token)) ?? false;
 }
