@@ -85,7 +85,9 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
                 return <tr key={item.id}>
                   <th scope="row">{event ? `${event.description} · ${formatMoney(event.amount, event.currency)}` : "Original event unavailable"}</th>
                   <td>{event ? formatDate(event.expectedDate) : "Unavailable"}</td>
-                  <td>{item.status === "active" ? formatDate(item.dateOverride) : "Invalid adjustment"}</td>
+                  <td>{item.status === "active" ? formatDate(item.dateOverride)
+                    : item.status === "not_applicable" ? "No longer applies: the invoice was received, paid or cancelled"
+                    : "Invalid adjustment"}</td>
                 </tr>;
               })}
             </tbody>

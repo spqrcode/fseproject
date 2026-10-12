@@ -92,3 +92,37 @@ test("rates are rounded for reading, the exact value is kept, and a saved shock 
     await account.db.query("DELETE FROM fx_snapshots WHERE effective_date = $1 AND provider = 'ecb'", [effective]);
   }
 });
+
+test("an invoice that is received after it was delayed is shown as no longer applying, and the page keeps working", async ({ page, account }) => {
+  await signUpAndIn(page, account);
+  await page.goto("/workspace");
+  await page.getByLabel("Workspace name").fill("Settled later");
+  await page.getByRole("button", { name: "Create workspace", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("Workspace saved.");
+  await page.goto("/cash-events");
+  await page.getByLabel("Account name").fill("Operating cash");
+  await page.getByRole("button", { name: "Add cash account", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Cash account added." })).toBeVisible();
+  await page.getByLabel("Description").fill("Customer invoice");
+  await page.getByLabel("Signed amount").fill("900");
+  await page.getByLabel("Expected date").fill("2026-11-02");
+  await page.getByRole("button", { name: "Add cash event", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Cash event added." })).toBeVisible();
+
+  await page.goto("/scenarios");
+  await page.getByLabel("Scenario name").fill("Late customer payment");
+  await page.getByRole("button", { name: "Create scenario", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Scenario created." })).toBeVisible();
+  await page.getByLabel("New expected date").fill("2026-11-16");
+  await page.getByRole("button", { name: "Delay invoice in scenario" }).click();
+  await expect(page.getByRole("table", { name: "Invoice delay comparison" })).toContainText("16 Nov 2026");
+
+  // The invoice is received while the scenario exists (in another tab or session).
+  await account.db.query("UPDATE cash_events SET status = 'received' WHERE description = 'Customer invoice'");
+  await page.reload();
+  const comparison = page.getByRole("table", { name: "Invoice delay comparison" });
+  await expect(comparison).toContainText("No longer applies");
+  await expect(comparison).not.toContainText("16 Nov 2026");
+  await expect(page.getByRole("heading", { level: 2, name: "Late customer payment" })).toBeVisible();
+});
+
