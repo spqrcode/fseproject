@@ -8,7 +8,7 @@ Owner: Gabriel (Product Experience), with Cash events and Scenario lab integrati
 | --- | --- | --- |
 | `/` | Public home page: what FinTwin Global is, which views are available or in development, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
-| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented; the forecast is shown as not connected until the engine is delivered |
+| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Module status is connected; numerical forecast is withheld until the shared forecast-input adapter is connected |
 | `/cash-events` | Cash accounts and planned income and expenses by date | Connected to the session-scoped cash-event store; create, edit, settle, cancel and delete expected events |
 | `/scenarios` | Scenario lab: delayed invoices and ECB percentage-FX shocks | Connected to persisted scenarios and adjustments, with an ECB rate preview; numerical forecast comparison still awaits the shared adapter |
 | `/workspace` | Workspace name stored in `workspaces` | Existing form, renamed from `/portfolio` |

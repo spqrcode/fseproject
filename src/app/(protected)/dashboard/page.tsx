@@ -33,8 +33,8 @@ export default async function LiquidityOverview() {
       <div><p className="eyebrow">First step</p><h2 id="onboarding-heading">Set up your workspace.</h2><p>Give your workspace a name. Cash events and scenarios will belong to it, and only you can see it.</p></div>
       <Link className="button inverse" href="/workspace">Create your workspace</Link>
     </section>}
-    <EmptyState eyebrow="Awaiting the forecast engine" title="The liquidity forecast is not connected yet." figure={<ForecastFigure />}>
-      <p>Once it is delivered, this page will show your projected balance over time, its lowest point and how long your cash lasts, in {currencyLabel(reporting)}. Nothing is estimated today, so no number is shown until a real projection exists.</p>
+    <EmptyState eyebrow="Awaiting the forecast-input adapter" title="The liquidity forecast is not connected yet." figure={<ForecastFigure />}>
+      <p>Once the shared adapter is connected, this page will show your projected balance over time, its lowest point and how long your cash lasts, in {currencyLabel(reporting)}. Nothing is estimated today, so no number is shown until a real projection exists.</p>
     </EmptyState>
     <section className="modules" aria-labelledby="modules-heading">
       <div className="index-head"><h2 id="modules-heading">Modules</h2><p className="eyebrow">{modules.length} modules</p></div>
