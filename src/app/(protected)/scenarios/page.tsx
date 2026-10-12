@@ -32,12 +32,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
     getWorkspace(token), getReportingCurrency(token), getScenarios(token), listCashEvents(token),
   ]);
   const selected = scenarios.find(item => item.id === params.scenario) ?? scenarios[0];
-  const [adjustments, savedShocks] = selected
-    ? await Promise.all([getAdjustments(token, selected.id), getScenarioFxShocks(token, selected.id)])
-    : [[], []];
-  const adjustedIds = new Set(adjustments.filter(item => item.status === "active").map(item => item.cashEventId));
-  const invoices = events.filter(item => item.status === "expected" && parseDecimal(item.amount).greaterThan(0) && !adjustedIds.has(item.id));
-  const eventById = new Map(events.map(item => [item.id, item]));
+  const adjustmentsPromise = selected ? getAdjustments(token, selected.id) : Promise.resolve([]);
   const base = reportingCurrencySchema.safeParse(params.base).data ?? "EUR";
   const quote = reportingCurrencySchema.safeParse(params.quote).data ?? (base === "USD" ? "SGD" : "USD");
   const shock = params.shock ?? "-10";
@@ -54,6 +49,13 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
       }
     }
   }
+  const [adjustments, savedShocks] = await Promise.all([
+    adjustmentsPromise,
+    selected ? getScenarioFxShocks(token, selected.id) : Promise.resolve([]),
+  ]);
+  const adjustedIds = new Set(adjustments.filter(item => item.status === "active").map(item => item.cashEventId));
+  const invoices = events.filter(item => item.status === "expected" && parseDecimal(item.amount).greaterThan(0) && !adjustedIds.has(item.id));
+  const eventById = new Map(events.map(item => [item.id, item]));
 
   return <>
     <PageHeading eyebrow="What if" title="Scenario lab" intro="Keep real cash events intact while exploring a delayed invoice or an exchange-rate shock." />
@@ -118,6 +120,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
           {selected && savedShocks.length > 0 && <div className="scenario-saved" aria-label="Saved FX shocks"><h3>Saved in {selected.name}</h3><ul>{savedShocks.map(item => <li key={item.id}>{item.snapshot
               ? <>{item.shockPercent}% on {item.snapshot.baseCurrency}/{item.snapshot.quoteCurrency} · {item.snapshot.provider.toUpperCase()} {formatDate(item.snapshot.effectiveDate)} · <data value={item.snapshot.rate}>{formatRate(item.snapshot.rate)}</data></>
               : <>{item.shockPercent}% shock · rate snapshot not available</>}
+            {item.newerSnapshotAvailable && <> · <span className="state state-pending">Newer ECB rate available; this saved shock still uses its original snapshot.</span></>}
             {item.status === "invalid" && <> · <span className="state state-pending">Invalid</span></>}</li>)}</ul></div>}
         </section>
       </div>

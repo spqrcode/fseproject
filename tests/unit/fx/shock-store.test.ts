@@ -139,6 +139,7 @@ vi.mock("@/lib/db", () => ({
               quote_currency: snapshot ? snapshot.quote_currency : null,
               rate: snapshot ? snapshot.rate : null,
               effective_date: snapshot ? snapshot.effective_date : null,
+              newer_snapshot_available: false,
             };
           }),
         };
@@ -233,6 +234,7 @@ describe("Scenario FX shock database store", () => {
       const list = await getScenarioFxShocks(VALID_TOKEN, scenarioId);
       expect(list).toHaveLength(1);
       expect(list[0].id).toBe(shock.id);
+      expect(list[0].newerSnapshotAvailable).toBe(false);
       // The list says what the shock was saved against, from the stored snapshot, so a label can be written.
       expect(list[0].snapshot).toEqual({
         provider: "ecb", baseCurrency: "EUR", quoteCurrency: expect.stringMatching(/^(USD|SGD)$/),

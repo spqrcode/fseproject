@@ -41,6 +41,7 @@ export type PersistedFxShock = Readonly<{
   scenarioId: string;
   snapshotId: string;
   snapshot: ShockSnapshotSummary | null;
+  newerSnapshotAvailable: boolean;
   shockPercent: string;
   status: "active" | "invalid";
   createdAt: Date;
@@ -60,6 +61,7 @@ interface ShockRow {
   quote_currency?: string | null;
   rate?: string | null;
   effective_date?: string | Date | null;
+  newer_snapshot_available?: boolean;
 }
 
 interface JoinedShockRow extends ShockRow {
@@ -90,6 +92,7 @@ function rowToPersistedShock(row: ShockRow): PersistedFxShock {
     scenarioId: row.scenario_id,
     snapshotId: row.snapshot_id,
     snapshot: snapshotSummary(row),
+    newerSnapshotAvailable: row.newer_snapshot_available === true,
     shockPercent: decimalString(parseDecimal(row.shock_percent)),
     status,
     createdAt: row.created_at,
@@ -198,7 +201,16 @@ export async function getScenarioFxShocks(
     `SELECT sfs.id, sfs.scenario_id, sfs.snapshot_id, sfs.shock_percent::text,
             sfs.status, sfs.created_at, sfs.updated_at,
             fx.provider, fx.base_currency, fx.quote_currency, fx.rate::text AS rate,
-            fx.effective_date::text AS effective_date
+            fx.effective_date::text AS effective_date,
+            COALESCE((
+              SELECT newest.id <> sfs.snapshot_id
+                FROM fx_snapshots newest
+               WHERE newest.provider = fx.provider
+                 AND newest.base_currency = fx.base_currency
+                 AND newest.quote_currency = fx.quote_currency
+               ORDER BY newest.effective_date DESC, newest.fetched_at DESC
+               LIMIT 1
+            ), false) AS newer_snapshot_available
        FROM scenario_fx_shocks sfs
        JOIN scenarios sc ON sc.id = sfs.scenario_id
        JOIN workspaces w ON w.id = sc.workspace_id
