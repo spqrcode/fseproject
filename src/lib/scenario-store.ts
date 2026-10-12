@@ -8,6 +8,11 @@
  * An adjustment may be marked status='invalid' when business validation makes
  * it unusable. Hard-deleting the target event removes its adjustment through
  * the database foreign key so account/workspace cleanup cannot be blocked.
+ *
+ * An adjustment whose event has since been received, paid or cancelled stays
+ * 'active' in the table (nothing is written when it is read) but is returned
+ * with status 'not_applicable': the event is no longer a forecast event, so
+ * the override has nothing to move. The calculation skips it and reports it.
  */
 
 import "server-only";
@@ -57,7 +62,7 @@ function postgresCode(error: unknown) {
 }
 
 function rowToAdjustment(row: AdjustmentRow): DelayAdjustment {
-  const status = row.status === "active" || row.status === "invalid" ? row.status : "invalid";
+  const status = row.status === "active" || row.status === "invalid" || row.status === "not_applicable" ? row.status : "invalid";
   return Object.freeze({
     id: row.id,
     scenarioId: row.scenario_id,
@@ -136,9 +141,12 @@ export async function getAdjustments(
   // Join through sessions+scenarios to enforce ownership in one query.
   const result = await database().query<AdjustmentRow>(
     `SELECT sa.id, sa.scenario_id, sa.cash_event_id,
-            sa.date_override::text AS date_override, sa.status
+            sa.date_override::text AS date_override,
+            CASE WHEN sa.status = 'active' AND ce.status <> 'expected' THEN 'not_applicable'
+                 ELSE sa.status END AS status
        FROM scenario_adjustments sa
        JOIN scenarios sc ON sc.id = sa.scenario_id
+       JOIN cash_events ce ON ce.id = sa.cash_event_id AND ce.workspace_id = sa.workspace_id
        JOIN workspaces w ON w.id = sc.workspace_id
        JOIN sessions s ON s.user_id = w.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()

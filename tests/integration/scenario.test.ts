@@ -34,7 +34,6 @@ import {
 import {
   runForecast,
   runScenarioForecast,
-  InvalidAdjustmentError,
   parseCashEvent,
   type CashEvent as ForecastCashEvent,
 } from "@/lib/forecast";
@@ -344,7 +343,7 @@ describe("two scenarios targeting the same event", () => {
 // ---------------------------------------------------------------------------
 
 describe("invalid adjustments and safe deletion", () => {
-  it("invalidateAdjustment marks status=invalid and applyDelayAdjustment then throws", async () => {
+  it("invalidateAdjustment marks status=invalid; the scenario skips it and reports why instead of failing", async () => {
     const event = await aliceEvent("200", "2025-04-01");
     const scenario = await createScenario(alice, "Scenario with invalid adj");
     const adj = await addDelayAdjustment(alice, scenario.id, event.id, "2025-07-01");
@@ -357,20 +356,77 @@ describe("invalid adjustments and safe deletion", () => {
     const adjsAfter = await getAdjustments(alice, scenario.id);
     expect(adjsAfter[0].status).toBe("invalid");
 
-    // The domain layer must throw, not silently ignore
+    // The domain layer neither throws nor hides it: the scenario equals the base and the skip is reported.
     const events: ForecastCashEvent[] = [forecastEvent(event)];
     const baseForecast = runForecast({ ...BASE, events });
-    expect(() =>
-      runScenarioForecast({
-        scenarioId: scenario.id,
-        adjustments: adjsAfter,
-        baseEvents: events,
-        baseForecast,
-        startDate: BASE.startDate,
-        endDate: BASE.endDate,
-        currency: BASE.currency,
-      }),
-    ).toThrow(InvalidAdjustmentError);
+    const projection = runScenarioForecast({
+      scenarioId: scenario.id,
+      adjustments: adjsAfter,
+      baseEvents: events,
+      baseForecast,
+      startDate: BASE.startDate,
+      endDate: BASE.endDate,
+      currency: BASE.currency,
+    });
+    expect(projection.contributionDelta).toBe("0");
+    expect(projection.skipped).toEqual([{ adjustmentId: adj.id, cashEventId: event.id, reason: "invalid" }]);
+  });
+
+  it("settling the target event makes its adjustment not applicable, and the scenario still runs", async () => {
+    const settled = await aliceEvent("200", "2025-04-01");
+    const other = await aliceEvent("100", "2025-05-01");
+    const scenario = await createScenario(alice, "Settle after delay");
+    const adjSettled = await addDelayAdjustment(alice, scenario.id, settled.id, "2025-07-01");
+    const adjOther = await addDelayAdjustment(alice, scenario.id, other.id, "2025-08-01");
+
+    expect(await setCashEventStatus(alice, settled.id, "received")).not.toBeNull();
+
+    // Loading derives the state; nothing is written, so the stored row is still 'active'.
+    const adjustments = await getAdjustments(alice, scenario.id);
+    expect(adjustments.map((item) => [item.id, item.status])).toEqual([[adjSettled.id, "not_applicable"], [adjOther.id, "active"]]);
+    expect((await database().query("SELECT status FROM scenario_adjustments WHERE id = $1", [adjSettled.id])).rows[0].status).toBe("active");
+
+    // The forecast input returns only expected events, so the settled one is not in the list.
+    const expected = (await listCashEvents(alice)).filter((item) => item.status === "expected").map(forecastEvent);
+    expect(expected.map((item) => item.id)).toEqual([other.id]);
+    const baseForecast = runForecast({ ...BASE, events: expected });
+    const projection = runScenarioForecast({
+      scenarioId: scenario.id, adjustments, baseEvents: expected, baseForecast,
+      startDate: BASE.startDate, endDate: BASE.endDate, currency: BASE.currency,
+    });
+
+    expect(projection.skipped).toEqual([{ adjustmentId: adjSettled.id, cashEventId: settled.id, reason: "not_applicable" }]);
+    // The remaining adjustment still applies: 100 arrives on 1 August instead of 1 May.
+    const on = (result: typeof baseForecast, date: string) => result.timeline.find((point) => point.date === date)?.balance;
+    expect(on(baseForecast, "2025-06-01")).toBe("1100");
+    expect(on(projection.result, "2025-06-01")).toBe("1000");
+    expect(on(projection.result, "2025-08-01")).toBe("1100");
+  });
+
+  it("an adjustment on another account's event is skipped for this account's forecast, not a failure", async () => {
+    const secondAccount = (await createCashAccount(alice, { name: "Second", currency: "EUR", openingBalance: "0" }))!.id;
+    const onMain = await aliceEvent("100", "2025-05-01");
+    const onSecond = (await createCashEvent(alice, secondAccount, { description: "Other account", amount: "300", expectedDate: "2025-05-01" }))!;
+    const scenario = await createScenario(alice, "Two accounts");
+    const adjMain = await addDelayAdjustment(alice, scenario.id, onMain.id, "2025-08-01");
+    const adjSecond = await addDelayAdjustment(alice, scenario.id, onSecond.id, "2025-09-01");
+
+    const adjustments = await getAdjustments(alice, scenario.id);
+    expect(adjustments.map((item) => item.status)).toEqual(["active", "active"]);
+
+    // The forecast is per account; the scenario belongs to the workspace.
+    const mainEvents = (await listCashEvents(alice))
+      .filter((item) => item.accountId === aliceAccountId && item.status === "expected")
+      .map(forecastEvent);
+    const baseForecast = runForecast({ ...BASE, events: mainEvents });
+    const projection = runScenarioForecast({
+      scenarioId: scenario.id, adjustments, baseEvents: mainEvents, baseForecast,
+      startDate: BASE.startDate, endDate: BASE.endDate, currency: BASE.currency,
+    });
+
+    expect(projection.skipped).toEqual([{ adjustmentId: adjSecond.id, cashEventId: onSecond.id, reason: "not_in_forecast" }]);
+    expect(projection.result.timeline.find((point) => point.date === "2025-06-01")?.balance).toBe("1000");
+    expect(adjMain.status).toBe("active");
   });
 
   it("hard-deleting a cash event cascades its scenario adjustment", async () => {

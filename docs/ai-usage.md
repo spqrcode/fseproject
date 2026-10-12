@@ -184,3 +184,10 @@ Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify`
 - Review correction: the first revision changed the Forecast Engine to use the database statuses directly. After merging the latest `main`, the existing team decision showed that PR #14 owns the adapter mapping from `expected / received / paid / cancelled` to the engine's `pending / completed / cancelled` contract. The direct-status change was therefore rejected and corrected.
 - Student action: reviewed the PR comments, resolved the AI-usage merge conflict by retaining both records, selected the business rules and ran the complete local validation.
 - Validation: 100 Forecast domain tests and 186 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.
+
+## Scenario adjustments that no longer apply (PR #9 review, Bastian, 2026-10-12)
+
+Review correction: the first AI-assisted version of the scenario calculation deliberately threw `InvalidAdjustmentError` or `MissingEventError` "rather than silently ignoring the override", and its tests asserted the throw. Bastian pointed out that this breaks a whole scenario whenever an adjusted event is later received, paid or cancelled (his forecast input returns only expected events), and whenever an adjustment targets an event on another account (scenarios are per workspace, forecasts per account). The decision was wrong, not a bug in its implementation, and neither the AI nor the first review had tried it with data that changes after the adjustment.
+
+Change: adjustments that cannot apply are skipped and returned with a reason, `getAdjustments` derives `not_applicable` without writing, and `applyDelayAdjustment` stays strict. The old "throws" assertions for `runScenarioForecast` were replaced, not deleted: they now assert the skip and its reason, and two integration tests cover settle-after-delay and the two-account case. Validation (2026-10-12, local, PostgreSQL 16): lint and TypeScript clean, 256 unit tests, 129 integration tests, production build.
+
