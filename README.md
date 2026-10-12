@@ -8,6 +8,22 @@ The implemented foundation provides account registration, login/logout, database
 
 The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the three MVP views, Liquidity overview, Cash events and Scenario lab, which show a not-connected state until their parts are delivered, a Workspace page, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
 
+## Deployed application and demo access
+
+- **URL:** https://fseproject-staging.vercel.app (staging, a Vercel deployment of this repository with a managed PostgreSQL database in Frankfurt). How it is built, configured and promoted is in [deployment](docs/deployment.md). The staging address points at the deployment someone assigned to it, so it can lag `main`; the status table below says what is expected to be live.
+- **Demo access:** there is no shared demo account and no credentials are committed. Open `/register`, create an account with any address and a 15–128 character passphrase (no email is sent and the address is not verified), and sign in. Use a throwaway address and a passphrase you do not use elsewhere.
+- **Suggested check in a private window:** `/dashboard` redirects to `/login` when signed out; register, sign in, name a workspace, change the reporting currency and appearance in settings, sign out, sign in again and confirm everything persisted; open another browser and confirm the second account sees none of it.
+
+Status of the three business views on `main`, as of 12 October 2026. Update this table when a pull request merges.
+
+| View | On `main` | Pull request |
+| --- | --- | --- |
+| Liquidity overview (`/dashboard`) | Placeholder: workspace and currency status only | #20, depends on #14 and #19 |
+| Cash events (`/cash-events`) | Placeholder; the data layer and its tests are on `main` | #16 |
+| Scenario Lab (`/scenarios`) | Placeholder | #9, #17, #18 |
+
+A seeded demo dataset is not provided yet; see [presentation feedback](docs/presentation-feedback.md) for open work.
+
 ## Local setup
 
 Prerequisites: Node.js 24, npm, and a running PostgreSQL 16 server. PostgreSQL must be installed separately; the application does not install or start a database service.
@@ -44,12 +60,13 @@ Node 24 is declared in `.nvmrc`, `package.json` (also used by Vercel), and GitHu
 ## Engineering documentation
 
 - [Requirements and traceability](docs/requirements.md)
-- [Architecture](docs/architecture.md) and [database](docs/database.md)
+- [Architecture](docs/architecture.md) (component diagram) and [database](docs/database.md) (entity-relationship diagrams)
 - [Decisions](docs/decisions.md), [security](docs/security.md), and [limitations](docs/limitations.md)
 - [Testing](docs/testing.md) and [deployment](docs/deployment.md)
 - [Forecast Engine working draft](docs/forecast-engine.md)
 - [Product experience](docs/product-experience.md)
-- [AI use and corrections](docs/ai-usage.md)
+- [AI use and corrections](docs/ai-usage.md); coding-agent instructions are versioned in [CLAUDE.md](CLAUDE.md)
+- [Presentation feedback and decisions](docs/presentation-feedback.md)
 - [Issue 1 evidence](docs/issue-1-evidence.md)
 
 Work uses small feature branches and reviewed PRs in [spqrcode/fseproject](https://github.com/spqrcode/fseproject). Student review and the later financial features remain separate work.
