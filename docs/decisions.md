@@ -111,6 +111,24 @@ Agreed by the team for connecting the cash events to the forecast engine. PR #12
 4. **Overdue `expected` events are counted on the forecast start date and flagged as overdue for the UI.** An overdue event is an `expected` one dated before the forecast start. Why: the money has not moved yet, so it still affects future cash; dropping it would overstate or understate the balance, and keeping it on its old date would put it in the past of the forecast. Showing the flag lets the user mark it received, paid or cancelled. Alternative: ignore overdue events (rejected, silently wrong totals). Accepted cost: the start date is an assumption about when the overdue amount will really move, so it can show a low balance earlier than reality, and the flag must be visible or the shifted date will look like a data error.
 5. **Settled events are immutable.** An event that is `received`, `paid` or `cancelled` can be neither edited nor deleted; only `expected` events can. Own settled events raise `StatusConflictError`, and another user's or a missing event is still `null`/`false`. Reason (review feedback from Jiaxin on PR #10): settled events feed the forecast's starting balance, so changing or removing one would silently change every forecast that starts after it. The status condition sits in the `WHERE` clause of the `UPDATE` and `DELETE`, so the check and the change are one atomic statement. Alternative: allow edits and rely on the user's care (rejected, history of money that has moved would become editable), or a database trigger (rejected for now, like the status order it is harder to read and test; a privileged connection can still bypass the rule). Accepted cost: a mistake in a settled event cannot be fixed in place; it is corrected with a new event, so the list keeps both. Tests: `tests/integration/cash-events.test.ts`.
 
+## 2026-10-08 — Delayed-invoice scenarios are immutable workspace overlays
+
+A delayed-invoice scenario stores a later date for one expected positive cash event; it never updates or copies the original event. The scenario calculation replaces the date only in a new in-memory event list, so the persisted event and base forecast remain unchanged. Alternatives: update the event and restore it later (rejected, concurrent users and failed requests could corrupt the base data), or copy every event into each scenario (rejected, duplicated data can drift).
+
+Scenarios and events meet through composite `(id, workspace_id)` foreign keys. Application queries also start from the unexpired session and join through its workspace. The duplicated workspace column costs one UUID per adjustment but makes cross-workspace links impossible even if an ownership predicate is accidentally omitted. Only expected income can be delayed, and the new date must be strictly later; the eligibility check and insert are one SQL statement. Migration 006 remains reserved for FX snapshots and migration 007 owns scenarios and their adjustments.
+
+### 2026-10-12 — An adjustment that cannot apply is skipped and reported, not thrown (review of PR #9)
+
+**Decision.** `runScenarioForecast` applies only the adjustments that fit the forecast and returns the others in `skipped` with a reason: `invalid`, `not_applicable` (its event is no longer `expected`) or `not_in_forecast` (its event is not in the account's event list). `getAdjustments` derives `not_applicable` when it reads; nothing is written. `applyDelayAdjustment` stays strict.
+
+**Requirement.** A scenario must keep working when the events around it change (US-03, isolation) and must not hide a skipped assumption.
+
+**Alternatives.** Throwing, the first version: one settled event, or an adjustment for another account's event, made the whole scenario fail. Writing a new status when an event is settled: needs a migration and a write on every settle. Dropping the adjustment silently: the person would not know an assumption was ignored.
+
+**Reason and trade-off.** Scenarios belong to the workspace but a forecast belongs to one account, and events are settled after adjustments are saved, so "does not apply here" is normal, not an error. The cost is that callers must show `skipped`. The derived state costs one join on read and cannot go stale.
+
+**Verification.** Unit tests for each reason and for purity; integration tests for adjustment → settle → scenario still runs, and for two accounts. Found by Bastian's review of #9.
+
 ## 2026-10-10 — Forecast input implemented; a settled event's date is the date the money moved
 
 Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`) and `src/lib/forecast-input.ts` (`toEngineStatus`). Since PR #12 (engine) and PR #19 (`toForecastInput`) are merged, the store's output goes through `toForecastInput` into `runForecast`; an integration test in `tests/integration/forecast-input.test.ts` runs the whole path.
