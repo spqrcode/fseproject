@@ -83,6 +83,16 @@ test("rates are rounded for reading, the exact value is kept, and a saved shock 
     await expect(saved).toContainText("ECB 1 Jan 2099");
     await expect(saved).toContainText("1.0856");
     await expect(saved).not.toContainText("snapshot");
+    await expect(saved).not.toContainText("Newer ECB rate available");
+
+    // A correction for the same ECB date should flag the newer cached rate, but not rebase the saved shock.
+    await account.db.query(`INSERT INTO fx_snapshots (provider, base_currency, quote_currency, rate, effective_date, fetched_at)
+      VALUES ('ecb','EUR','USD',1.0910,$1,now() + interval '1 minute')`, [effective]);
+    await page.reload();
+    await expect(saved).toContainText("Newer ECB rate available");
+    await expect(saved).toContainText("ECB 1 Jan 2099");
+    await expect(saved).toContainText("1.0856");
+    await expect(saved).not.toContainText("1.0910");
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
 
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
@@ -209,4 +219,3 @@ for (const scheme of ["light", "dark"] as const) {
     expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(" ")).join(" | ")}`)).toEqual([]);
   });
 }
-

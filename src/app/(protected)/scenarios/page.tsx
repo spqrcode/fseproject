@@ -35,23 +35,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
     getWorkspace(token), getReportingCurrency(token), getScenarios(token), listCashEvents(token), listCashAccounts(token),
   ]);
   const selected = scenarios.find(item => item.id === params.scenario) ?? scenarios[0];
-  const [adjustments, savedShocks] = selected
-    ? await Promise.all([getAdjustments(token, selected.id), getScenarioFxShocks(token, selected.id)])
-    : [[], []];
-  const adjustedIds = new Set(adjustments.filter(item => item.status === "active").map(item => item.cashEventId));
-  const invoices = events.filter(item => item.status === "expected" && parseDecimal(item.amount).greaterThan(0) && !adjustedIds.has(item.id));
-  const eventById = new Map(events.map(item => [item.id, item]));
-  // The comparison is per account: a scenario belongs to the workspace, a forecast to one account. Only the
-  // caller's own accounts can be chosen; an unknown id falls back to the first one and the store checks again.
-  const comparedAccount = accounts.find(item => item.id === firstParam(params.account)) ?? accounts[0];
-  const horizon = parseHorizon(params.days);
-  const comparison = selected && comparedAccount && adjustments.length > 0
-    ? await getScenarioComparison(token, { scenarioId: selected.id, accountId: comparedAccount.id, ...forecastWindow(new Date(), horizon) })
-    : null;
-  const described = adjustments.flatMap(item => {
-    const event = eventById.get(item.cashEventId);
-    return event ? [{ id: item.id, description: event.description, originalDate: event.expectedDate, overrideDate: item.dateOverride }] : [];
-  });
+  const adjustmentsPromise = selected ? getAdjustments(token, selected.id) : Promise.resolve([]);
   const base = reportingCurrencySchema.safeParse(params.base).data ?? "EUR";
   const quote = reportingCurrencySchema.safeParse(params.quote).data ?? (base === "USD" ? "SGD" : "USD");
   const shock = params.shock ?? "-10";
@@ -68,6 +52,24 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
       }
     }
   }
+  const [adjustments, savedShocks] = await Promise.all([
+    adjustmentsPromise,
+    selected ? getScenarioFxShocks(token, selected.id) : Promise.resolve([]),
+  ]);
+  const adjustedIds = new Set(adjustments.filter(item => item.status === "active").map(item => item.cashEventId));
+  const invoices = events.filter(item => item.status === "expected" && parseDecimal(item.amount).greaterThan(0) && !adjustedIds.has(item.id));
+  const eventById = new Map(events.map(item => [item.id, item]));
+  // The comparison is per account: a scenario belongs to the workspace, a forecast to one account. Only the
+  // caller's own accounts can be chosen; an unknown id falls back to the first one and the store checks again.
+  const comparedAccount = accounts.find(item => item.id === firstParam(params.account)) ?? accounts[0];
+  const horizon = parseHorizon(params.days);
+  const comparison = selected && comparedAccount && adjustments.length > 0
+    ? await getScenarioComparison(token, { scenarioId: selected.id, accountId: comparedAccount.id, ...forecastWindow(new Date(), horizon) })
+    : null;
+  const described = adjustments.flatMap(item => {
+    const event = eventById.get(item.cashEventId);
+    return event ? [{ id: item.id, description: event.description, originalDate: event.expectedDate, overrideDate: item.dateOverride }] : [];
+  });
 
   return <>
     <PageHeading eyebrow="What if" title="Scenario lab" intro="Keep real cash events intact while exploring a delayed invoice or an exchange-rate shock." />
@@ -149,6 +151,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
           {selected && savedShocks.length > 0 && <div className="scenario-saved" aria-label="Saved FX shocks"><h3>Saved in {selected.name}</h3><ul>{savedShocks.map(item => <li key={item.id}>{item.snapshot
               ? <>{item.shockPercent}% on {item.snapshot.baseCurrency}/{item.snapshot.quoteCurrency} · {item.snapshot.provider.toUpperCase()} {formatDate(item.snapshot.effectiveDate)} · <data value={item.snapshot.rate}>{formatRate(item.snapshot.rate)}</data></>
               : <>{item.shockPercent}% shock · rate snapshot not available</>}
+            {item.newerSnapshotAvailable && <> · <span className="state state-pending">Newer ECB rate available; this saved shock still uses its original snapshot.</span></>}
             {item.status === "invalid" && <> · <span className="state state-pending">Invalid</span></>}</li>)}</ul></div>}
         </section>
       </div>
