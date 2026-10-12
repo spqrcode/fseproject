@@ -116,3 +116,16 @@ Agreed by the team for connecting the cash events to the forecast engine. PR #12
 A delayed-invoice scenario stores a later date for one expected positive cash event; it never updates or copies the original event. The scenario calculation replaces the date only in a new in-memory event list, so the persisted event and base forecast remain unchanged. Alternatives: update the event and restore it later (rejected, concurrent users and failed requests could corrupt the base data), or copy every event into each scenario (rejected, duplicated data can drift).
 
 Scenarios and events meet through composite `(id, workspace_id)` foreign keys. Application queries also start from the unexpired session and join through its workspace. The duplicated workspace column costs one UUID per adjustment but makes cross-workspace links impossible even if an ownership predicate is accidentally omitted. Only expected income can be delayed, and the new date must be strictly later; the eligibility check and insert are one SQL statement. Migration 006 remains reserved for FX snapshots and migration 007 owns scenarios and their adjustments.
+
+### 2026-10-12 — An adjustment that cannot apply is skipped and reported, not thrown (review of PR #9)
+
+**Decision.** `runScenarioForecast` applies only the adjustments that fit the forecast and returns the others in `skipped` with a reason: `invalid`, `not_applicable` (its event is no longer `expected`) or `not_in_forecast` (its event is not in the account's event list). `getAdjustments` derives `not_applicable` when it reads; nothing is written. `applyDelayAdjustment` stays strict.
+
+**Requirement.** A scenario must keep working when the events around it change (US-03, isolation) and must not hide a skipped assumption.
+
+**Alternatives.** Throwing, the first version: one settled event, or an adjustment for another account's event, made the whole scenario fail. Writing a new status when an event is settled: needs a migration and a write on every settle. Dropping the adjustment silently: the person would not know an assumption was ignored.
+
+**Reason and trade-off.** Scenarios belong to the workspace but a forecast belongs to one account, and events are settled after adjustments are saved, so "does not apply here" is normal, not an error. The cost is that callers must show `skipped`. The derived state costs one join on read and cannot go stale.
+
+**Verification.** Unit tests for each reason and for purity; integration tests for adjustment → settle → scenario still runs, and for two accounts. Found by Bastian's review of #9.
+

@@ -14,6 +14,7 @@ import {
   scenarioContribution,
   InvalidAdjustmentError,
   MissingEventError,
+  partitionAdjustments,
   type DelayAdjustment,
 } from "@/lib/forecast/scenario";
 
@@ -350,27 +351,71 @@ describe("invalid/cancelled adjustment errors", () => {
     expect(() => applyDelayAdjustment(orphanAdjustment, [event])).toThrow("nonexistent-id");
   });
 
-  it("throws InvalidAdjustmentError when runScenarioForecast encounters an invalid adjustment", () => {
+  it("applyDelayAdjustment also refuses an adjustment whose event is no longer expected", () => {
     const event = makeEvent({ id: "e1" });
-    const baseForecast = runForecast({ ...BASE_INPUT, events: [event] });
-    const badAdjustment: DelayAdjustment = {
-      id: "adj-bad",
-      scenarioId: "sc-1",
-      cashEventId: "e1",
-      dateOverride: "2025-06-01",
-      status: "invalid",
+    const settled: DelayAdjustment = {
+      id: "adj-settled", scenarioId: "sc-1", cashEventId: "e1", dateOverride: "2025-05-01", status: "not_applicable",
     };
-    expect(() =>
-      runScenarioForecast({
-        scenarioId: "sc-1",
-        adjustments: [badAdjustment],
-        baseEvents: [event],
-        baseForecast,
-        startDate: BASE_INPUT.startDate,
-        endDate: BASE_INPUT.endDate,
-        currency: BASE_INPUT.currency,
-      }),
-    ).toThrow(InvalidAdjustmentError);
+    expect(() => applyDelayAdjustment(settled, [event])).toThrow(InvalidAdjustmentError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6b. An adjustment that cannot apply must not break the scenario, and is reported
+// ---------------------------------------------------------------------------
+
+describe("adjustments that do not apply to a forecast", () => {
+  const params = (adjustments: DelayAdjustment[], baseEvents: ReturnType<typeof makeEvent>[]) => ({
+    scenarioId: "sc-1",
+    adjustments,
+    baseEvents,
+    baseForecast: runForecast({ ...BASE_INPUT, events: baseEvents }),
+    startDate: BASE_INPUT.startDate,
+    endDate: BASE_INPUT.endDate,
+    currency: BASE_INPUT.currency,
+  });
+  const delay = (id: string, cashEventId: string, status: DelayAdjustment["status"] = "active"): DelayAdjustment => ({
+    id, scenarioId: "sc-1", cashEventId, dateOverride: "2025-06-01", status,
+  });
+
+  it("skips an invalid adjustment instead of throwing and says why", () => {
+    const event = makeEvent({ id: "e1", amount: "1000", expectedDate: "2025-02-01" });
+    const projection = runScenarioForecast(params([delay("adj-bad", "e1", "invalid")], [event]));
+    expect(projection.contributionDelta).toBe("0");
+    expect(projection.skipped).toEqual([{ adjustmentId: "adj-bad", cashEventId: "e1", reason: "invalid" }]);
+  });
+
+  it("skips an adjustment whose event has been settled since it was saved", () => {
+    // The settled event is no longer returned as an expected event, so only e2 is in the forecast.
+    const kept = makeEvent({ id: "e2", amount: "500", expectedDate: "2025-02-10" });
+    const projection = runScenarioForecast(params([delay("adj-settled", "e1", "not_applicable"), delay("adj-ok", "e2")], [kept]));
+    expect(projection.skipped).toEqual([{ adjustmentId: "adj-settled", cashEventId: "e1", reason: "not_applicable" }]);
+    // The other adjustment is still applied: e2 moves to 1 June, which is inside the horizon, so the delta is zero
+    // but the balance on 10 February no longer includes it.
+    expect(projection.result.timeline.find((point) => point.date === "2025-02-10")?.balance)
+      .toBe(runForecast({ ...BASE_INPUT, events: [] }).timeline.find((point) => point.date === "2025-02-10")?.balance);
+  });
+
+  it("skips an adjustment for an event that is not in this forecast's event list, such as another account's", () => {
+    const here = makeEvent({ id: "e1", amount: "400", expectedDate: "2025-02-01" });
+    const projection = runScenarioForecast(params([delay("adj-other", "event-on-another-account"), delay("adj-here", "e1")], [here]));
+    expect(projection.skipped).toEqual([{ adjustmentId: "adj-other", cashEventId: "event-on-another-account", reason: "not_in_forecast" }]);
+    expect(projection.skipped).toHaveLength(1);
+  });
+
+  it("reports nothing skipped when every adjustment applies", () => {
+    const event = makeEvent({ id: "e1", amount: "1000", expectedDate: "2025-02-01" });
+    expect(runScenarioForecast(params([delay("adj-ok", "e1")], [event])).skipped).toEqual([]);
+  });
+
+  it("partitionAdjustments is pure: it does not change its inputs", () => {
+    const event = makeEvent({ id: "e1" });
+    const adjustments = [delay("a", "e1"), delay("b", "gone"), delay("c", "e1", "invalid")];
+    const copy = JSON.stringify(adjustments);
+    const { applicable, skipped } = partitionAdjustments(adjustments, [event]);
+    expect(applicable.map((item) => item.id)).toEqual(["a"]);
+    expect(skipped.map((item) => item.reason)).toEqual(["not_in_forecast", "invalid"]);
+    expect(JSON.stringify(adjustments)).toBe(copy);
   });
 });
 

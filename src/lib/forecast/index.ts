@@ -35,7 +35,9 @@ export {
 
 export {
   applyDelayAdjustment,
+  partitionAdjustments,
   runScenarioForecast,
+  type SkippedAdjustment,
   scenarioContribution,
   InvalidAdjustmentError,
   MissingEventError,
