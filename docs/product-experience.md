@@ -1,6 +1,6 @@
 # Product experience
 
-Owner: Gabriel (Product Experience). Scope of this increment: the FinTwin Global interface shell, shared presentation rules, and the reporting currency preference. Forecast and scenario logic belong to Haina's Forecast Engine and Jiaxin's Scenarios & Exchange Rates increments and are not implemented here.
+Owner: Gabriel (Product Experience), with Cash events integration by Jiaxin. The product layer owns presentation and user interaction. Forecast calculations belong to Haina's Forecast Engine, and scenario and FX calculations belong to Jiaxin's domain services.
 
 ## Information architecture
 
@@ -9,18 +9,33 @@ Owner: Gabriel (Product Experience). Scope of this increment: the FinTwin Global
 | `/` | Public home page: what FinTwin Global is, which views are available or in development, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
 | `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented; the forecast is shown as not connected until the engine is delivered |
-| `/cash-events` | Planned income and expenses by date | Page and navigation ready; honest empty state until cash events are stored |
+| `/cash-events` | Cash accounts and planned income and expenses by date | Connected to the session-scoped cash-event store; create, edit, settle, cancel and delete expected events |
 | `/scenarios` | Scenario lab: what-if and FX scenario comparison against the base case | Page and navigation ready; honest empty state until scenario analysis is connected |
-| `/workspace` | Workspace name (stored in the `portfolios` table until the workspace schema replaces it) | Existing form, renamed from `/portfolio` |
+| `/workspace` | Workspace name stored in `workspaces` | Existing form, renamed from `/portfolio` |
 | `/settings` | Reporting currency, appearance and active sessions | Implemented |
 
 Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/scenarios/compare`).
 
 Section names follow the MVP views agreed by the team on 2 October 2026: Liquidity overview, Cash events and Scenario lab, then Workspace (which replaces the Portfolio page of the earlier project) and Settings. The forecast has no page of its own, because the projected balance is the main content of the liquidity overview. Routes keep short, stable paths (`/dashboard` is where sign-in lands), so renaming a label never breaks a link.
 
-The home page lists the three MVP views as in development and names what is available today, so a visitor is never promised a feature that does not exist yet. The logo on the sign-in and registration pages links back to it.
+The home page marks Cash events as available and keeps the forecast and Scenario lab in development. The logo on the sign-in and registration pages links back to it.
 
-Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the page states what will appear and that nothing is estimated today.
+Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so forecast and scenario pages state what will appear and that nothing is estimated today. The Cash events page shows only persisted account and event values.
+
+## US-11: cash accounts and events
+
+As a signed-in user, I can record where cash is held and add dated income and expenses, so that the forecast has explicit, reviewable inputs.
+
+Acceptance criteria:
+- Cash accounts can be created only inside the signed-in user's workspace and use EUR, USD or SGD.
+- Opening balances and event amounts remain decimal strings; income is positive, expenses negative and zero is rejected.
+- New events start as `expected`. Expected events can be edited, deleted, marked received or paid according to their sign, or cancelled.
+- Received, paid and cancelled events remain visible as an audit trail and cannot be edited or deleted.
+- Deleting takes a second step (a native disclosure with "Delete permanently"), and the confirmation points to cancelling as the way to keep a record. Each action's accessible name includes the event (for example "Delete: Office rent"), starting with the visible words. An action on an event that has already changed is answered with a message rather than ignored. Dates use the shared `formatDate`.
+- A user never supplies a workspace or user ID. Every action resolves ownership from the session and verifies the request origin.
+- Empty, validation, success and error states are announced accessibly, and the page remains usable on a phone-sized viewport.
+
+Implementation: `src/app/(protected)/cash-events/page.tsx`, `src/app/actions/cash-events.ts`, the three `cash-*` components, and `tests/e2e/cash-events.spec.ts`.
 
 ## Visual design
 
@@ -109,7 +124,7 @@ A skip link is the first keyboard stop on every page. Headings follow one `h1` p
 
 ## How the Forecast Engine and Scenarios & FX plug in
 
-1. Replace the empty state with the real content: the forecast in `src/app/(protected)/dashboard/page.tsx`, events in `cash-events/page.tsx`, scenarios in `scenarios/page.tsx`. The route, navigation, loading and error states already exist.
+1. Replace the remaining empty states with the real forecast in `src/app/(protected)/dashboard/page.tsx` and scenario comparison in `scenarios/page.tsx`. Cash events are connected already.
 2. Read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
 3. Pass amounts as decimal strings from the calculation layer; pass `null` when a value is unavailable.
 4. Update the module row on the liquidity overview from "Not connected yet" to the real status.
