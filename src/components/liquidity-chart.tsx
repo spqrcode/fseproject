@@ -15,7 +15,8 @@ export function LiquidityChart({ result }: { result: ForecastResult }) {
       <line className="threshold" x1="0" x2={chart.width} y1={chart.thresholdY} y2={chart.thresholdY} />
       {chart.dangerX !== null && <line className="breach" x1={chart.dangerX} x2={chart.dangerX} y1="0" y2={chart.height} />}
       <path className="balance" d={chart.path} vectorEffect="non-scaling-stroke" />
-      <circle className="lowest" cx={chart.minimum.x} cy={chart.minimum.y} r="4" />
+      {/* A tick rather than a dot: the drawing is stretched to the width, which would turn a circle into an ellipse. */}
+      <line className="lowest" x1={chart.minimum.x} x2={chart.minimum.x} y1={chart.minimum.y - 10} y2={chart.minimum.y + 10} />
     </svg>
     <figcaption>
       <span>{formatDate(first)}</span>

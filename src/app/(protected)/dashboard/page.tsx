@@ -32,7 +32,7 @@ export default async function LiquidityOverview({ searchParams }: { searchParams
     { title: "Workspace", text: workspace ? "Your workspace is saved and only you can access it." : "Name your workspace to get started.", state: workspace ? "Ready" : "Not created", tone: workspace ? "ready" : "pending", href: "/workspace", action: "Open workspace" },
     { title: "Reporting currency", text: `Figures will be reported in ${currencyLabel(reporting)}. Until exchange-rate conversion is connected, each forecast is shown in its account's currency.`, state: reporting, tone: "value", href: "/settings", action: "Change currency" },
     { title: "Cash events", text: accounts.length > 0 ? "Accounts and planned income and expenses feed the forecast above." : "Add a cash account, then record expected income and expenses.", state: accounts.length > 0 ? `${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}` : "Set up", tone: accounts.length > 0 ? "ready" : "pending", href: "/cash-events", action: "Open cash events" },
-    { title: "Scenario lab", text: "What-if scenarios, including delayed invoices and exchange-rate shocks.", state: workspace ? "Preview" : "Set up", tone: workspace ? "ready" : "pending", href: "/scenarios", action: "Open scenario lab" },
+    { title: "Scenario lab", text: "What-if scenarios, including exchange-rate shocks, will appear once scenario analysis is delivered.", state: "Not connected yet", tone: "pending", href: "/scenarios", action: "Open scenario lab" },
   ];
   return <>
     <PageHeading eyebrow="Liquidity" title="Liquidity overview" intro={workspace ? workspace.name : "Your financial twin starts here."}>

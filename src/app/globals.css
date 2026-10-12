@@ -237,7 +237,7 @@ button:disabled { opacity: .6; cursor: progress; }
 .forecast-chart .threshold { stroke: var(--danger); stroke-width: 1; stroke-dasharray: 4 5; vector-effect: non-scaling-stroke; }
 .forecast-chart .zero { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .forecast-chart .breach { stroke: var(--danger); stroke-width: 1; stroke-dasharray: 2 4; vector-effect: non-scaling-stroke; }
-.forecast-chart .lowest { fill: var(--surface); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.forecast-chart .lowest { stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; }
 .forecast-chart figcaption { display: flex; justify-content: space-between; gap: 16px; margin-top: 10px; color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
 .legend { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .key { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--ink); }
