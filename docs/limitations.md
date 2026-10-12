@@ -14,7 +14,11 @@ A cash event's status can only move once, from `expected` to `received`, `paid` 
 
 ## Forecast input
 
-`getForecastInput` serves one account in one currency; there is no combined view across accounts or currencies yet. Forecasts cover at most 366 dates, counting both the first and the last day, between 2000 and 2100. The starting balance can be negative, which the forecast engine in the open PR #12 does not accept yet, and that engine ignores the workspace's danger threshold. The engine is not called from the application yet.
+`getForecastInput` serves one account in one currency; there is no combined view across accounts or currencies yet. Forecasts cover at most 366 dates, counting both the first and the last day, between 2000 and 2100. The engine (PR #12) accepts a negative starting balance and the workspace's danger threshold. The Liquidity overview calls it through `src/lib/liquidity-forecast.ts` (store, then the adapter of PR #19, then `runForecast`).
+
+## Liquidity overview
+
+One account at a time, in that account's own currency: amounts are not converted into the reporting currency yet, and the page says so. The workspace danger threshold is an amount in the reporting currency (decision 2 of 2026-10-08) but is applied unconverted to an account in another currency; the page says this too. Both are fixed by the later FX integration layer. Chart coordinates use floating point for pixel positions only; every amount shown as text is formatted from the exact decimal string. The forecast always starts on today's UTC date.
 
 ## Exchange rates
 

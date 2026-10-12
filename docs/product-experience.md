@@ -8,7 +8,7 @@ Owner: Gabriel (Product Experience). Scope of this increment: the FinTwin Global
 | --- | --- | --- |
 | `/` | Public home page: what FinTwin Global is, which views are available or in development, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
-| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented; the forecast is shown as not connected until the engine is delivered |
+| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented: one account's deterministic forecast for 30, 90, 180 or 365 days (balance today, lowest point, closing balance, runway, danger threshold, overdue events, a step chart and a day-by-day table); an empty state asks for a cash account when there is none |
 | `/cash-events` | Planned income and expenses by date | Page and navigation ready; honest empty state until cash events are stored |
 | `/scenarios` | Scenario lab: what-if and FX scenario comparison against the base case | Page and navigation ready; honest empty state until scenario analysis is connected |
 | `/workspace` | Workspace name (stored in the `portfolios` table until the workspace schema replaces it) | Existing form, renamed from `/portfolio` |
