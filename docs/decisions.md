@@ -119,9 +119,9 @@ Scenarios and events meet through composite `(id, workspace_id)` foreign keys. A
 
 ### 2026-10-12 — An adjustment that cannot apply is skipped and reported, not thrown (review of PR #9)
 
-**Decision.** `runScenarioForecast` applies only the adjustments that fit the forecast and returns the others in `skipped` with a reason: `invalid`, `not_applicable` (its event is no longer `expected`) or `not_in_forecast` (its event is not in the account's event list). `getAdjustments` derives `not_applicable` when it reads; nothing is written. `applyDelayAdjustment` stays strict.
+**Decision.** `runScenarioForecast` applies only the adjustments that fit the forecast and returns the others in `skipped` with a reason: `invalid`, `not_applicable` (its event is no longer `expected`, or was edited so that it is no longer income or no longer earlier than the override) or `not_in_forecast` (its event is not in the account's event list). `getAdjustments` derives `not_applicable` when it reads; nothing is written. `applyDelayAdjustment` stays strict.
 
-**Requirement.** A scenario must keep working when the events around it change (US-03, isolation) and must not hide a skipped assumption.
+**Requirement.** A scenario must keep working when the events around it change (US-12, isolation) and must not hide a skipped assumption.
 
 **Alternatives.** Throwing, the first version: one settled event, or an adjustment for another account's event, made the whole scenario fail. Writing a new status when an event is settled: needs a migration and a write on every settle. Dropping the adjustment silently: the person would not know an assumption was ignored.
 

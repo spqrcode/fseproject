@@ -6,7 +6,7 @@ import { Brand } from "@/components/brand";
 
 const views = [
   { title: "Liquidity overview", text: "Your projected balance over time, its lowest point and how long your cash lasts.", state: "In development", tone: "pending" },
-  { title: "Cash events", text: "Planned income and expenses by date, each in its own currency.", state: "In development", tone: "pending" },
+  { title: "Cash events", text: "Record cash accounts and dated income or expenses, each in its own currency.", state: "Available", tone: "ready" },
   { title: "Scenario lab", text: "What-if comparisons against your base case, such as a delayed invoice or an exchange-rate shock.", state: "In development", tone: "pending" },
 ];
 const principles = [
@@ -42,7 +42,7 @@ export default async function Home() {
             <p className={`state state-${view.tone}`}>{view.state}</p>
           </li>)}
         </ol>
-        <p className="views-note">Available today: a private account, your workspace and the reporting currency in euro, US dollar or Singapore dollar.</p>
+        <p className="views-note">Available today: a private account, workspace, cash events and reporting currency in euro, US dollar or Singapore dollar.</p>
       </section>
       <section className="landing-principles" aria-labelledby="principles-heading">
         <h2 id="principles-heading">How it is built</h2>

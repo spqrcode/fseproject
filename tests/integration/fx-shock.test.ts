@@ -150,6 +150,40 @@ describe("Scenario FX shock persistence (PostgreSQL)", () => {
     expect(dbRow.rows[0].status).toBe("active");
   });
 
+  it("labels a saved shock when a newer cached rate exists without changing its snapshot", async () => {
+    const shock = await addScenarioFxShock(token, scenarioId, snapshotId, "-10");
+    expect((await getScenarioFxShocks(token, scenarioId))[0].newerSnapshotAvailable).toBe(false);
+
+    const laterFetch = new Date(Date.now() + 60_000);
+    await upsertSnapshot("ecb", {
+      baseCurrency: "EUR", quoteCurrency: "SGD", rate: "1.50", effectiveDate: "2026-10-03",
+    }, laterFetch);
+    expect((await getScenarioFxShocks(token, scenarioId))[0].newerSnapshotAvailable).toBe(false);
+
+    // Re-fetching the same observation keeps the same ID and is not a new rate.
+    const repeated = await upsertSnapshot("ecb", {
+      baseCurrency: "EUR", quoteCurrency: "USD", rate: "1.1225", effectiveDate: "2026-10-02",
+    }, laterFetch);
+    expect(repeated.id).toBe(snapshotId);
+    expect((await getScenarioFxShocks(token, scenarioId))[0].newerSnapshotAvailable).toBe(false);
+
+    // ECB can correct a rate on the same effective date: date comparison alone would miss this.
+    await upsertSnapshot("ecb", {
+      baseCurrency: "EUR", quoteCurrency: "USD", rate: "1.1300", effectiveDate: "2026-10-02",
+    }, new Date(laterFetch.getTime() + 1000));
+    const corrected = (await getScenarioFxShocks(token, scenarioId))[0];
+    expect(corrected.newerSnapshotAvailable).toBe(true);
+    expect(corrected.snapshotId).toBe(snapshotId);
+    expect(corrected.snapshot?.rate).toMatch(/^1\.12250*$/);
+    expect(corrected.snapshot?.effectiveDate).toBe("2026-10-02");
+    expect((await evaluateScenarioFxShock(token, scenarioId, shock.id)).sourceRate).toBe("1.1225");
+
+    await upsertSnapshot("ecb", {
+      baseCurrency: "EUR", quoteCurrency: "USD", rate: "1.1400", effectiveDate: "2026-10-03",
+    }, new Date(laterFetch.getTime() + 2000));
+    expect((await getScenarioFxShocks(token, scenarioId))[0].newerSnapshotAvailable).toBe(true);
+  });
+
   it("enforces database CHECK constraint rejecting shock_percent <= -100", async () => {
     await expect(
       database().query(

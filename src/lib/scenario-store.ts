@@ -9,10 +9,14 @@
  * it unusable. Hard-deleting the target event removes its adjustment through
  * the database foreign key so account/workspace cleanup cannot be blocked.
  *
- * An adjustment whose event has since been received, paid or cancelled stays
- * 'active' in the table (nothing is written when it is read) but is returned
- * with status 'not_applicable': the event is no longer a forecast event, so
- * the override has nothing to move. The calculation skips it and reports it.
+ * An adjustment that no longer fits its event stays 'active' in the table
+ * (nothing is written when it is read) but is returned with status
+ * 'not_applicable'. That is the case when the event has been received, paid
+ * or cancelled (it is no longer a forecast event), and also when an expected
+ * event was edited afterwards so that its amount is no longer income or its
+ * date is no longer earlier than the override: the conditions that were
+ * checked when the adjustment was added. The calculation skips it and
+ * reports it.
  */
 
 import "server-only";
@@ -142,8 +146,9 @@ export async function getAdjustments(
   const result = await database().query<AdjustmentRow>(
     `SELECT sa.id, sa.scenario_id, sa.cash_event_id,
             sa.date_override::text AS date_override,
-            CASE WHEN sa.status = 'active' AND ce.status <> 'expected' THEN 'not_applicable'
-                 ELSE sa.status END AS status
+            CASE WHEN sa.status = 'active'
+                  AND (ce.status <> 'expected' OR ce.amount <= 0 OR sa.date_override <= ce.expected_date)
+                 THEN 'not_applicable' ELSE sa.status END AS status
        FROM scenario_adjustments sa
        JOIN scenarios sc ON sc.id = sa.scenario_id
        JOIN cash_events ce ON ce.id = sa.cash_event_id AND ce.workspace_id = sa.workspace_id

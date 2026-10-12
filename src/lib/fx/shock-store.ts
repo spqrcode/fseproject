@@ -27,10 +27,22 @@ import { uuidSchema } from "@/lib/validation";
 // Types
 // ---------------------------------------------------------------------------
 
+// What a saved shock refers to, for display. The rate and date are read from the stored snapshot, never from
+// today's market, so the label stays true even after ECB publishes a new rate.
+export type ShockSnapshotSummary = Readonly<{
+  provider: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: string;
+  effectiveDate: string;
+}>;
+
 export type PersistedFxShock = Readonly<{
   id: string;
   scenarioId: string;
   snapshotId: string;
+  snapshot: ShockSnapshotSummary | null;
+  newerSnapshotAvailable: boolean;
   shockPercent: string;
   status: "active" | "invalid";
   createdAt: Date;
@@ -45,6 +57,12 @@ interface ShockRow {
   status: string;
   created_at: Date;
   updated_at: Date;
+  provider?: string | null;
+  base_currency?: string | null;
+  quote_currency?: string | null;
+  rate?: string | null;
+  effective_date?: string | Date | null;
+  newer_snapshot_available?: boolean;
 }
 
 interface JoinedShockRow extends ShockRow {
@@ -56,12 +74,26 @@ interface JoinedShockRow extends ShockRow {
   fetched_at: Date | null;
 }
 
+function snapshotSummary(row: ShockRow): ShockSnapshotSummary | null {
+  if (!row.provider || !row.base_currency || !row.quote_currency || !row.rate || !row.effective_date) return null;
+  const date = typeof row.effective_date === "string" ? row.effective_date : row.effective_date.toISOString();
+  return Object.freeze({
+    provider: row.provider,
+    baseCurrency: row.base_currency,
+    quoteCurrency: row.quote_currency,
+    rate: row.rate,
+    effectiveDate: date.slice(0, 10),
+  });
+}
+
 function rowToPersistedShock(row: ShockRow): PersistedFxShock {
   const status = row.status === "active" || row.status === "invalid" ? row.status : "invalid";
   return Object.freeze({
     id: row.id,
     scenarioId: row.scenario_id,
     snapshotId: row.snapshot_id,
+    snapshot: snapshotSummary(row),
+    newerSnapshotAvailable: row.newer_snapshot_available === true,
     shockPercent: decimalString(parseDecimal(row.shock_percent)),
     status,
     createdAt: row.created_at,
@@ -167,11 +199,23 @@ export async function getScenarioFxShocks(
   if (!id.success) return [];
   const result = await database().query<ShockRow>(
     `SELECT sfs.id, sfs.scenario_id, sfs.snapshot_id, sfs.shock_percent::text,
-            sfs.status, sfs.created_at, sfs.updated_at
+            sfs.status, sfs.created_at, sfs.updated_at,
+            fx.provider, fx.base_currency, fx.quote_currency, fx.rate::text AS rate,
+            fx.effective_date::text AS effective_date,
+            COALESCE((
+              SELECT newest.id <> sfs.snapshot_id
+                FROM fx_snapshots newest
+               WHERE newest.provider = fx.provider
+                 AND newest.base_currency = fx.base_currency
+                 AND newest.quote_currency = fx.quote_currency
+               ORDER BY newest.effective_date DESC, newest.fetched_at DESC
+               LIMIT 1
+            ), false) AS newer_snapshot_available
        FROM scenario_fx_shocks sfs
        JOIN scenarios sc ON sc.id = sfs.scenario_id
        JOIN workspaces w ON w.id = sc.workspace_id
        JOIN sessions s ON s.user_id = w.user_id
+       LEFT JOIN fx_snapshots fx ON fx.id = sfs.snapshot_id
       WHERE s.token_hash = $1 AND s.expires_at > now()
         AND sfs.scenario_id = $2
       ORDER BY sfs.created_at ASC`,

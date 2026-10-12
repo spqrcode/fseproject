@@ -169,6 +169,16 @@ Validation (2026-10-07, local, PostgreSQL 16): `npm run verify` exit code 0 — 
 
 Review finding (PR #10, Jiaxin, 2026-10-08): the AI-generated `updateCashEvent` and `deleteCashEvent` still allowed changing and deleting received, paid and cancelled events, although they feed the forecast's starting balance; the student's own review and the AI's earlier "concerns" note had accepted this. Fixed with `status = 'expected'` in the `WHERE` clause and `StatusConflictError` for the caller's own settled events, with new tests; `npm run verify` exit code 0 afterwards (86 unit, 99 integration, 24 Chromium tests).
 
+## Cash events product integration
+
+Date: 2026-10-11. Tool: OpenAI Codex. Owner: Jiaxin.
+
+Jiaxin decided to take over the unimplemented Cash events user flow after reviewing the Product Experience workload. She set the scope boundary: connect the already-merged session-scoped stores without duplicating forecast or scenario calculations, keep the work on a separate branch, preserve the existing visual system, and verify the complete browser path before committing.
+
+Codex assisted with the server actions, account and event forms, persisted event schedule, responsive styling, overview status, documentation and browser tests. During browser verification, Jiaxin retained the existing financial rules from PR #10: signed decimal strings, account-owned currency, `expected`-only edits, and final settled events. The tests exposed two presentation issues before delivery: success feedback was hidden or lost after server revalidation, and an invalid amount reset the other form values. The implementation was changed to use redirect-backed success messages and controlled inputs that survive validation errors.
+
+Verification used a local PostgreSQL 16 container bound only to localhost with the dedicated `portfolio_risk_test` database. No staging or production data was used. Final validation evidence is recorded in `docs/testing.md`; staging deployment and PR publication remain separate student decisions.
+
 ## Jiaxin — ECB snapshot cache and failure handling (migration 006)
 
 Date: 2026-10-08 to 2026-10-09. Tools: Antigravity and OpenAI Codex. Owner: Jiaxin (Scenarios & Exchange Rates).
@@ -191,6 +201,14 @@ Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify`
 - Review correction: the first revision changed the Forecast Engine to use the database statuses directly. After merging the latest `main`, the existing team decision showed that PR #14 owns the adapter mapping from `expected / received / paid / cancelled` to the engine's `pending / completed / cancelled` contract. The direct-status change was therefore rejected and corrected.
 - Student action: reviewed the PR comments, resolved the AI-usage merge conflict by retaining both records, selected the business rules and ran the complete local validation.
 - Validation: 100 Forecast domain tests and 186 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.
+
+## Jiaxin — Scenario lab product integration
+
+Date: 2026-10-12. Tool: OpenAI Codex. Owner: Jiaxin (Scenarios & Exchange Rates).
+
+Jiaxin authorized taking on the unfinished Scenario lab page and set the contract boundary: use the existing session-scoped scenario and ECB services, keep cash events and snapshots unchanged, and do not show invented forecast balances while the shared forecast-input adapter is under review. Codex assisted with the server actions, forms, page layout, styling, browser test and documentation. The implementation exposes original and delayed invoice dates, a percentage-shock preview with ECB provenance and freshness, and saving only for direct EUR pairs backed by one snapshot. The first browser run exposed a currency-label mismatch and a missing wait for workspace creation; a later run found an ambiguous `alert` test locator. These were corrected and all 27 Chromium tests passed. The student will inspect the diff, review the PR and own the final merge decision. Numerical base-versus-scenario forecasts remain for a later integration.
+
+Review follow-up (Bastian, 2026-10-12): Jiaxin accepted that saved shocks must stay tied to their original immutable ECB snapshot. Bastian asked for the snapshot's ECB date and a hint when a newer cached rate exists. The date and source rate were already displayed; Codex added a read-only latest-snapshot comparison and the hint. Tests cover a repeat fetch, another pair, a later ECB date and a correction to the same ECB date, while verifying the saved calculation still uses its original rate.
 
 ## Scenario adjustments that no longer apply (PR #9 review, Bastian, 2026-10-12)
 
@@ -218,9 +236,26 @@ Validation (2026-10-10, local, PostgreSQL 16): `npm run verify` exit code 0 — 
 
 Review finding (PR #14, Haina, 2026-10-11): two defects in the AI-generated forecast input, both missed by the AI and by the student's review. (1) The starting balance counted settled events dated before the start date, so money that moved on the start day, including an event marked paid today in a forecast that starts today, was in neither the balance nor the list; fixed by counting `<=` the start date (overdue stays `<`) with two new integration tests and an updated starting-balance test. (2) The 366-day limit counted differences instead of dates, so it allowed 367 dates while the engine in PR #12 allows 366; fixed by counting both ends, with the boundary tests moved to 2026-10-01 to 2027-10-01 (accepted) and 2027-10-02 (rejected). Validation after the fix (2026-10-11, local, PostgreSQL 16): `npm run verify` exit code 0 — 124 unit, 128 integration and 24 Chromium tests; lint and TypeScript clean; production build succeeded. Student review: read the diff line by line and confirmed that only the starting-balance condition changed to `<=` while the overdue condition stays `<`.
 
+## Jiaxin (covering Product Experience) — Liquidity overview connected to the forecast (branch `feat/product-liquidity-overview`)
+
+Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin, covering Gabriel's Product Experience work.
+
+Student direction: connect the overview only to real data — the store of PR #14, the adapter of PR #19 and the engine of PR #12 — without editing those branches, and show nothing estimated. Keep amounts in the account's currency with a visible notice until FX conversion exists. While reviewing PR #19 the student and AI found that the workspace danger threshold (reporting currency) is applied unconverted to accounts in other currencies; the overview now states this and it is recorded in `limitations.md`.
+
+AI-generated: `src/lib/liquidity-overview.ts` (horizon, UTC window, chart geometry), `src/lib/liquidity-forecast.ts`, `src/components/liquidity-chart.tsx`, the overview page, `formatDate`, the forecast styles, and the unit, integration and Chromium tests. Corrections during development: the engine's minimum can be the balance before the start date's events and so lie below every end-of-day point, so the chart marker uses the engine's minimum rather than a timeline point; two existing browser assertions were updated only where the page's behaviour intentionally changed (the overview no longer shows "not connected"), and the reporting-currency sentence was kept so the original assertion still holds.
+
+Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — lint and TypeScript clean; 250 unit tests; 144 integration tests; production build; 30 Chromium tests, including WCAG 2.2 AA checks of the forecast view (with a breach, overdue events and the daily table open) in light and dark mode, and a 375 px phone width.
+
 Merge with `main` (2026-10-12, after PRs #12, #13 and #19): Claude Code resolved the conflicts in four documentation files by keeping both sides; the student compared the result line by line with `main` (no line from `main` lost except text that this branch deliberately updates) and with Gabriel's resolution on `feat/product-liquidity-overview`, and updated the 2026-10-10 decision entry now that the engine and `toForecastInput` are merged. AI-generated: one integration test that runs `getForecastInput` → `toForecastInput` → `runForecast` for an account with a settled, an overdue and a future event. Validation: TODO (`npm run verify` numbers).
 
 ## FX shock bounds and errors (PR #17 review, Bastian, 2026-10-12)
 
 Review correction: the first AI-assisted FX-shock code validated only "greater than -100" in two places (a private parser and the store) and left the column an unbounded `numeric`. Bastian found that +5000% or a 40-digit value was accepted. Neither the AI nor the first human review had tried the upper end, and the duplicated parser had already drifted from the one in `calculateShockedRate`. Change: one exported `parseShockPercent` (-99.99 to 100, four decimals) used by the preview and the save, migration 009 for the column and a range check, a domain error for a duplicate shock, and "Authentication required." for an expired session. One existing unit test relied on an 18-decimal input and was rewritten to test what it meant to (the shocked rate is not rounded) with a four-decimal input; one integration assertion now expects the column's four decimals. Validation (2026-10-12, local, PostgreSQL 16): lint and TypeScript clean, unit tests, 169 integration tests, production build.
 
+## Product experience: exchange-rate display
+
+Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel (Product Experience). Delivered as a patch that the student inspected, tested and committed.
+
+Request: while reviewing PR #18 the student ran the Scenario lab with seeded ECB snapshots and saw cross and reciprocal rates printed with about 40 digits ("1 USD = 1.30130803242446573323507737656595431098 SGD"). AI-generated: `formatRate` in `src/lib/format.ts`, its unit tests and the presentation rule in `docs/product-experience.md`. Rates are shown with four decimals, half to even like amounts; the calculation keeps every digit and pages keep the exact value next to the text.
+
+Validation: ESLint and TypeScript clean, all unit tests passed including the new ones, production build passed. Removing the half-even rounding mode makes the rounding test fail (1.23445 becomes 1.2345).

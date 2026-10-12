@@ -55,6 +55,7 @@ export {
 export {
   addScenarioFxShock,
   getScenarioFxShocks,
+  type ShockSnapshotSummary,
   evaluateScenarioFxShock,
   invalidateScenarioFxShock,
   type PersistedFxShock,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatMoney, formatPercent, formatTimestamp, UNAVAILABLE } from "@/lib/format";
+import { formatDate, formatMoney, formatPercent, formatTimestamp, UNAVAILABLE } from "@/lib/format";
 import { REPORTING_CURRENCIES, DEFAULT_REPORTING_CURRENCY, currencyLabel } from "@/lib/currency";
 import { reportingCurrencySchema } from "@/lib/validation";
 
@@ -87,5 +87,18 @@ describe("reporting currency", () => {
   it("defaults to a listed currency and labels it for people", () => {
     expect(REPORTING_CURRENCIES).toContain(DEFAULT_REPORTING_CURRENCY);
     expect(currencyLabel("SGD")).toBe("Singapore dollar (SGD)");
+  });
+});
+
+describe("calendar dates", () => {
+  it("formats a forecast day as the same UTC calendar date, whatever the server's time zone", () => {
+    expect(formatDate("2026-10-12")).toBe("12 Oct 2026");
+    expect(formatDate("2028-02-29")).toBe("29 Feb 2028");
+    expect(formatDate(null)).toBe(UNAVAILABLE);
+  });
+  it("refuses anything that is not a real calendar date", () => {
+    for (const value of ["2026-02-30", "2026-13-01", "12/10/2026", "2026-10-12T00:00:00Z", ""]) {
+      expect(() => formatDate(value), value).toThrow(RangeError);
+    }
   });
 });

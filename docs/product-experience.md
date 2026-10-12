@@ -1,6 +1,6 @@
 # Product experience
 
-Owner: Gabriel (Product Experience). Scope of this increment: the FinTwin Global interface shell, shared presentation rules, and the reporting currency preference. Forecast and scenario logic belong to Haina's Forecast Engine and Jiaxin's Scenarios & Exchange Rates increments and are not implemented here.
+Owner: Gabriel (Product Experience), with Cash events and Scenario lab integration by Jiaxin. The product layer owns presentation and user interaction. Forecast calculations belong to Haina's Forecast Engine, and scenario and FX calculations belong to Jiaxin's domain services.
 
 ## Information architecture
 
@@ -8,19 +8,34 @@ Owner: Gabriel (Product Experience). Scope of this increment: the FinTwin Global
 | --- | --- | --- |
 | `/` | Public home page: what FinTwin Global is, which views are available or in development, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
-| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented; the forecast is shown as not connected until the engine is delivered |
-| `/cash-events` | Planned income and expenses by date | Page and navigation ready; honest empty state until cash events are stored |
-| `/scenarios` | Scenario lab: what-if and FX scenario comparison against the base case | Page and navigation ready; honest empty state until scenario analysis is connected |
-| `/workspace` | Workspace name (stored in the `portfolios` table until the workspace schema replaces it) | Existing form, renamed from `/portfolio` |
+| `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented: one account's deterministic forecast for 30, 90, 180 or 365 days (balance today, lowest point, closing balance, runway, danger threshold, overdue events, a step chart and a day-by-day table); an empty state asks for a cash account when there is none |
+| `/cash-events` | Cash accounts and planned income and expenses by date | Connected to the session-scoped cash-event store; create, edit, settle, cancel and delete expected events |
+| `/scenarios` | Scenario lab: delayed invoices and ECB percentage-FX shocks | Connected to persisted scenarios and adjustments, with an ECB rate preview; numerical forecast comparison still awaits the shared adapter |
+| `/workspace` | Workspace name stored in `workspaces` | Existing form, renamed from `/portfolio` |
 | `/settings` | Reporting currency, appearance and active sessions | Implemented |
 
 Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/scenarios/compare`).
 
 Section names follow the MVP views agreed by the team on 2 October 2026: Liquidity overview, Cash events and Scenario lab, then Workspace (which replaces the Portfolio page of the earlier project) and Settings. The forecast has no page of its own, because the projected balance is the main content of the liquidity overview. Routes keep short, stable paths (`/dashboard` is where sign-in lands), so renaming a label never breaks a link.
 
-The home page lists the three MVP views as in development and names what is available today, so a visitor is never promised a feature that does not exist yet. The logo on the sign-in and registration pages links back to it.
+The home page marks Cash events as available and keeps the complete forecast and Scenario lab comparison in development. The logo on the sign-in and registration pages links back to it.
 
-Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the page states what will appear and that nothing is estimated today.
+Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the overview states that it has no projected balance yet. The Scenario lab displays persisted invoice dates and real ECB snapshot rates, but does not invent a cash-flow comparison. The Cash events page shows only persisted account and event values.
+
+## US-11: cash accounts and events
+
+As a signed-in user, I can record where cash is held and add dated income and expenses, so that the forecast has explicit, reviewable inputs.
+
+Acceptance criteria:
+- Cash accounts can be created only inside the signed-in user's workspace and use EUR, USD or SGD.
+- Opening balances and event amounts remain decimal strings; income is positive, expenses negative and zero is rejected.
+- New events start as `expected`. Expected events can be edited, deleted, marked received or paid according to their sign, or cancelled.
+- Received, paid and cancelled events remain visible as an audit trail and cannot be edited or deleted.
+- Deleting takes a second step (a native disclosure with "Delete permanently"), and the confirmation points to cancelling as the way to keep a record. Each action's accessible name includes the event (for example "Delete: Office rent"), starting with the visible words. An action on an event that has already changed is answered with a message rather than ignored. Dates use the shared `formatDate`.
+- A user never supplies a workspace or user ID. Every action resolves ownership from the session and verifies the request origin.
+- Empty, validation, success and error states are announced accessibly, and the page remains usable on a phone-sized viewport.
+
+Implementation: `src/app/(protected)/cash-events/page.tsx`, `src/app/actions/cash-events.ts`, the three `cash-*` components, and `tests/e2e/cash-events.spec.ts`.
 
 ## Visual design
 
@@ -53,6 +68,7 @@ The logo is two overlapping circles: the finances as they are and their twin. He
 - Rounding happens only at display time, half to even (1.245 becomes 1.24, 1.255 becomes 1.26), using the currency's own minor units (two decimals for EUR, USD and SGD). This is the rule the forecast engine uses when it rounds, so the screen never disagrees with a rounded calculation by a cent. Unrounded engine results with 40 significant digits are accepted as they are.
 - A missing amount or an undefined ratio (for example a zero denominator) is shown as "Unavailable", never as 0, NaN or Infinity.
 - Input that is not a plain decimal (exponent notation, `NaN`, grouping separators, empty strings) throws instead of printing a guessed value, so a bug in a calculation is visible during development rather than shown to users.
+- Exchange rates are shown with four decimals, as the ECB publishes them, rounded half to even with `formatRate`. Cross and reciprocal rates keep every digit in the calculation; only the text is rounded, and the exact value stays in the page data.
 - Values that round to zero never show a minus sign. Changes can be shown with an explicit sign (`+US$25.00`).
 - Locale `en-GB` and time zone UTC are fixed so the server and the browser render the same text, and timestamps carry the "UTC" label.
 
@@ -109,7 +125,7 @@ A skip link is the first keyboard stop on every page. Headings follow one `h1` p
 
 ## How the Forecast Engine and Scenarios & FX plug in
 
-1. Replace the empty state with the real content: the forecast in `src/app/(protected)/dashboard/page.tsx`, events in `cash-events/page.tsx`, scenarios in `scenarios/page.tsx`. The route, navigation, loading and error states already exist.
+1. The Liquidity overview reads the forecast input, the adapter and the engine (#20). The numerical base-versus-scenario comparison in `scenarios/page.tsx` is #23. Cash events, scenario adjustments and FX preview are connected already.
 2. Read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
 3. Pass amounts as decimal strings from the calculation layer; pass `null` when a value is unavailable.
 4. Update the module row on the liquidity overview from "Not connected yet" to the real status.
@@ -120,7 +136,13 @@ See [testing](testing.md). Unit tests cover formatting and currency validation, 
 
 ## Limitations
 
-- No currency conversion exists yet. The preference records the choice; converting amounts is part of Scenarios & FX.
+- The ECB service resolves rates and the Scenario lab previews and saves shocked rates. Forecast values are shown in each account's own currency until the reporting-currency conversion (#26) is merged.
 - EUR is the default because the team and the assessment are based in Europe. Changing the default needs a migration and a decision in `decisions.md`.
 - The interface is English only and uses a fixed `en-GB` number format.
-- The domain content of the liquidity overview, cash events and scenario lab will be designed with their owners once their data model is agreed.
+- The Scenario lab shows dates and rate provenance; the numerical comparison with the base forecast is #23, so this page does not claim a cash-flow result.
+
+## Scenario lab integration
+
+As a signed-in user, I can create a named scenario, move an expected positive invoice to a later date inside that scenario, and see the original and hypothetical dates side by side. The original event stays unchanged on Cash events. The page also previews an ECB percentage shock with source and adjusted rates as decimal strings, effective date, provider and current/stale/unavailable status. Unavailable data has no adjusted number. Direct EUR/USD and EUR/SGD shocks may be saved against one immutable snapshot; cross and reciprocal rates remain preview-only. Saved shocks display that snapshot's ECB date and rate; if a different latest snapshot for the same pair is already cached, a hint says so without changing the saved result or making an ECB request.
+
+Implementation: `src/app/(protected)/scenarios/page.tsx`, `src/app/actions/scenarios.ts`, `src/components/scenario-forms.tsx`, and `tests/e2e/scenarios.spec.ts`. Numerical base-versus-scenario forecasts are separate product work, although the shared adapter has merged.
