@@ -9,7 +9,7 @@ import { buildScenarioFxResult, type ScenarioFxResult } from "@/lib/fx/fx-shock"
 import { parseDecimal } from "@/lib/forecast/decimal";
 import { getReportingCurrency } from "@/lib/preferences-store";
 import { DEFAULT_REPORTING_CURRENCY, REPORTING_CURRENCIES, currencyLabel } from "@/lib/currency";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, formatRate } from "@/lib/format";
 import { reportingCurrencySchema } from "@/lib/validation";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyState } from "@/components/empty-state";
@@ -76,17 +76,20 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
         {selected ? <section className="scenario-section" aria-labelledby="delay-heading">
           <p className="eyebrow">Selected scenario</p><h2 id="delay-heading">{selected.name}</h2>
           <p className="muted">Original and delayed dates are shown side by side. Forecast balances wait for the shared forecast-input adapter.</p>
-          {adjustments.length > 0 && <div className="scenario-comparison" role="table" aria-label="Invoice delay comparison">
-            <div className="scenario-comparison-head" role="row"><span role="columnheader">Invoice</span><span role="columnheader">Base date</span><span role="columnheader">Scenario date</span></div>
-            {adjustments.map(item => {
-              const event = eventById.get(item.cashEventId);
-              return <div className="scenario-comparison-row" role="row" key={item.id}>
-                <span role="cell">{event ? `${event.description} · ${formatMoney(event.amount, event.currency)}` : "Original event unavailable"}</span>
-                <span role="cell">{event?.expectedDate ?? "Unavailable"}</span>
-                <span role="cell">{item.status === "active" ? item.dateOverride : "Invalid adjustment"}</span>
-              </div>;
-            })}
-          </div>}
+          {adjustments.length > 0 && <table className="data-table scenario-comparison">
+            <caption className="visually-hidden">Invoice delay comparison</caption>
+            <thead><tr><th scope="col">Invoice</th><th scope="col">Base date</th><th scope="col">Scenario date</th></tr></thead>
+            <tbody>
+              {adjustments.map(item => {
+                const event = eventById.get(item.cashEventId);
+                return <tr key={item.id}>
+                  <th scope="row">{event ? `${event.description} · ${formatMoney(event.amount, event.currency)}` : "Original event unavailable"}</th>
+                  <td>{event ? formatDate(event.expectedDate) : "Unavailable"}</td>
+                  <td>{item.status === "active" ? formatDate(item.dateOverride) : "Invalid adjustment"}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>}
           {invoices.length > 0 ? <DelayForm scenarioId={selected.id} invoices={invoices} /> : <p className="muted">Add an expected positive cash event in <Link href="/cash-events">Cash events</Link> to try an invoice delay.</p>}
         </section> : <EmptyState eyebrow="No scenario selected" title="Start with a named scenario." figure={<ScenarioFigure />}>
           <p>Once you create one, you can delay an invoice without changing the real event.</p>
@@ -104,13 +107,16 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
           </form>
           {previewError && <p role="alert" className="notice error">{previewError}</p>}
           {preview && (preview.freshness === "UNAVAILABLE" ? <div role="status" className="scenario-rate-state"><p className="state state-pending">Rate unavailable</p><p>{preview.failure.message}</p><p>No adjusted rate is shown or invented.</p></div> : <div className="scenario-rate-state" role="status">
-            <p className={`state ${preview.freshness === "CURRENT" ? "state-ready" : "state-pending"}`}>{preview.freshness === "CURRENT" ? "Current" : "Stale"} · {preview.provider.toUpperCase()} · {preview.effectiveDate}</p>
-            <div className="scenario-rate-grid"><div><small>ECB source rate</small><data value={preview.sourceRate}>1 {preview.baseCurrency} = {preview.sourceRate} {preview.quoteCurrency}</data></div><div><small>Hypothetical · {preview.shockPercent}%</small><data value={preview.adjustedRate}>1 {preview.baseCurrency} = {preview.adjustedRate} {preview.quoteCurrency}</data></div></div>
+            <p className={`state ${preview.freshness === "CURRENT" ? "state-ready" : "state-pending"}`}>{preview.freshness === "CURRENT" ? "Current" : "Stale"} · {preview.provider.toUpperCase()} · {formatDate(preview.effectiveDate)}</p>
+            <div className="scenario-rate-grid"><div><small>ECB source rate</small><data value={preview.sourceRate}>1 {preview.baseCurrency} = {formatRate(preview.sourceRate)} {preview.quoteCurrency}</data></div><div><small>Hypothetical · {preview.shockPercent}%</small><data value={preview.adjustedRate}>1 {preview.baseCurrency} = {formatRate(preview.adjustedRate)} {preview.quoteCurrency}</data></div></div>
             {preview.freshness === "STALE" && <p className="muted">Last available observation. {preview.refreshFailure?.message}</p>}
             {selected && base === "EUR" && (quote === "USD" || quote === "SGD") && preview.sourceSnapshotIds.length === 1 && <SaveShockForm scenarioId={selected.id} snapshotId={preview.sourceSnapshotIds[0]} shockPercent={preview.shockPercent} />}
             {selected && base !== "EUR" && <p className="muted">Cross and reciprocal rates can be previewed; saving supports direct ECB EUR pairs only.</p>}
           </div>)}
-          {selected && savedShocks.length > 0 && <div className="scenario-saved" aria-label="Saved FX shocks"><h3>Saved in {selected.name}</h3><ul>{savedShocks.map(item => <li key={item.id}>{item.shockPercent}% shock · snapshot {item.snapshotId.slice(0, 8)} · {item.status}</li>)}</ul></div>}
+          {selected && savedShocks.length > 0 && <div className="scenario-saved" aria-label="Saved FX shocks"><h3>Saved in {selected.name}</h3><ul>{savedShocks.map(item => <li key={item.id}>{item.snapshot
+              ? <>{item.shockPercent}% on {item.snapshot.baseCurrency}/{item.snapshot.quoteCurrency} · {item.snapshot.provider.toUpperCase()} {formatDate(item.snapshot.effectiveDate)} · <data value={item.snapshot.rate}>{formatRate(item.snapshot.rate)}</data></>
+              : <>{item.shockPercent}% shock · rate snapshot not available</>}
+            {item.status === "invalid" && <> · <span className="state state-pending">Invalid</span></>}</li>)}</ul></div>}
         </section>
       </div>
     </div>}

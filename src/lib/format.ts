@@ -38,6 +38,17 @@ export function formatPercent(ratio: string | null | undefined, options: SignOpt
   return formatter({ style: "percent", maximumFractionDigits: 2, signDisplay: sign(options), roundingMode: ROUNDING }).format(decimal(ratio));
 }
 
+const calendarDate = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+// A calendar date such as a forecast day (YYYY-MM-DD) is read as a UTC date, so it never shifts by a day.
+export function formatDate(value: string | null | undefined): string {
+  if (value === null || value === undefined) return UNAVAILABLE;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw new RangeError(`Not a calendar date: ${JSON.stringify(value)}`);
+  }
+  return calendarDate.format(date);
+}
+
 const timestamp = new Intl.DateTimeFormat(LOCALE, {
   day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC",
 });
@@ -47,4 +58,17 @@ export function formatTimestamp(value: Date | string | null | undefined): string
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) throw new RangeError(`Not a valid timestamp: ${JSON.stringify(value)}`);
   return `${timestamp.format(date)} UTC`;
+}
+
+// An exchange rate as ECB publishes it: four decimals, half to even, without grouping. A rate that would round
+// to zero at four decimals keeps four significant digits instead, so a small rate is never shown as 0.0000.
+// The exact value stays available to callers, for example in a <data value> attribute.
+export function formatRate(value: string | null | undefined): string {
+  if (value === null || value === undefined) return UNAVAILABLE;
+  const exact = decimal(value);
+  const small = /^-?0\.00/.test(exact);
+  const options: Intl.NumberFormatOptions = small
+    ? { maximumSignificantDigits: 4, useGrouping: false, roundingMode: ROUNDING }
+    : { minimumFractionDigits: 4, maximumFractionDigits: 4, useGrouping: false, roundingMode: ROUNDING };
+  return formatter(options).format(exact);
 }
