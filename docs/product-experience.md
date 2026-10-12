@@ -127,7 +127,7 @@ A skip link is the first keyboard stop on every page. Headings follow one `h1` p
 
 ## How the Forecast Engine and Scenarios & FX plug in
 
-1. Connect the shared forecast-input adapter to `src/app/(protected)/dashboard/page.tsx` and the numerical base-versus-scenario comparison in `scenarios/page.tsx`. Cash events, scenario adjustments and FX preview are connected already.
+1. The Liquidity overview reads the forecast input, the adapter and the engine (#20). The numerical base-versus-scenario comparison in `scenarios/page.tsx` is #23. Cash events, scenario adjustments and FX preview are connected already.
 2. Read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
 3. Pass amounts as decimal strings from the calculation layer; pass `null` when a value is unavailable.
 4. Update the module row on the liquidity overview from "Not connected yet" to the real status.
@@ -138,10 +138,10 @@ See [testing](testing.md). Unit tests cover formatting and currency validation, 
 
 ## Limitations
 
-- The ECB service can resolve rates and the Scenario lab previews shocked rates. Forecast values are not yet converted or displayed on the product pages; the shared forecast-input adapter is still required.
+- The ECB service resolves rates and the Scenario lab previews and saves shocked rates. Forecast values are shown in each account's own currency until the reporting-currency conversion (#26) is merged.
 - EUR is the default because the team and the assessment are based in Europe. Changing the default needs a migration and a decision in `decisions.md`.
 - The interface is English only and uses a fixed `en-GB` number format.
-- The Liquidity overview still needs the shared forecast-input adapter before it can show projected balances and runway. The Scenario lab intentionally shows dates and rate provenance without claiming a numerical cash-flow result.
+- The Scenario lab shows dates and rate provenance; the numerical comparison with the base forecast is #23, so this page does not claim a cash-flow result.
 
 ## Scenario lab integration
 

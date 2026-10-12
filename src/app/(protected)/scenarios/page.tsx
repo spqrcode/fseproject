@@ -91,7 +91,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
       <div className="scenario-main">
         {selected ? <section className="scenario-section" aria-labelledby="delay-heading">
           <p className="eyebrow">Selected scenario</p><h2 id="delay-heading">{selected.name}</h2>
-          <p className="muted">Original and delayed dates are shown side by side, followed by the effect on one account&apos;s forecast.</p>
+          <p className="muted">Original and delayed dates are shown side by side, followed by the effect on one account&apos;s forecast. The real cash event keeps its date.</p>
           {adjustments.length > 0 && <table className="data-table scenario-comparison">
             <caption className="visually-hidden">Invoice delay comparison</caption>
             <thead><tr><th scope="col">Invoice</th><th scope="col">Base date</th><th scope="col">Scenario date</th></tr></thead>
@@ -102,7 +102,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
                   <th scope="row">{event ? `${event.description} · ${formatMoney(event.amount, event.currency)}` : "Original event unavailable"}</th>
                   <td>{event ? formatDate(event.expectedDate) : "Unavailable"}</td>
                   <td>{item.status === "active" ? formatDate(item.dateOverride)
-                    : item.status === "not_applicable" ? "No longer applies: the invoice was received, paid or cancelled"
+                    : item.status === "not_applicable" ? "No longer applies: the invoice was settled, cancelled or changed"
                     : "Invalid adjustment"}</td>
                 </tr>;
               })}

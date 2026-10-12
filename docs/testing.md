@@ -29,6 +29,8 @@ On the stacked `feat/product-scenario-lab` branch, lint, strict TypeScript, 277 
 
 Review follow-up on the same branch (2026-10-12): a saved shock now carries a read-only hint when a newer snapshot for its ECB pair is already cached. A fresh `portfolio_risk_hint_test` database was created with migrations 001–008 so migration 009 from a different local branch could not affect these tests. Lint, typecheck, 298 unit tests, production build, 184 PostgreSQL integration tests and 33 Chromium tests passed. The integration test covers an unchanged observation, another pair, a later effective date and a correction to the same effective date; the browser test confirms the saved rate/date do not change when the hint appears. No ECB network request or Vercel deployment was part of this verification.
 
+The Scenario lab's server actions are covered the same way in `tests/integration/scenario-actions.test.ts`: a scenario, a delay and a saved shock for the signed-in user; validation; another user's scenario or invoice refused with nothing changed; a missing or foreign origin saving nothing; anonymous and expired sessions sent to sign in.
+
 ## Test isolation
 
 `scripts/test.mjs` requires `TEST_DATABASE_URL` ending in `_test` and passes it as the child's `DATABASE_URL`. Playwright also checks they match. It starts a new server at `http://localhost:3100`, with `APP_ORIGIN` set to that address, and refuses to reuse another server. Tests cannot silently hit development/staging through the ordinary script commands.

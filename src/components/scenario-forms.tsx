@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { addInvoiceDelay, addScenario, saveFxShock } from "@/app/actions/scenarios";
+import { formatDate } from "@/lib/format";
 
 export function ScenarioForm() {
   const [state, action, pending] = useActionState(addScenario, {});
@@ -27,7 +28,7 @@ export function DelayForm({ scenarioId, invoices }: { scenarioId: string; invoic
     <div className="field">
       <label htmlFor="delay-invoice">Expected invoice</label>
       <select id="delay-invoice" name="cashEventId" value={cashEventId} onChange={event => setCashEventId(event.target.value)} required>
-        {invoices.map(invoice => <option key={invoice.id} value={invoice.id}>{invoice.description} · {invoice.expectedDate}</option>)}
+        {invoices.map(invoice => <option key={invoice.id} value={invoice.id}>{invoice.description} · {formatDate(invoice.expectedDate)}</option>)}
       </select>
     </div>
     <div className="field">
