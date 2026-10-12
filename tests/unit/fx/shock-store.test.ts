@@ -90,8 +90,9 @@ vi.mock("@/lib/db", () => ({
         };
       }
 
-      // SELECT joined shock and snapshot (evaluateScenarioFxShock)
-      if (sqlNorm.includes("JOIN fx_snapshots fx ON fx.id = sfs.snapshot_id")) {
+      // SELECT joined shock and snapshot for one shock id (evaluateScenarioFxShock). The list query joins the
+      // snapshot too, but is not addressed by shock id.
+      if (sqlNorm.includes("JOIN fx_snapshots fx ON fx.id = sfs.snapshot_id") && sqlNorm.includes("sfs.id = $3")) {
         const [, qScenarioId, qShockId] = params as [string, string, string];
         const shock = mockShocks.find((s) => s.id === qShockId && s.scenario_id === qScenarioId);
         if (!shock) return { rows: [] };
@@ -123,15 +124,24 @@ vi.mock("@/lib/db", () => ({
         const [, scenarioId] = params as [string, string];
         const matching = mockShocks.filter((s) => s.scenario_id === scenarioId);
         return {
-          rows: matching.map((s) => ({
-            id: s.id,
-            scenario_id: s.scenario_id,
-            snapshot_id: s.snapshot_id,
-            shock_percent: s.shock_percent,
-            status: s.status,
-            created_at: s.created_at,
-            updated_at: s.updated_at,
-          })),
+          rows: matching.map((s) => {
+            const snapshot = mockSnapshots.find((candidate) => candidate.id === s.snapshot_id);
+            return {
+              id: s.id,
+              scenario_id: s.scenario_id,
+              snapshot_id: s.snapshot_id,
+              shock_percent: s.shock_percent,
+              status: s.status,
+              created_at: s.created_at,
+              updated_at: s.updated_at,
+              provider: snapshot ? snapshot.provider : null,
+              base_currency: snapshot ? snapshot.base_currency : null,
+              quote_currency: snapshot ? snapshot.quote_currency : null,
+              rate: snapshot ? snapshot.rate : null,
+              effective_date: snapshot ? snapshot.effective_date : null,
+              newer_snapshot_available: false,
+            };
+          }),
         };
       }
 
@@ -224,6 +234,12 @@ describe("Scenario FX shock database store", () => {
       const list = await getScenarioFxShocks(VALID_TOKEN, scenarioId);
       expect(list).toHaveLength(1);
       expect(list[0].id).toBe(shock.id);
+      expect(list[0].newerSnapshotAvailable).toBe(false);
+      // The list says what the shock was saved against, from the stored snapshot, so a label can be written.
+      expect(list[0].snapshot).toEqual({
+        provider: "ecb", baseCurrency: "EUR", quoteCurrency: expect.stringMatching(/^(USD|SGD)$/),
+        rate: "1.1225", effectiveDate: "2026-10-02",
+      });
 
       const evaluated = await evaluateScenarioFxShock(VALID_TOKEN, scenarioId, shock.id);
       expect(evaluated.sourceRate).toBe("1.1225");
