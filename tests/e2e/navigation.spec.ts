@@ -29,14 +29,17 @@ test("main navigation reaches every section and marks only the current one", asy
   }
 });
 
-test("sections that are not connected yet say so instead of showing figures", async ({ page, account }) => {
+test("forecast stays honest and scenario setup requires a workspace", async ({ page, account }) => {
   await signUpAndIn(page, account);
   await expect(page.getByRole("link", { name: "Create your workspace", exact: true })).toBeVisible();
-  for (const path of ["/dashboard", "/cash-events", "/scenarios"]) {
-    await page.goto(path);
-    await expect(page.getByRole("heading", { level: 2, name: /not connected yet/ })).toBeVisible();
-    await expect(page.locator("main")).not.toContainText(/[€$£¥]\s?\d|SGD\s\d/);
-  }
+  // The overview is connected to the forecast; without a cash account it asks for one and shows no figures.
+  await expect(page.getByRole("heading", { level: 2, name: "Add a cash account to see your forecast." })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/[€$£¥]\s?\d|SGD\s\d/);
+  // The Scenario lab is connected too; without a workspace it asks for one.
+  await page.goto("/scenarios");
+  await expect(page.getByRole("heading", { level: 2, name: "Create your workspace first." })).toBeVisible();
+  await page.goto("/cash-events");
+  await expect(page.getByRole("heading", { level: 2, name: "Create your workspace first." })).toBeVisible();
 });
 
 test("the old Forecast and Portfolio pages are gone, not left behind as duplicates", async ({ page, account }) => {

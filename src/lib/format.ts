@@ -32,10 +32,31 @@ export function formatMoney(value: string | null | undefined, currency: string, 
   return formatter({ style: "currency", currency, signDisplay: sign(options), roundingMode: ROUNDING }).format(decimal(value));
 }
 
+// An exchange rate is shown with four decimals, as the ECB publishes it, rounded half to even like amounts.
+// Cross and reciprocal rates keep 40 significant digits in the calculation; only this text is rounded, so
+// callers should keep the exact value next to it (for example in a <data value> attribute).
+export function formatRate(rate: string | null | undefined): string {
+  if (rate === null || rate === undefined) return UNAVAILABLE;
+  const value = decimal(rate);
+  if (value.startsWith("-") || /^0+(\.0+)?$/.test(value)) throw new RangeError(`Not a positive exchange rate: ${JSON.stringify(rate)}`);
+  return formatter({ minimumFractionDigits: 4, maximumFractionDigits: 4, roundingMode: ROUNDING }).format(value);
+}
+
 // A ratio of 0.1234 is shown as 12.34%. A missing ratio (for example a zero denominator) is unavailable, never NaN.
 export function formatPercent(ratio: string | null | undefined, options: SignOption = {}): string {
   if (ratio === null || ratio === undefined) return UNAVAILABLE;
   return formatter({ style: "percent", maximumFractionDigits: 2, signDisplay: sign(options), roundingMode: ROUNDING }).format(decimal(ratio));
+}
+
+const calendarDate = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+// A calendar date such as a forecast day (YYYY-MM-DD) is read as a UTC date, so it never shifts by a day.
+export function formatDate(value: string | null | undefined): string {
+  if (value === null || value === undefined) return UNAVAILABLE;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw new RangeError(`Not a calendar date: ${JSON.stringify(value)}`);
+  }
+  return calendarDate.format(date);
 }
 
 const timestamp = new Intl.DateTimeFormat(LOCALE, {

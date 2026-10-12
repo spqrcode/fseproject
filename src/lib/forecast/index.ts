@@ -37,3 +37,15 @@ export {
   type Currency,
   type Money,
 } from "@/lib/forecast/money";
+
+export {
+  applyDelayAdjustment,
+  partitionAdjustments,
+  runScenarioForecast,
+  type SkippedAdjustment,
+  scenarioContribution,
+  InvalidAdjustmentError,
+  MissingEventError,
+  type DelayAdjustment,
+  type ScenarioProjection,
+} from "@/lib/forecast/scenario";
