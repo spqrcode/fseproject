@@ -55,6 +55,13 @@ export type ScenarioProjection = Readonly<{
   contributionDelta: string;
 }>;
 
+export function scenarioContribution(base: ForecastResult, scenario: ForecastResult): string {
+  if (base.currency !== scenario.currency) {
+    throw new Error("Cannot compare forecasts in different currencies.");
+  }
+  return decimalString(parseDecimal(scenario.closingBalance).minus(parseDecimal(base.closingBalance)));
+}
+
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
@@ -144,13 +151,14 @@ export function runScenarioForecast(params: {
     startDate: params.startDate,
     endDate: params.endDate,
     openingBalance: baseForecast.openingBalance,
+    dangerThreshold: baseForecast.dangerThresholdPercent === null
+      ? baseForecast.dangerThresholdAmount
+      : null,
     events: scenarioEvents,
     currency: params.currency,
   });
 
-  const delta = decimalString(
-    parseDecimal(result.closingBalance).minus(parseDecimal(baseForecast.closingBalance)),
-  );
+  const delta = scenarioContribution(baseForecast, result);
 
   return Object.freeze({
     scenarioId,

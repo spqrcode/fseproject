@@ -65,6 +65,14 @@ Evidence retained: the saved upload manifest showing the ignored paths, the late
 - Scope deliberately deferred: ECB snapshot caching and percentage-based FX shocks remain on separate local branches. Phase 3 result-contract work remains in a local stash. They are not claimed as merged, deployed or complete.
 - Data handling: no real passwords, session tokens, database credentials or private financial data were supplied to an AI tool. Local environment files remain ignored and were not committed.
 - Post-review alignment on 2026-10-08: after Jiaxin reviewed and approved Bastian's PR #10, its workspace/account/event schema was merged into `main`. The duplicate cash-event migration and store were removed from this Draft; scenario persistence now uses migration 007, the canonical cash-event store and workspace-safe composite foreign keys. Jiaxin retained migration 006 for the separate ECB snapshot work and kept the Forecast Engine adapter deferred until PR #12 is finalized. Final local checks covered 143 unit tests, 115 PostgreSQL integration tests and 24 Chromium tests. A separate fresh database containing the staging role confirmed that it can select and insert scenario data and update only adjustment status metadata, but cannot delete scenario rows or rewrite their ownership columns.
+- Follow-up on 2026-10-12: after PR #12 was merged, OpenAI Codex resolved PR #9's conflicts by retaining Haina's canonical cash-event and forecast-engine files and adapting only Jiaxin's scenario module and tests. The old scenario tests had assumed event-only timeline points and ignored overdue events; they now assert the engine's daily timeline and overdue-on-start rule. This follow-up remains subject to Jiaxin's review before merge.
+
+## Jiaxin Huang — Percentage-based FX shocks
+
+- Date: 2026-10-10 to 2026-10-12. Tool: OpenAI Codex. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
+- Student decisions: Jiaxin set the ownership boundary: the FX service resolves direct, reciprocal and cross rates, while the Forecast Engine receives resolved rates and remains deterministic. Jiaxin also confirmed that `-10` means minus 10%, unavailable results contain no fallback rate, and Scenario Lab receives freshness and snapshot metadata with the adjusted result.
+- AI assistance: inspected and adapted the Phase 3 work to the merged forecast and scenario contracts, including test events with canonical timestamps and statuses. This work remains subject to Jiaxin's review before GitHub delivery or merge.
+- Validation: focused unit tests and PostgreSQL integration tests passed after the 2026-10-12 alignment; the full-suite result is recorded separately once complete. No staging or production deployment is claimed.
 
 ## Product experience increment: FinTwin Global shell, formatting and reporting currency
 
@@ -130,6 +138,15 @@ AI-flagged trade-off: check-then-increment is not atomic, so parallel wrong gues
 
 Validation (2026-09-29, local, Node 24, PostgreSQL 16): npm run verify passed. ESLint (zero warnings) and strict TypeScript clean; 8 unit tests, 26 integration tests (previously 20), 4 Chromium tests passed; production build succeeded; test migrations applied.
 
+## Member B — Cash projection and review follow-up
+
+- Date: 2026-10-07. Tool: OpenAI Codex. Owner: Member B.
+- Request: implement and review deterministic cash-event projection, minimum balance, liquidity runway and agreed forecast rules.
+- AI-assisted work: proposed code, tests and documentation for the fixed 50% warning threshold, deterministic same-day ordering, shared reporting-currency allowlist and negative half-even rounding cases.
+- Student review: inspected the diff, confirmed the business rules, ran the tests and created the commits personally.
+- Validation: 90 Forecast domain tests and 129 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.
+- Remaining team decision: confirm EUR-derived cross-rate ownership and precision with the ECB adapter owner.
+
 ## Workspace and cash events schema (migration 005)
 
 Date: 2026-10-07. Tool: Claude Code (Claude Sonnet 5.5). Owner: Foundation & Security student.
@@ -166,10 +183,11 @@ Review correction (PR #13, Bastian, 2026-10-10): the first draft updated `rate` 
 
 Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify` exited 0 — ESLint with zero warnings, strict TypeScript, 162 unit tests, production build, 111 integration tests and 24 Chromium tests passed. Migrations 001–006 were applied successfully from an empty database. The 12 FX integration tests passed with the application connected as `fse_runtime` and fixtures connected as the database owner; direct privilege checks returned SELECT=true, INSERT=true, DELETE=false, UPDATE `fetched_at`=true, UPDATE `rate`=false and UPDATE `provider`=false. Phase 3 percentage-shock work and Scenario Lab UI are deliberately not part of this increment.
 
-## Jiaxin Huang — Percentage-based FX shocks
+## Member B — PR #12 review corrections
 
-- Date: 2026-10-10. Tool: OpenAI Codex. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
-- Student decisions: Jiaxin set the ownership boundary: the FX service resolves direct, reciprocal and cross rates, while the Forecast Engine receives resolved `FxRate` values and remains deterministic. Jiaxin also confirmed that `-10` means minus 10%, unavailable results contain no fallback rate, and the Scenario Lab receives freshness and snapshot metadata with the adjusted result.
-- AI assistance: inspected the earlier local Phase 3 commit and stash, preserved a backup branch, rebuilt the work on the current Phase 1 and Phase 2 contracts, identified the migration-number conflict, adapted outdated workspace/snapshot assumptions, and helped debug unit and PostgreSQL integration failures.
-- Student responsibility: the financial rules, team interface decisions, selection of the changes to retain, review of the resulting diff, GitHub delivery and responses to teammate review remain Jiaxin's responsibility.
-- Validation: on 2026-10-10, `npm run verify` exited 0 locally with Node 26.7.0 and an isolated PostgreSQL 16 Docker database: lint and strict TypeScript passed, all 211 unit tests, 135 PostgreSQL integration tests, the production build and all 24 Chromium tests passed. Migrations 001–008 applied successfully. No staging or production deployment is claimed by this entry.
+- Date: 2026-10-11. Tool: OpenAI Codex. Owner: Member B.
+- Request: address the changes requested on PR #12 and align the Forecast Engine with migration 005 and the forecast-input boundary.
+- AI-assisted work: added a 366-day maximum horizon, canonical UTC timestamp precision, consistent `ForecastInputError` handling, overdue-event handling, nullable workspace-threshold support, negative opening-balance handling, documentation and regression tests.
+- Review correction: the first revision changed the Forecast Engine to use the database statuses directly. After merging the latest `main`, the existing team decision showed that PR #14 owns the adapter mapping from `expected / received / paid / cancelled` to the engine's `pending / completed / cancelled` contract. The direct-status change was therefore rejected and corrected.
+- Student action: reviewed the PR comments, resolved the AI-usage merge conflict by retaining both records, selected the business rules and ran the complete local validation.
+- Validation: 100 Forecast domain tests and 186 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.

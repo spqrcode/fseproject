@@ -1,152 +1,240 @@
-/**
- * Pure forecast engine.
- *
- * Converts a list of CashEvents (all in the same currency) into a
- * daily balance timeline and derives summary metrics.
- *
- * Financial rules:
- *  - Events on the startDate ARE included.
- *  - Events outside [startDate, endDate] are excluded (not an error).
- *  - Multiple events on the same date are summed; the daily balance is
- *    recorded once per day (after all same-day events).
- *  - Events are processed in ascending expectedDate order; within a date
- *    they are processed in ascending creation order (id is used as a
- *    tiebreaker so ordering is deterministic).
- *  - The opening balance is the startingBalance argument.
- *  - Currency mixing is not attempted; callers must convert first.
- *  - All arithmetic uses Decimal; results are plain decimal strings.
- *
- * This module has no database, network, authentication, or UI dependency.
- */
+import { parseCashEvent, parseForecastDate, type CashEvent } from "@/lib/forecast/cash-event";
+import { decimalString, parseDecimal } from "@/lib/forecast/decimal";
+import {
+  addMoney,
+  CurrencyMismatchError,
+  money,
+  parseCurrency,
+  type Currency,
+} from "@/lib/forecast/money";
 
-import { parseDecimal, decimalString } from "@/lib/forecast/decimal";
-import { money, type Currency, type Money } from "@/lib/forecast/money";
-import type { CashEvent } from "@/lib/forecast/cash-event";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/** Balance at the end of one calendar day. */
 export type ForecastPoint = Readonly<{
-  date: string;        // YYYY-MM-DD
-  balance: string;     // signed decimal string in the reporting currency
+  /** Calendar date in UTC, formatted as YYYY-MM-DD. */
+  date: string;
+  /** End-of-day balance in the reporting currency. */
+  balance: string;
 }>;
+
+export type ForecastInput = Readonly<{
+  /** Inclusive UTC calendar date. */
+  startDate: string;
+  /** Inclusive UTC calendar date. */
+  endDate: string;
+  /** Balance before events on startDate are applied. */
+  openingBalance: string;
+  /** Workspace amount; null selects the 50% default. */
+  dangerThreshold: string | null;
+  events: readonly CashEvent[];
+  currency: Currency;
+}>;
+
+/** Warning is triggered after available cash falls below 50% of opening balance. */
+export const DANGER_THRESHOLD_PERCENT = "50";
+/** Inclusive calendar dates returned by one forecast request. */
+export const MAX_FORECAST_DAYS = 366;
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export type ForecastResult = Readonly<{
-  /** Balance at every day that had at least one event (plus startDate if provided). */
+  /** One end-of-day balance for every date in the inclusive forecast range. */
   timeline: readonly ForecastPoint[];
-  /**
-   * Starting balance of the forecast range, i.e. openingBalance argument value.
-   * Stored here so callers can compute deltas between scenarios without re-running.
-   */
   openingBalance: string;
-  /**
-   * Balance after all events in the horizon have been applied.
-   * Equals openingBalance when no events fall within [startDate, endDate].
-   */
   closingBalance: string;
-  /** Minimum balance reached at any point in the timeline. */
+  /** Includes the balance before startDate events are applied. */
   minimumBalance: string;
-  /** Date on which minimumBalance was first reached. null when timeline is empty. */
-  minimumDate: string | null;
-  /** Reporting currency. */
+  /** First date on which the minimum was observed. */
+  minimumDate: string;
+  /** The default percentage, or null when a workspace amount was supplied. */
+  dangerThresholdPercent: string | null;
+  dangerThresholdAmount: string;
+  /** First date whose balance is strictly below the threshold. */
+  firstDangerDate: string | null;
+  /** Calendar days from startDate; null when the threshold is never breached. */
+  runwayDays: number | null;
   currency: Currency;
 }>;
 
-// ---------------------------------------------------------------------------
-// Engine
-// ---------------------------------------------------------------------------
+type ForecastInputField =
+  | "startDate"
+  | "endDate"
+  | "openingBalance"
+  | "dangerThreshold";
 
-export interface ForecastInput {
-  /** Inclusive start date. Events on this date are included. YYYY-MM-DD. */
-  startDate: string;
-  /** Inclusive end date. YYYY-MM-DD. */
-  endDate: string;
-  /** Balance before any event in the horizon is applied. */
-  openingBalance: string;
-  /** All events to consider. Events outside the date range are silently skipped. */
-  events: readonly CashEvent[];
-  /** The reporting currency.  All events must already be in this currency. */
-  currency: Currency;
+export class ForecastInputError extends Error {
+  constructor(
+    readonly field: ForecastInputField,
+    message: string,
+  ) {
+    super(`ForecastInput.${field}: ${message}`);
+  }
+}
+
+function validateInputDate(field: "startDate" | "endDate", value: unknown) {
+  try {
+    return parseForecastDate("expectedDate", value);
+  } catch {
+    throw new ForecastInputError(field, `Expected a valid YYYY-MM-DD date, received ${JSON.stringify(value)}.`);
+  }
+}
+
+function nextDate(value: string) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function inclusiveDays(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00.000Z`).getTime();
+  const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
+  return (end - start) / MILLISECONDS_PER_DAY + 1;
+}
+
+function validateOpeningBalance(value: string, currency: Currency) {
+  let opening;
+  try {
+    opening = money(value, currency);
+  } catch {
+    throw new ForecastInputError(
+      "openingBalance",
+      `Expected a plain decimal amount, received ${JSON.stringify(value)}.`,
+    );
+  }
+  return opening;
+}
+
+function resolveDangerThreshold(value: string | null, openingBalance: string, currency: Currency) {
+  if (value === null) {
+    const percent = parseDecimal(DANGER_THRESHOLD_PERCENT);
+    return {
+      amount: money(
+        decimalString(parseDecimal(openingBalance).times(percent).dividedBy(100)),
+        currency,
+      ),
+      percent: decimalString(percent),
+    };
+  }
+
+  try {
+    return { amount: money(value, currency), percent: null };
+  } catch {
+    throw new ForecastInputError(
+      "dangerThreshold",
+      `Expected a plain decimal amount or null, received ${JSON.stringify(value)}.`,
+    );
+  }
+}
+
+type ProjectedEvent = Readonly<{
+  event: CashEvent;
+  forecastDate: string;
+}>;
+
+function compareProjectedEvents(left: ProjectedEvent, right: ProjectedEvent) {
+  if (left.forecastDate !== right.forecastDate) {
+    return left.forecastDate < right.forecastDate ? -1 : 1;
+  }
+  if (left.event.createdAt !== right.event.createdAt) {
+    return left.event.createdAt < right.event.createdAt ? -1 : 1;
+  }
+  const leftIsExpense = parseDecimal(left.event.amount).isNegative();
+  const rightIsExpense = parseDecimal(right.event.amount).isNegative();
+  if (leftIsExpense !== rightIsExpense) return leftIsExpense ? -1 : 1;
+  if (left.event.id === right.event.id) return 0;
+  return left.event.id < right.event.id ? -1 : 1;
 }
 
 /**
- * Run the base forecast.  The input events are never mutated; a new
- * ForecastResult is returned.
+ * Projects pending cash events without mutating caller input.
+ * Completed and cancelled events never affect a forecast.
  */
 export function runForecast(input: ForecastInput): ForecastResult {
-  const { startDate, endDate, currency } = input;
-
-  // Filter to events inside [startDate, endDate].
-  const inRange = input.events
-    .filter((e) => e.expectedDate >= startDate && e.expectedDate <= endDate && e.currency === currency)
-    .slice()
-    // Primary: date ascending; secondary: id ascending (deterministic tiebreak)
-    .sort((a, b) =>
-      a.expectedDate < b.expectedDate
-        ? -1
-        : a.expectedDate > b.expectedDate
-          ? 1
-          : a.id < b.id
-            ? -1
-            : a.id > b.id
-              ? 1
-              : 0,
+  const startDate = validateInputDate("startDate", input.startDate);
+  const endDate = validateInputDate("endDate", input.endDate);
+  if (startDate > endDate) {
+    throw new ForecastInputError("endDate", "Must be on or after startDate.");
+  }
+  if (inclusiveDays(startDate, endDate) > MAX_FORECAST_DAYS) {
+    throw new ForecastInputError(
+      "endDate",
+      `Forecast range must contain at most ${MAX_FORECAST_DAYS} calendar days.`,
     );
+  }
 
-  const openingMoney: Money = money(input.openingBalance, currency);
-  const timeline: ForecastPoint[] = [];
+  const currency = parseCurrency(input.currency);
+  const opening = validateOpeningBalance(input.openingBalance, currency);
+  const threshold = resolveDangerThreshold(input.dangerThreshold, opening.amount, currency);
+  const thresholdAmount = threshold.amount;
 
-  let running: Money = openingMoney;
-  let minBalance: string = input.openingBalance;
-  let minDate: string | null = null;
+  const eligibleEvents = input.events
+    .map((event) => parseCashEvent(event))
+    .filter(
+      (event) =>
+        event.status === "pending" &&
+        event.expectedDate <= endDate,
+    )
+    .map((event) => ({
+      event,
+      forecastDate: event.expectedDate < startDate ? startDate : event.expectedDate,
+    }));
 
-  // Group by date and accumulate.
-  let i = 0;
-  while (i < inRange.length) {
-    const date = inRange[i].expectedDate;
-    let dayTotal: Money = money("0", currency);
-    let j = i;
-    while (j < inRange.length && inRange[j].expectedDate === date) {
-      // amount is signed: positive = income, negative = expense
-      const current = parseDecimal(dayTotal.amount).plus(parseDecimal(inRange[j].amount));
-      dayTotal = money(decimalString(current), currency);
-      j++;
+  for (const { event } of eligibleEvents) {
+    if (event.currency !== currency) {
+      throw new CurrencyMismatchError(event.currency, currency);
     }
-    // Apply day total to running balance
-    const newBalance = parseDecimal(running.amount).plus(parseDecimal(dayTotal.amount));
-    running = money(decimalString(newBalance), currency);
+  }
+  eligibleEvents.sort(compareProjectedEvents);
+
+  const timeline: ForecastPoint[] = [];
+  let running = opening;
+  let minimum = opening;
+  let minimumDate = startDate;
+  let firstDangerDate: string | null = null;
+  let runwayDays: number | null = null;
+  let eventIndex = 0;
+  let elapsedDays = 0;
+
+  for (let date = startDate; ; date = nextDate(date)) {
+    while (
+      eventIndex < eligibleEvents.length &&
+      eligibleEvents[eventIndex].forecastDate === date
+    ) {
+      const event = eligibleEvents[eventIndex].event;
+      running = addMoney(
+        running,
+        money(event.amount, event.currency),
+      );
+      eventIndex += 1;
+    }
 
     timeline.push(Object.freeze({ date, balance: running.amount }));
 
-    // Track minimum
-    if (parseDecimal(running.amount).lessThan(parseDecimal(minBalance))) {
-      minBalance = running.amount;
-      minDate = date;
+    if (parseDecimal(running.amount).lessThan(parseDecimal(minimum.amount))) {
+      minimum = running;
+      minimumDate = date;
     }
-    i = j;
+
+    if (
+      firstDangerDate === null &&
+      parseDecimal(running.amount).lessThan(parseDecimal(thresholdAmount.amount))
+    ) {
+      firstDangerDate = date;
+      runwayDays = elapsedDays;
+    }
+
+    if (date === endDate) break;
+    elapsedDays += 1;
   }
 
   return Object.freeze({
     timeline: Object.freeze(timeline),
-    openingBalance: openingMoney.amount,
+    openingBalance: opening.amount,
     closingBalance: running.amount,
-    minimumBalance: minBalance,
-    minimumDate: minDate,
+    minimumBalance: minimum.amount,
+    minimumDate,
+    dangerThresholdPercent: threshold.percent,
+    dangerThresholdAmount: thresholdAmount.amount,
+    firstDangerDate,
+    runwayDays,
     currency,
   });
 }
-
-/**
- * Compute the delta between a scenario result and the base result.
- * Returns the difference in closing balance: scenarioResult - baseResult.
- */
-export function scenarioContribution(
-  base: ForecastResult,
-  scenario: ForecastResult,
-): string {
-  const diff = parseDecimal(scenario.closingBalance).minus(parseDecimal(base.closingBalance));
-  return decimalString(diff);
-}
-

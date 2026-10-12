@@ -244,21 +244,22 @@ describe("Percentage-based FX shock domain logic", () => {
 
     // Base conversion: Event 2 converted at unshocked rate (1122.50 / 1.1225 = 1000 EUR)
     const baseEvents: CashEvent[] = [
-      { id: "e1", userId: "u1", description: "EU Client", amount: "1000", currency: "EUR", expectedDate: "2026-10-05" },
-      { id: "e2", userId: "u1", description: "US Client", amount: "1000", currency: "EUR", expectedDate: "2026-10-10" },
+      { id: "e1", amount: "1000", currency: "EUR", expectedDate: "2026-10-05", createdAt: "2026-10-01T00:00:00.000Z", status: "pending" },
+      { id: "e2", amount: "1000", currency: "EUR", expectedDate: "2026-10-10", createdAt: "2026-10-01T00:00:00.000Z", status: "pending" },
     ];
 
     // Shocked conversion: Event 2 converted at shocked rate (1122.50 USD / 1.178625 = 952.38095238095238095238 EUR)
     const shockedAmount = convertWithShock(money("1122.50", "USD"), "EUR", shock);
     const shockedEvents: CashEvent[] = [
-      { id: "e1", userId: "u1", description: "EU Client", amount: "1000", currency: "EUR", expectedDate: "2026-10-05" },
-      { id: "e2", userId: "u1", description: "US Client", amount: shockedAmount.amount, currency: "EUR", expectedDate: "2026-10-10" },
+      { id: "e1", amount: "1000", currency: "EUR", expectedDate: "2026-10-05", createdAt: "2026-10-01T00:00:00.000Z", status: "pending" },
+      { id: "e2", amount: shockedAmount.amount, currency: "EUR", expectedDate: "2026-10-10", createdAt: "2026-10-01T00:00:00.000Z", status: "pending" },
     ];
 
     const baseForecast = runForecast({
       startDate: "2026-10-01",
       endDate: "2026-10-31",
       openingBalance: "5000",
+      dangerThreshold: null,
       events: baseEvents,
       currency: "EUR",
     });
@@ -267,6 +268,7 @@ describe("Percentage-based FX shock domain logic", () => {
       startDate: "2026-10-01",
       endDate: "2026-10-31",
       openingBalance: "5000",
+      dangerThreshold: null,
       events: shockedEvents,
       currency: "EUR",
     });
