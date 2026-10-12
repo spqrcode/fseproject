@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
     "test:integration": "node --env-file-if-exists=.env.local scripts/test.mjs integration",
+    "test:integration:runtime": "node --env-file-if-exists=.env.local scripts/test.mjs integration:runtime",
     "test:e2e": "node --env-file-if-exists=.env.local scripts/test.mjs e2e",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
