@@ -1,6 +1,6 @@
 # Forecast Engine
 
-Status: the Decimal, Money and FX foundation (PR #8), deterministic cash projection (PR #12), database-to-engine adapter (PR #19), delayed-invoice projection, reporting-currency conversion (PR #26), and base-versus-scenario comparison (PR #23) are merged into `main`. The Liquidity overview and Scenario lab call the shared Forecast Engine path with real session-scoped data. PR #30 proposes expressing the comparison in the reporting currency; it remains under review and is not described as merged here.
+Status: the Decimal, Money and FX foundation (PR #8), deterministic cash projection (PR #12), database-to-engine adapter (PR #19), delayed-invoice projection, reporting-currency conversion (PR #26), base-versus-scenario comparison (PR #23), and comparison in the reporting currency (PR #30) are merged into `main`. The Liquidity overview and Scenario lab call the shared Forecast Engine path with real session-scoped data.
 
 ## Boundary and data flow
 
@@ -39,9 +39,9 @@ The Forecast Engine never fetches a rate and never invents a fallback. The FX se
 - Cash-event amounts are signed and non-zero: income is positive and expense is negative.
 - The store returns only database events with status `expected`. Received and paid events dated on or before the start date are included in `startingBalance`; cancelled events appear nowhere.
 - `toForecastInput` maps every returned expected event to the engine status `pending` and copies the account currency onto it. The engine also validates `completed` and `cancelled` inputs defensively, but neither affects a projection.
-- Dates are real UTC `YYYY-MM-DD` calendar dates. `startDate` and `endDate` are inclusive.
+- Dates are real UTC `YYYY-MM-DD` calendar dates. `startDate` and `endDate` are inclusive. Application validation restricts dates to 2000–2100 before they reach the engine.
 - An overdue pending event is projected on `startDate`; an event after `endDate` is ignored.
-- One forecast contains at most 366 inclusive dates between 2000 and 2100.
+- The engine independently restricts one forecast to at most 366 inclusive dates.
 - Events on the same projected date are ordered by creation time, then expense before income for equal timestamps, then event ID. The order makes Decimal arithmetic deterministic.
 - Inputs and their event objects are never mutated.
 
@@ -70,8 +70,9 @@ The Forecast Engine never fetches a rate and never invents a fallback. The FX se
 - A delayed-invoice adjustment creates a new in-memory event list with a date override. It never changes the cash event or base forecast.
 - Adjustments that no longer apply are reported as `invalid`, `not_applicable` or `not_in_forecast` instead of breaking the whole scenario.
 - `scenarioContribution` is scenario closing balance minus base closing balance in the same currency.
-- PR #23 supplies the side-by-side base/scenario result and an additive per-adjustment contribution breakdown. It checks that the contribution total equals the scenario-minus-base closing-balance difference instead of silently showing an inconsistent breakdown.
-- The comparison currently runs in the selected account's currency. PR #30 proposes reusing `forecastStoredInReportingCurrency` so the Liquidity overview and Scenario lab use the same persisted ECB rate and both suppress figures when no usable rate exists.
+- PR #23 supplies the side-by-side base/scenario result and an additive per-adjustment contribution breakdown. `compareScenario` checks that the contribution total agrees with the scenario-minus-base closing-balance difference instead of silently showing an inconsistent breakdown.
+- Contributions are exact before currency conversion. After conversion, `CONTRIBUTION_TOLERANCE` permits a difference of at most `0.0000000001`, because two sums at 40-digit calculation precision can differ in their last digit; this is still eight orders of magnitude below one cent.
+- PR #30 routes `getScenarioComparison` through `forecastStoredInReportingCurrency`, so the Liquidity overview and Scenario lab use the same persisted ECB rate for base and scenario. When the rate is `UNAVAILABLE`, no comparison is shown rather than using a fallback or the wrong currency.
 - FX-shock provenance, freshness and percentage calculations remain owned by the FX/scenario modules; the Forecast Engine consumes only resolved rates and cash-event inputs.
 
 ## Verified boundary cases
@@ -87,11 +88,10 @@ The Forecast Engine never fetches a rate and never invents a fallback. The FX se
 | Missing required FX rate | Explicit unavailable/error result; never zero or fallback |
 | Negative opening balance with default threshold | Warning on the first forecast day |
 
-On 2026-10-13, after updating the documentation branch through PR #23, `npm run check` passed ESLint, TypeScript, 335 unit tests and the Next.js production build. Database integration and browser validation remain recorded in the individual feature PRs and the final `npm run verify` run.
+On 2026-10-13, after updating the documentation branch through PR #30, `npm run check` passed ESLint, TypeScript, 341 unit tests and the Next.js production build. Database integration and browser validation remain recorded in the individual feature PRs and the final `npm run verify` run.
 
 ## Remaining work requiring team scope
 
-- PR #30 must be reviewed and merged before the base-versus-scenario comparison can be described as using the workspace reporting currency.
 - Saved FX shocks are displayed with provenance but are not yet applied to the base-versus-scenario cash-flow comparison.
 - There is no combined forecast across several accounts. Adding one requires an agreed rule for combining accounts converted with different rates and effective dates; it is not silently assumed by the current engine.
 - Scenarios that combine delayed events and FX shocks need an agreed attribution rule before individual contributions can claim to explain the total effect.
