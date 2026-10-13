@@ -29,6 +29,8 @@ jobs:
       DATABASE_URL: postgresql://postgres@localhost:5432/portfolio_risk_test
       TEST_DATABASE_URL: postgresql://postgres@localhost:5432/portfolio_risk_test
       APP_ORIGIN: http://localhost:3100
+      # Throwaway password of the restricted role in the CI database service; not a secret.
+      TEST_RUNTIME_DATABASE_URL: postgresql://fse_runtime:ci-only-runtime-password@localhost:5432/portfolio_risk_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,11 +39,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node --version
+      # The role must exist before the migrations so their guarded GRANT blocks run; the base grants need the tables.
+      - run: node scripts/ci-runtime-role.mjs role
       - run: npm run db:migrate:test
+      - run: node scripts/ci-runtime-role.mjs base-grants
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:integration
+      # The data-store tests again, with the application connected as the restricted staging role.
+      - run: npm run test:integration:runtime
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
