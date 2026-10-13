@@ -213,6 +213,10 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(page.getByRole("status").filter({ hasText: "Scenario created." })).toBeVisible();
     await page.getByLabel("New expected date").fill(iso(20));
     await page.getByRole("button", { name: "Delay invoice in scenario" }).click();
+    // The delay redirects back to this page; wait until that navigation has finished (its status message and its
+    // title are in place) before scanning, so axe does not see the page between two documents.
+    await expect(page.getByRole("status").filter({ hasText: "Invoice delayed in this scenario." })).toBeVisible();
+    await expect(page).toHaveTitle("Scenario lab · FinTwin Global");
     await expect(page.getByRole("table", { name: "Base forecast and scenario forecast side by side" })).toBeVisible();
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
