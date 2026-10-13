@@ -32,13 +32,13 @@ Node 24 (`.nvmrc`), PostgreSQL 16. Copy `.env.example` to `.env.local` for your 
 
 - Amounts and rates are decimal strings end to end: `numeric` in PostgreSQL, Decimal in the engine. Do not use JavaScript `number` arithmetic for money. Round only at the presentation boundary (`src/lib/format.ts`, half to even).
 - Dates are UTC calendar dates (`YYYY-MM-DD`). A forecast covers at most 366 dates counting both ends.
-- Migrations are additive. Never edit a migration that has been applied or shared; add a new numbered file. Grant the runtime role `fse_runtime` only the columns it needs, inside a guarded `DO` block like the existing migrations.
+- Migrations are additive. Never edit a migration that has been applied or shared; add a new numbered file. Grant the runtime role `fse_runtime` only the columns it needs, inside a guarded `DO` block like the existing migrations. Since #27, CI compares the runtime role's actual privileges with a fixed list, so a new or changed grant must change in three places together: the migration, the grant table in `docs/deployment.md` and the expected map in `tests/integration/runtime-privileges.test.ts` (base grants that no migration gives also live in `scripts/ci-runtime-role.mjs`). Otherwise CI fails with a privilege mismatch.
 
 ## Security rules
 
 - Ownership comes from the session in the database, never from an id sent by the browser. Every store query starts at the session token and joins down user, workspace, account, event.
 - Validate every input on the server with the schemas in `src/lib/validation.ts`.
-- Never commit `.env*` files, credentials, tokens or real personal data. Do not paste secrets or real financial data into an AI tool. Do not log balances, tokens or passwords.
+- Never commit `.env*` files (except `.env.example`, which holds placeholders only), credentials, tokens or real personal data. Do not paste secrets or real financial data into an AI tool. Do not log balances, tokens or passwords.
 - A change that touches authentication, authorization or a migration needs a test showing that user A cannot read or change user B's data.
 
 ## Tests

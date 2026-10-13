@@ -72,9 +72,9 @@ Reading the diagram:
 - **No currency on events.** An event's currency is its account's currency, so the two cannot disagree.
 - **Not drawn.** `schema_migrations` (applied migration history) has no relationships.
 
-### Scenario tables (open pull requests, not on `main`)
+### Scenario tables
 
-Migration `007_scenarios.sql` is in PR #9 and `008_scenario_fx_shocks.sql` in PR #17. A scenario stores only its adjustments; the base events are never copied or edited, which is what makes base and scenario comparable.
+Migrations `007_scenarios.sql` (PR #9) and `008_scenario_fx_shocks.sql` (PR #17) are on `main`. `009_scenario_fx_shock_bounds.sql`, which bounds the stored shock percentage, is in PR #24 and still in review. A scenario stores only its adjustments; the base events are never copied or edited, which is what makes base and scenario comparable.
 
 ```mermaid
 erDiagram

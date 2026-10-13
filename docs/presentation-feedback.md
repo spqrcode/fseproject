@@ -25,12 +25,12 @@ Raising these before being asked is part of the assessment ("candid discussion o
 
 | Weakness | Where it is documented | Planned or accepted |
 | --- | --- | --- |
-| Amounts are not yet converted into the reporting currency; the workspace danger threshold is applied unconverted to accounts in other currencies | [limitations](limitations.md), PR #20 | To be built on the persisted ECB snapshots |
+| A forecast uses one persisted ECB rate for its whole horizon, so future exchange-rate moves are not modelled, and FX shocks are not yet part of the base-versus-scenario comparison | [limitations](limitations.md), PRs #26 and #30 | Accepted for the prototype; shocks are previewed separately |
 | The ECB cache refreshes only when a rate is requested; there is no scheduler, and concurrent refreshes are not coalesced | [limitations](limitations.md) | Accepted for the prototype |
 | Email is not verified and there is no password recovery or MFA | [security](security.md) | Accepted, listed in the reflection |
 | Authorization is in application queries and composite foreign keys, not database row-level security | [limitations](limitations.md) | Accepted, listed in the reflection |
 | Preview deployments can be blocked when a commit author is not linked to the Vercel team | [deployment](deployment.md) | Account linking and team membership |
-| No shared demo dataset; a presenter registers a fresh account | README | Optional seed script |
+| The demo data is seeded by a script for a user registered in the browser, not a shared account, and its dates are relative to the seeding day | README, Demo data (PR #28) | Accepted: no credentials are committed; seed on the day of the demo or the day before |
 
 ## Defense answer pattern
 

@@ -2,7 +2,7 @@
 
 ## Component diagram
 
-Status as of 13 October 2026, after PRs #9, #14, #16, #17, #18, #19, #20 and #25 were merged. Solid green boxes are on `main`, dashed amber boxes are in open pull requests and not merged yet, dotted grey boxes are planned and not started. The same status is given in the table below, so the diagram does not rely on colour alone.
+Status as of 14 October 2026, after PRs #9, #14, #16, #17, #18, #19, #20, #23, #25, #26 and #30 were merged. Solid green boxes are on `main`, dashed amber boxes are in open pull requests and not merged yet, dotted grey boxes are planned and not started; at the moment every box is on `main`. The same status is given in the table below, so the diagram does not rely on colour alone.
 
 ```mermaid
 flowchart TB
@@ -29,8 +29,8 @@ flowchart TB
     Scen["Scenario store<br/>PR #9, merged"]:::done
     Shock["Percentage FX shocks<br/>PR #17, merged"]:::done
     FX["FX service and ECB adapter"]:::done
-    Conv["Currency conversion<br/>PR #26"]:::pr
-    Cmp["Base versus scenario comparison<br/>PR #23"]:::pr
+    Conv["Currency conversion<br/>PR #26, merged"]:::done
+    Cmp["Base versus scenario comparison<br/>PRs #23 and #30, merged"]:::done
   end
 
   subgraph Dom["Domain: pure functions"]
@@ -46,9 +46,11 @@ flowchart TB
   UI --> Auth
   UI --> Stores
   Events --> Stores
-  Overview --> Input
+  Overview --> Conv
+  Conv --> Input
   Lab --> Scen
   Lab --> Shock
+  Lab --> Cmp
   Input --> Adapter
   Adapter --> Engine
   Scen --> Engine
@@ -60,10 +62,10 @@ flowchart TB
   FX -- "reads and writes snapshots" --> DB
   FX -- "fetches rates" --> ECB
   Shock --> FX
-  Conv -.-> FX
-  Conv -.-> Engine
-  Cmp -.-> Scen
-  Cmp -.-> Engine
+  Conv --> FX
+  Conv --> Engine
+  Cmp --> Scen
+  Cmp --> Conv
 
   style Pres fill:#ffffff,stroke:#8b8d93
   style Svc fill:#ffffff,stroke:#8b8d93
@@ -84,8 +86,8 @@ flowchart TB
 | Cash events page | Accounts and expected events: create, edit, settle, cancel, delete | Implemented (PR #16) |
 | Liquidity overview page | One account's deterministic forecast with chart, runway and danger threshold | Implemented (PR #20) |
 | Scenario Lab page | Delayed invoices and percentage FX shocks | Implemented (PR #18) | `src/app/(protected)` |
-| Conversion into the reporting currency | Convert an account's forecast with one persisted snapshot; no figures when no usable rate exists | Open PR #26 | `src/lib/forecast/reporting-currency.ts`, `src/lib/forecast-reporting.ts` |
-| Base versus scenario comparison | Delta between base and scenario with a contribution breakdown that sums to the delta | Open PR #23 (delayed invoices only) | `src/lib/forecast/scenario-comparison.ts` |
+| Conversion into the reporting currency | Convert an account's forecast with one persisted snapshot; no figures when no usable rate exists | Implemented (PR #26) | `src/lib/forecast/reporting-currency.ts`, `src/lib/forecast-reporting.ts` |
+| Base versus scenario comparison | Delta between base and scenario in the reporting currency, with a contribution breakdown that sums to the delta (exactly in one currency, within 1e-10 after conversion) | Implemented (PRs #23 and #30; delayed invoices only) | `src/lib/forecast/scenario-comparison.ts`, `src/lib/scenario-comparison.ts` |
 
 Dependency rules that keep the structure maintainable: the Forecast Engine imports nothing from the database, the framework or the UI; presentation code does not calculate financial results; only server-side code reaches PostgreSQL and the ECB; forecasts read persisted snapshots, never a live market price, so a result can be reproduced.
 
@@ -120,4 +122,4 @@ The service first checks the cache. A snapshot fetched within one hour is `CURRE
 
 ## Later increments
 
-The snapshot/cache layer is not yet wired to Scenario Lab or the forecast workflow on this branch. Holdings, market quotes and `/analytics` remain outside the current cash-forecast MVP. See requirements for the planned calculations and failure states.
+FX shocks are previewed and saved with their snapshot but are not yet applied in the base-versus-scenario comparison. Holdings, market quotes and `/analytics` remain outside the current cash-forecast MVP. See requirements for the planned calculations and failure states.

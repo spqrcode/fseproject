@@ -1,10 +1,10 @@
-# Portfolio Risk Dashboard
+# FinTwin Global
 
-Investment portfolio tracker for the Financial Software Engineering course at Frankfurt School.
+Multi-currency cash-flow and liquidity scenario tool for the Financial Software Engineering course at Frankfurt School.
 
 ## Current scope
 
-The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. The foundation also has a server-only ECB exchange-rate provider with a validated PostgreSQL snapshot cache for EUR, USD and SGD, the deterministic Forecast Engine, forecast input for one account, and the data layer for delayed-invoice scenarios and percentage FX shocks. The Scenario Lab page uses them: it delays invoices and previews and saves ECB exchange-rate shocks. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
+The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. The foundation also has a server-only ECB exchange-rate provider with a validated PostgreSQL snapshot cache for EUR, USD and SGD, the deterministic Forecast Engine, forecast input for one account, and the data layer for delayed-invoice scenarios and percentage FX shocks. The Scenario Lab page uses them: it delays invoices, compares base and scenario in the reporting currency, and previews and saves ECB exchange-rate shocks. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
 
 The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the three MVP views, Liquidity overview, Cash events and Scenario lab, all three live on `main` (see the status table below for what is still in review), a Workspace page, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
 
@@ -14,15 +14,13 @@ The interface is branded FinTwin Global. Signed-out visitors see a public home p
 - **Demo access:** there is no shared demo account and no credentials are committed. Open `/register`, create an account with any address and a 15–128 character passphrase (no email is sent and the address is not verified), and sign in. Use a throwaway address and a passphrase you do not use elsewhere.
 - **Suggested check in a private window:** `/dashboard` redirects to `/login` when signed out; register, sign in, name a workspace, change the reporting currency and appearance in settings, sign out, sign in again and confirm everything persisted; open another browser and confirm the second account sees none of it.
 
-Status of the three business views on `main`, as of 12 October 2026. Update this table when a pull request merges.
+Status of the three business views on `main`, as of 14 October 2026. Update this table when a pull request merges.
 
 | View | On `main` | Pull request |
 | --- | --- | --- |
-| Liquidity overview (`/dashboard`) | Live: one account's forecast for 30 to 365 days with chart, runway and danger threshold, in the account's currency | #20, merged; reporting-currency conversion in #26 |
+| Liquidity overview (`/dashboard`) | Live: one account's forecast for 30 to 365 days with chart, runway and danger threshold, in the reporting currency (one persisted ECB rate per forecast) | #20 and #26, merged |
 | Cash events (`/cash-events`) | Live: accounts and expected events; create, edit, settle, cancel and delete | #16, merged |
-| Scenario Lab (`/scenarios`) | Live: delayed invoices, ECB shock preview and saved shocks with their snapshot | #18, merged; base versus scenario comparison in #23; shock bounds in #24 |
-
-A seeded demo dataset is not provided yet; see [presentation feedback](docs/presentation-feedback.md) for open work.
+| Scenario Lab (`/scenarios`) | Live: delayed invoices, base versus scenario comparison in the reporting currency, ECB shock preview and saved shocks with their snapshot | #18, #23 and #30, merged; shock bounds and error messages in #24, in review |
 
 ## Local setup
 
