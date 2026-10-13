@@ -7,7 +7,7 @@ import { listCashAccounts, listCashEvents } from "@/lib/cash-events-store";
 import { getForecastInput } from "@/lib/forecast-input-store";
 import { getAdjustments, getScenarios } from "@/lib/scenario-store";
 import { runForecast, runScenarioForecast, toForecastInput } from "@/lib/forecast";
-import { DEMO_PLAN, isoDay, seedDemo } from "../../scripts/demo-seed.mjs";
+import { checkDemo, DEMO_PLAN, isoDay, seedDemo } from "../../scripts/demo-seed.mjs";
 
 // The demo seed against real PostgreSQL: what it writes, that the story it is meant to tell holds when the real
 // stores and the engine read it back, and that it refuses to touch a workspace that already has data.
@@ -113,5 +113,19 @@ describe("demo seed", () => {
 
     await expect(seedDemo(client, { email: `nobody-${randomUUID()}@example.com`, today })).rejects.toThrow("Register the demo user");
     await expect(seedDemo(client, { email: "not-an-email", today })).rejects.toThrow("--email");
+  });
+
+  it("the read-only check says whether seeding would work, and writes nothing", async () => {
+    expect(await checkDemo(client, { email: `nobody-${randomUUID()}@example.com` })).toEqual({ userExists: false, workspaceExists: false, accounts: 0, ready: false });
+
+    const user = await registered();
+    expect(await checkDemo(client, { email: user.email })).toEqual({ userExists: true, workspaceExists: false, accounts: 0, ready: true });
+    // Read-only: the check created nothing.
+    expect((await database().query("SELECT count(*)::int AS n FROM workspaces WHERE user_id = $1", [user.id])).rows[0].n).toBe(0);
+
+    await seedDemo(client, { email: user.email, today });
+    expect(await checkDemo(client, { email: user.email.toUpperCase() })).toEqual({ userExists: true, workspaceExists: true, accounts: 3, ready: false });
+    // The connection is left usable for the next statement (the read-only transaction was closed).
+    expect((await client.query("SELECT 1 AS ok")).rows[0].ok).toBe(1);
   });
 });

@@ -2,7 +2,12 @@
 // does not depend on typing events live and shows the same story every time.
 //
 //   npm run demo:seed -- --email demo@example.com            (DATABASE_URL from the environment or .env.local)
-//   npm run demo:seed -- --email demo@example.com --dry-run  (prints the plan, writes nothing)
+//   npm run demo:seed -- --email demo@example.com --dry-run  (prints the plan, writes nothing; with DATABASE_URL
+//                                                            set it also checks the database, read-only)
+//
+// Use the restricted runtime role (fse_runtime) as DATABASE_URL: the script only reads users and inserts into the
+// tables the application itself writes to, so it needs no more privileges than the application. Seed on the day of
+// the demo or the day before, because every date is relative to today.
 //
 // Safety rules:
 // - No account or password is created here. Register the demo user in the browser first; the password stays with
@@ -120,6 +125,29 @@ export async function seedDemo(client, { email, today = new Date() }) {
   }
 }
 
+// Read-only check for the day before the demo: does the user exist, and is the workspace still empty enough to seed?
+// Runs in a READ ONLY transaction, so it cannot write even by mistake.
+export async function checkDemo(client, { email }) {
+  await client.query("BEGIN TRANSACTION READ ONLY");
+  try {
+    const user = (await client.query("SELECT id FROM users WHERE email = $1", [String(email).trim().toLowerCase()])).rows[0];
+    if (!user) return { userExists: false, workspaceExists: false, accounts: 0, ready: false };
+    const workspace = (await client.query("SELECT id FROM workspaces WHERE user_id = $1", [user.id])).rows[0];
+    const accounts = workspace
+      ? (await client.query("SELECT count(*)::int AS n FROM cash_accounts WHERE workspace_id = $1", [workspace.id])).rows[0].n
+      : 0;
+    return { userExists: true, workspaceExists: Boolean(workspace), accounts, ready: accounts === 0 };
+  } finally {
+    await client.query("ROLLBACK");
+  }
+}
+
+function describeCheck(check) {
+  if (!check.userExists) return "Database check: no user with that email. Register the demo user in the application first.";
+  if (!check.ready) return `Database check: the workspace already has ${check.accounts} cash accounts, so seeding would be refused. Use a fresh demo user.`;
+  return `Database check: user found, ${check.workspaceExists ? "workspace exists and has no cash accounts" : "no workspace yet (one will be created)"}. Ready to seed.`;
+}
+
 function describePlan(today) {
   const lines = [`Workspace: ${DEMO_PLAN.workspace} (kept if the user already has one)`];
   for (const account of DEMO_PLAN.accounts) {
@@ -136,6 +164,17 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   if (!args.includes("--email") || !email) throw new Error("Usage: npm run demo:seed -- --email demo@example.com [--dry-run]");
   if (args.includes("--dry-run")) {
     console.log(describePlan(new Date()));
+    if (process.env.DATABASE_URL) {
+      const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+      await client.connect();
+      try {
+        console.log(describeCheck(await checkDemo(client, { email })));
+      } finally {
+        await client.end();
+      }
+    } else {
+      console.log("Set DATABASE_URL to also check, read-only, that the user exists and the workspace is empty.");
+    }
   } else {
     if (!process.env.DATABASE_URL) throw new Error("Set DATABASE_URL to the database to seed.");
     const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
