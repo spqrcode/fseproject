@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ScenarioFigure } from "@/components/placeholder-figures";
 import { DelayForm, SaveShockForm, ScenarioForm } from "@/components/scenario-forms";
 import { ScenarioComparisonPanel } from "@/components/scenario-comparison";
+import { ConversionNote, NoRateNotice } from "@/components/conversion-note";
 
 export const metadata = { title: "Scenario lab" };
 type Params = { scenario?: string; base?: string; quote?: string; shock?: string; preview?: string; success?: string; account?: string; days?: string };
@@ -64,7 +65,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
   const comparedAccount = accounts.find(item => item.id === firstParam(params.account)) ?? accounts[0];
   const horizon = parseHorizon(params.days);
   const comparison = selected && comparedAccount && adjustments.length > 0
-    ? await getScenarioComparison(token, { scenarioId: selected.id, accountId: comparedAccount.id, ...forecastWindow(new Date(), horizon) })
+    ? await getScenarioComparison(token, { scenarioId: selected.id, accountId: comparedAccount.id, ...forecastWindow(new Date(), horizon) }, reporting ?? DEFAULT_REPORTING_CURRENCY)
     : null;
   const described = adjustments.flatMap(item => {
     const event = eventById.get(item.cashEventId);
@@ -122,11 +123,16 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
               <button className="button secondary" type="submit">Compare</button>
             </form>
             {comparison
-              ? <ScenarioComparisonPanel comparison={comparison.comparison} currency={comparison.account.currency} horizon={horizon} described={described} />
+              ? comparison.comparison
+                ? <>
+                    <ConversionNote conversion={comparison.conversion} />
+                    <ScenarioComparisonPanel comparison={comparison.comparison} currency={comparison.conversion.to} horizon={horizon} described={described} />
+                  </>
+                : <NoRateNotice conversion={comparison.conversion} what="comparison" />
               : adjustments.length === 0
                 ? <p className="muted">Delay an invoice above to see its effect on the lowest balance and the runway.</p>
                 : <p role="status" className="muted">The comparison is not available for this account.</p>}
-            <p className="muted comparison-note">Amounts are in the account&apos;s currency; conversion into your reporting currency is not applied yet. Exchange-rate shocks are not part of this comparison yet.</p>
+            <p className="muted comparison-note">Amounts are in your reporting currency, converted with the same ECB rate as the Liquidity overview. Exchange-rate shocks are not part of this comparison yet.</p>
           </>}
         </section>}
         <section className="scenario-section" aria-labelledby="fx-heading">
