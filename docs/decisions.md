@@ -131,10 +131,10 @@ Scenarios and events meet through composite `(id, workspace_id)` foreign keys. A
 
 ## 2026-10-10 — Forecast input implemented; a settled event's date is the date the money moved
 
-Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`) and `src/lib/forecast-input.ts` (`toEngineStatus`). Since PR #12 (engine) and PR #19 (`toForecastInput`) are merged, the store's output goes through `toForecastInput` into `runForecast`; an integration test in `tests/integration/forecast-input.test.ts` runs the whole path.
+Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`); the status mapping lives in `toForecastInput` (PR #19). Since PR #12 (engine) and PR #19 (`toForecastInput`) are merged, the store's output goes through `toForecastInput` into `runForecast`; an integration test in `tests/integration/forecast-input.test.ts` runs the whole path.
 
 **Status of the 2026-10-08 decisions**
-1. Status mapping: implemented as `toEngineStatus` (expected → pending, received and paid → completed, cancelled → excluded, checked for every status at compile time). The adapter from PR #19 marks every returned event `pending`; that is the same mapping, because the store only returns `expected` events.
+1. Status mapping: implemented in `toForecastInput` (PR #19). The store returns only `expected` events (received and paid events are summed into the starting balance, cancelled events never appear), and the adapter marks every returned event `pending`, which is the agreed mapping. A separate `toEngineStatus` function written for this was removed on 2026-10-13 because nothing called it.
 2. Default danger threshold: the store returns the workspace value as stored (`null` when none is set). The 50% default belongs to the engine (PR #12) and is not applied by the store.
 3. Starting balance: implemented, with one correction found in review (PR #14, 2026-10-11). It is the account's opening balance plus its `received` and `paid` events dated **on or before** the start date, summed by PostgreSQL in `numeric`. The first version used "before", which left money that moved on the start day in neither the balance nor the event list, because the engine ignores completed events. Decision 3 of 2026-10-08 is read as "on or before" from here on.
 4. Overdue events: implemented as decided. An `expected` event dated before the start date is returned with `expectedDate` set to the start date, its stored date kept as `originalDate`, and `overdue: true`.
@@ -147,3 +147,24 @@ Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`) and `src/l
 
 Tests: `tests/integration/forecast-input.test.ts`, the settling tests in `tests/integration/cash-events.test.ts`, `tests/unit/forecast-input.test.ts`.
 
+## 2026-10-12 — Forecasts in the reporting currency
+
+**Decision.** An account's forecast is converted into the reporting currency before it is run: the opening balance and every event with one rate from the persisted ECB snapshots (through the rate service, so a fresh cache is used without a network call and at most one refresh is attempted per hour). The workspace danger threshold is not converted, because it is already an amount in the reporting currency (decision 2 of 2026-10-08). `CURRENT` and `STALE` rates are both used and labelled; with no usable rate the forecast is unavailable and no number is shown. Code: `convertForecastInput` (pure) and `getForecastInReportingCurrency` (server).
+
+**Requirement.** US-06 (proposal): use EUR, USD or SGD as display currency, with a visible effective date, provider and data state. It also fixes the known limit that the threshold was compared in the account's own currency.
+
+**Alternatives.** Convert each event with the rate of its own date: more realistic for settled history but makes a forecast a mix of rates that nobody can reproduce from one snapshot. Convert only the totals: the threshold and runway would still be computed in the wrong currency.
+
+**Trade-off.** One rate for a whole forecast means the converted figures are the base figures scaled by that rate; it does not model future rate moves (that is what FX shocks are for).
+
+**Verification.** Unit tests: no-op in the same currency, both directions of a pair, no rounding, the threshold passed through and changing the warning, a missing or wrong-pair rate refused, purity. PostgreSQL tests with a provider double: fresh cache without a provider call, the threshold in the reporting currency, the cross rate, STALE when the provider is down, unavailable without a rate, ownership.
+
+## 2026-10-13 — The comparison in the reporting currency, and a tolerance for its sum check
+
+**Decision.** The base-versus-scenario comparison uses the same conversion as the Liquidity overview (one persisted ECB rate per forecast, `forecastStoredInReportingCurrency`), so both pages show the same figures in the same currency. The check that the per-invoice contributions add up to the closing-balance difference accepts a gap of at most `CONTRIBUTION_TOLERANCE` (10⁻¹⁰).
+
+**Why the tolerance.** Converted amounts carry the engine's 40 significant digits, so adding them rounds in the last digit, and the two ways of adding the same numbers (each contribution, then the total) can differ around the 34th decimal. With the real EUR/SGD rate 1.4127 the exact check threw for an ordinary account. 10⁻¹⁰ is eight orders of magnitude below one cent, so a missing, double-counted or wrongly attributed invoice still fails; for unconverted amounts the gap stays exactly zero.
+
+**Alternatives.** Round converted amounts to a fixed scale before the engine runs: exact sums, but it would change #26's rule of rounding only for display. Compare in the account currency and convert the results: the workspace threshold would then be compared in the wrong currency, the problem #26 fixed.
+
+**Verification.** Unit tests with the rates that used to throw (1.4127, 3, 1.123456789) and the tolerance boundary (10⁻¹⁰ accepted, 10⁻⁹, a cent and a missing invoice refused); a PostgreSQL test comparing a dollar account in euro; a test that no comparison is shown without a rate.

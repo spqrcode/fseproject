@@ -11,3 +11,8 @@ test-results/
 .local/
 .vercel/
 .vercel
+
+# macOS and iCloud sync leave "name 2" copies of files and folders; they must never be committed
+* 2
+* 2.*
+* 2/
