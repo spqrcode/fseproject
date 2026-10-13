@@ -30,6 +30,17 @@ npm run dev
 
 Open [localhost:3000](http://localhost:3000), register with an email address and a 15–128 character passphrase, then sign in. Email delivery and password recovery are not implemented; registration does not verify ownership of the email address.
 
+## Demo data
+
+For a presentation, register a demo user in the browser first (the password stays with the person who chose it), then seed a workspace for it:
+
+```sh
+npm run demo:seed -- --email demo@example.com --dry-run
+npm run demo:seed -- --email demo@example.com
+```
+
+`DATABASE_URL` selects the database; seed a hosted database with the owner connection, as for migrations. The script adds a euro operating account, US receivables and a Singapore office with sixteen expected events dated from today, and two scenarios: a customer invoice three weeks late (the euro account falls below its danger threshold on payroll day) and a US client paying 30 days late. It creates no user or password, inserts no exchange rate, runs in one transaction, and refuses a workspace that already has cash accounts. See `scripts/demo-seed.mjs`.
+
 ## Verify Issue 1
 
 ```sh
