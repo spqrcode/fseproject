@@ -268,11 +268,21 @@ Request: while reviewing PR #18 the student ran the Scenario lab with seeded ECB
 
 Validation: ESLint and TypeScript clean, all unit tests passed including the new ones, production build passed. Removing the half-even rounding mode makes the rounding test fail (1.23445 becomes 1.2345).
 
+## Comparison in the reporting currency (branch `feat/comparison-reporting-currency`)
+
+Date: 2026-10-13. Tool: Claude Code. Owner: Jiaxin. Follow-up requested by Haina in her approval of #23.
+
+Found before writing the change: a probe with converted inputs showed that the exact sum check in `compareScenario` throws for real rates such as EUR/SGD 1.4127, because converted amounts carry 40 significant digits and sums round in the last digit. Connecting the comparison to the conversion as it was would have broken the Scenario lab for every Singapore-dollar account. The student chose a documented tolerance (10⁻¹⁰) over rounding converted amounts, to keep #26's rule that amounts are rounded only for display.
+
+AI-generated: the tolerance and `contributionsAddUp`, the comparison through `forecastStoredInReportingCurrency`, the shared `ConversionNote` and `NoRateNotice` (now used by both pages), and the unit and PostgreSQL tests. The overview's notes keep their exact wording, which its browser tests check.
+
+Validation (2026-10-13, local, fresh PostgreSQL 16 database): see the PR description for the numbers of the final run.
+
 ## Haina Liu — Forecast Engine status reconciliation after PR #26
 
 - Date: 2026-10-13. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
 - Request: update local `main`, inspect the merged implementation and continue the next independent Forecast Engine task without duplicating open pull requests.
-- AI-assisted work: audited the merged Forecast Engine, input adapter, reporting-currency service and open branches; updated `docs/forecast-engine.md` so it distinguishes merged behavior from PR #23 and records the actual store → adapter → FX conversion → engine → UI boundary.
+- AI-assisted work: audited the merged Forecast Engine, input adapter, reporting-currency service and open branches; updated `docs/forecast-engine.md` to record the actual store → adapter → FX conversion → engine → UI boundary and distinguish merged behavior from remaining scope.
 - Scope decision for student review: no multi-account forecast was added. That would require a team rule for combining accounts converted with different rates and effective dates, so it remains explicit future scope rather than an AI assumption.
 - Validation: after fast-forwarding `main` through PR #26, `npm run check` passed ESLint, TypeScript, 325 unit tests and the Next.js production build. The student must inspect this documentation diff and remains responsible for staging, committing, pushing and opening the PR.
-- Follow-up: after PR #23 merged, Codex merged the latest `main` into the documentation branch and updated the status to distinguish the merged account-currency comparison from PR #30's still-unmerged reporting-currency follow-up. The student reviewed PR #30 separately; no PR #30 behavior is recorded here as merged. `npm run check` then passed ESLint, TypeScript, 335 unit tests and the Next.js production build.
+- Follow-up: after PRs #23 and #30 merged, Codex merged the latest `main` into the documentation branch, retained both appended AI usage entries, and updated the Forecast Engine status, reporting-currency comparison, contribution tolerance and date-validation boundary in response to review. The student reviewed PR #30 separately before it merged.

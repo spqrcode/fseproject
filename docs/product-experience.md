@@ -14,7 +14,7 @@ Owner: Gabriel (Product Experience), with Cash events and Scenario lab integrati
 | `/workspace` | Workspace name stored in `workspaces` | Existing form, renamed from `/portfolio` |
 | `/settings` | Reporting currency, appearance and active sessions | Implemented |
 
-On the Scenario lab, a selected scenario with delayed invoices is compared with the base forecast of one account for 30, 90, 180 or 365 days: closing balance, lowest balance and its date, first day below the danger threshold and runway, side by side with the difference, then one effect per delayed invoice that adds up to the closing-balance difference. Adjustments that do not apply to that forecast are listed with the reason, never hidden. Amounts are in the account's currency; exchange-rate shocks are not part of the comparison yet.
+On the Scenario lab, a selected scenario with delayed invoices is compared with the base forecast of one account for 30, 90, 180 or 365 days: closing balance, lowest balance and its date, first day below the danger threshold and runway, side by side with the difference, then one effect per delayed invoice that adds up to the closing-balance difference. Adjustments that do not apply to that forecast are listed with the reason, never hidden. Amounts are in the reporting currency, converted with the same ECB rate and note as the Liquidity overview (`src/components/conversion-note.tsx`); without a usable rate no comparison is shown. Exchange-rate shocks are not part of the comparison yet.
 
 Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/scenarios/compare`).
 
@@ -127,7 +127,7 @@ A skip link is the first keyboard stop on every page. Headings follow one `h1` p
 
 ## How the Forecast Engine and Scenarios & FX plug in
 
-1. The Liquidity overview reads the forecast input, the adapter and the engine (#20). The numerical base-versus-scenario comparison in `scenarios/page.tsx` is #23. Cash events, scenario adjustments and FX preview are connected already.
+1. The Liquidity overview reads the forecast input, the adapter and the engine (#20). The numerical base-versus-scenario comparison in `scenarios/page.tsx` came with #23 and is in the reporting currency since this change. Cash events, scenario adjustments and FX preview are connected already.
 2. Read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
 3. Pass amounts as decimal strings from the calculation layer; pass `null` when a value is unavailable.
 4. Update the module row on the liquidity overview from "Not connected yet" to the real status.
@@ -138,10 +138,10 @@ See [testing](testing.md). Unit tests cover formatting and currency validation, 
 
 ## Limitations
 
-- The ECB service resolves rates and the Scenario lab previews and saves shocked rates. Forecast values are shown in each account's own currency until the reporting-currency conversion (#26) is merged.
+- The ECB service resolves rates and the Scenario lab previews and saves shocked rates. Forecasts and the comparison are shown in the reporting currency with one persisted rate per forecast.
 - EUR is the default because the team and the assessment are based in Europe. Changing the default needs a migration and a decision in `decisions.md`.
 - The interface is English only and uses a fixed `en-GB` number format.
-- The Scenario lab shows dates and rate provenance; the numerical comparison with the base forecast is #23, so this page does not claim a cash-flow result.
+- The Scenario lab's comparison covers delayed invoices only; saved FX shocks are shown with their snapshot but do not change the compared forecast yet.
 
 ## Scenario lab integration
 
