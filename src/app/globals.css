@@ -303,6 +303,36 @@ button:disabled { opacity: .6; cursor: progress; }
 .confirm-delete .button { color: var(--danger); border-color: var(--danger); min-height: 40px; }
 .event-empty { padding: 48px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line); }
 
+/* Scenario lab */
+.scenario-layout { display: grid; grid-template-columns: minmax(260px, .7fr) minmax(0, 1.7fr); align-items: start; gap: 56px; }
+.scenario-sidebar { display: grid; gap: 24px; }
+.scenario-sidebar .scenario-note { color: var(--muted); font-size: 13px; }
+.scenario-list { margin: 0 0 28px; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.scenario-list li { border-bottom: 1px solid var(--line); }
+.scenario-list a { display: block; padding: 12px 0; overflow-wrap: anywhere; }
+.scenario-list a[aria-current="page"] { color: var(--accent); font-weight: 700; }
+.scenario-form { margin-top: 22px; }
+.scenario-form .button { justify-self: start; }
+.scenario-main { display: grid; gap: 48px; min-width: 0; }
+.scenario-section { padding-bottom: 40px; border-bottom: 1px solid var(--line); }
+.scenario-section h2 { margin: 10px 0 12px; font-family: var(--serif); font-size: 34px; font-weight: 400; }
+.scenario-section > .muted { max-width: 66ch; margin-bottom: 24px; }
+.scenario-comparison { margin-bottom: 28px; table-layout: fixed; }
+.scenario-comparison th, .scenario-comparison td { overflow-wrap: anywhere; }
+.scenario-comparison thead th:first-child { width: 48%; }
+.scenario-comparison tbody th { font-weight: 400; text-align: left; padding: 14px 12px 14px 0; border-bottom: 1px solid var(--line); }
+.scenario-comparison td:last-child { text-align: left; }
+.scenario-preview-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 16px; margin: 22px 0; }
+.scenario-preview-form .button { justify-self: start; }
+.scenario-rate-state { display: grid; gap: 16px; padding: 24px; background: var(--surface); border: 1px solid var(--line); }
+.scenario-rate-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.scenario-rate-grid > div { display: grid; gap: 8px; min-width: 0; }
+.scenario-rate-grid small { color: var(--muted); }
+.scenario-rate-grid data { font-family: var(--mono); font-size: 14px; overflow-wrap: anywhere; }
+.scenario-save-shock { display: grid; gap: 12px; justify-items: start; }
+.scenario-saved { margin-top: 24px; }
+.scenario-saved ul { padding-left: 20px; overflow-wrap: anywhere; }
+
 /* Settings and portfolio */
 .settings-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 56px; }
 .settings-section .form { max-width: 520px; }
@@ -394,7 +424,8 @@ button:disabled { opacity: .6; cursor: progress; }
   .index-row { grid-template-columns: 40px minmax(0, 1fr); gap: 10px 12px; padding: 22px 0; }
   .index-row > .state, .index-row > .index-link { grid-column: 2; justify-self: start; }
   .index-number { align-self: start; padding-top: 12px; }
-  .empty-state, .settings-section, .cash-layout { grid-template-columns: 1fr; gap: 28px; }
+  .empty-state, .settings-section, .cash-layout, .scenario-layout { grid-template-columns: 1fr; gap: 28px; }
+  .scenario-preview-form, .scenario-rate-grid { grid-template-columns: 1fr; }
   .choice-group { grid-template-columns: 1fr; }
   .choice { flex-direction: row; align-items: center; }
   .swatch { width: 44px; height: 28px; flex: none; }
@@ -438,4 +469,22 @@ button:disabled { opacity: .6; cursor: progress; }
   .figure .unknown { animation: drift 3s linear infinite; }
   @keyframes pulse { 50% { opacity: .55; } }
   @keyframes drift { to { stroke-dashoffset: -20; } }
+}
+
+/* Base versus scenario */
+.comparison { display: grid; gap: 28px; margin-top: 24px; }
+.comparison-form { margin-bottom: 8px; }
+.comparison-table th[scope="row"] { font-weight: 400; text-align: left; padding: 14px 12px 14px 0; border-bottom: 1px solid var(--line); }
+.comparison-table td { text-align: right; }
+.comparison-table th[scope="col"]:not(:first-child) { text-align: right; }
+.comparison-effects h3, .comparison-skipped h3 { margin-bottom: 10px; font-size: 15px; }
+.comparison-effects ul, .comparison-skipped ul { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.comparison-effects li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.comparison-effects li small { flex-basis: 100%; }
+.comparison-skipped li { padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.comparison-total { margin-top: 14px; font-size: 14px; }
+.comparison-note { font-size: 13px; }
+@media (max-width: 760px) {
+  .comparison-table { font-size: 13px; }
+  .comparison-table td, .comparison-table th { overflow-wrap: anywhere; }
 }

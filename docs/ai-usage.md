@@ -202,6 +202,14 @@ Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify`
 - Student action: reviewed the PR comments, resolved the AI-usage merge conflict by retaining both records, selected the business rules and ran the complete local validation.
 - Validation: 100 Forecast domain tests and 186 total unit tests passed; ESLint, TypeScript typecheck and the Next.js production build passed.
 
+## Jiaxin — Scenario lab product integration
+
+Date: 2026-10-12. Tool: OpenAI Codex. Owner: Jiaxin (Scenarios & Exchange Rates).
+
+Jiaxin authorized taking on the unfinished Scenario lab page and set the contract boundary: use the existing session-scoped scenario and ECB services, keep cash events and snapshots unchanged, and do not show invented forecast balances while the shared forecast-input adapter is under review. Codex assisted with the server actions, forms, page layout, styling, browser test and documentation. The implementation exposes original and delayed invoice dates, a percentage-shock preview with ECB provenance and freshness, and saving only for direct EUR pairs backed by one snapshot. The first browser run exposed a currency-label mismatch and a missing wait for workspace creation; a later run found an ambiguous `alert` test locator. These were corrected and all 27 Chromium tests passed. The student will inspect the diff, review the PR and own the final merge decision. Numerical base-versus-scenario forecasts remain for a later integration.
+
+Review follow-up (Bastian, 2026-10-12): Jiaxin accepted that saved shocks must stay tied to their original immutable ECB snapshot. Bastian asked for the snapshot's ECB date and a hint when a newer cached rate exists. The date and source rate were already displayed; Codex added a read-only latest-snapshot comparison and the hint. Tests cover a repeat fetch, another pair, a later ECB date and a correction to the same ECB date, while verifying the saved calculation still uses its original rate.
+
 ## Scenario adjustments that no longer apply (PR #9 review, Bastian, 2026-10-12)
 
 Review correction: the first AI-assisted version of the scenario calculation deliberately threw `InvalidAdjustmentError` or `MissingEventError` "rather than silently ignoring the override", and its tests asserted the throw. Bastian pointed out that this breaks a whole scenario whenever an adjusted event is later received, paid or cancelled (his forecast input returns only expected events), and whenever an adjustment targets an event on another account (scenarios are per workspace, forecasts per account). The decision was wrong, not a bug in its implementation, and neither the AI nor the first review had tried it with data that changes after the adjustment.
@@ -240,6 +248,18 @@ Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — 
 
 Merge with `main` (2026-10-12, after PRs #12, #13 and #19): Claude Code resolved the conflicts in four documentation files by keeping both sides; the student compared the result line by line with `main` (no line from `main` lost except text that this branch deliberately updates) and with Gabriel's resolution on `feat/product-liquidity-overview`, and updated the 2026-10-10 decision entry now that the engine and `toForecastInput` are merged. AI-generated: one integration test that runs `getForecastInput` → `toForecastInput` → `runForecast` for an account with a settled, an overdue and a future event. Validation: CI on the merge commit 6c7bf18 passed: 238 unit, 141 integration and 24 Chromium tests, lint, typecheck and build.
 
+## Base versus scenario comparison (branch `feat/scenario-comparison`)
+
+Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin (Scenarios & Exchange Rates), covering the Scenario lab for Product Experience.
+
+Student direction: build the side-by-side view on the merged forecast input, adapter and scenario calculation, make the breakdown add up to the difference by construction and not by rounding, and show what was not applied instead of hiding it (a consequence of Bastian's review of #9).
+
+AI-generated: `compareScenario`, the server composition, the comparison panel, and the unit, integration and browser tests. Design check by the student: the closing balance is the opening balance plus the events dated inside the range, so it is additive across events and one adjustment per event makes the per-adjustment effects sum exactly to the total; the function checks the equality and throws instead of showing a breakdown that does not add up. Found while testing: a first browser test used the wrong locator once an event existed (two Description fields); a final assertion assumed the Cash events date format from another branch and was made independent of it.
+
+Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — lint and TypeScript clean, 318 unit tests, 173 integration tests, production build, 32 Chromium tests including WCAG 2.2 AA checks of the comparison in light and dark mode at 375 px.
+
+Follow-up merge (2026-10-12): Codex incorporated the latest Scenario Lab branch after its saved-ECB-snapshot review change. The comparison code and tests remain in this branch; the merged page now refreshes the FX preview before reading saved shocks and then computes the account comparison. Local `npm run verify` passed with 318 unit, 190 PostgreSQL integration and 36 Chromium tests, plus lint, typecheck and production build, against a fresh dedicated test database.
+
 ## Product experience: exchange-rate display
 
 Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel (Product Experience). Delivered as a patch that the student inspected, tested and committed.
@@ -267,3 +287,13 @@ Reviewed and changed by the student: I set the goal, because the missing DELETE 
 Concerns for the student's review: the grant list now exists in three places (`deployment.md`, the CI script and the test's expected map), which have to be changed together by hand. The scenario, FX-shock and cash-event-action tests still run only as the owner, because their fixtures need rights the role does not have; their tables are covered only by the privilege test. The test reads the catalog, so privileges inherited through role memberships are not compared, which is why it forbids memberships separately. The CI password is a throwaway value for the CI service only.
 
 Validation (2026-10-12, local, rebuilt `portfolio_risk_test` in CI state): `npm run verify` exit 0: 315 unit, 187 integration (1 skipped, the privilege test), 36 Chromium; lint, typecheck and build clean. `npm run test:integration:runtime` exit 0: 101 passed in 5 files, including 14 privilege tests. Mutations: missing UPDATE (status) on cash_events → 17 failed; extra DELETE on fx_snapshots → privilege test failed; extra DELETE in the base grants → 2 failed.
+
+## Comparison in the reporting currency (branch `feat/comparison-reporting-currency`)
+
+Date: 2026-10-13. Tool: Claude Code. Owner: Jiaxin. Follow-up requested by Haina in her approval of #23.
+
+Found before writing the change: a probe with converted inputs showed that the exact sum check in `compareScenario` throws for real rates such as EUR/SGD 1.4127, because converted amounts carry 40 significant digits and sums round in the last digit. Connecting the comparison to the conversion as it was would have broken the Scenario lab for every Singapore-dollar account. The student chose a documented tolerance (10⁻¹⁰) over rounding converted amounts, to keep #26's rule that amounts are rounded only for display.
+
+AI-generated: the tolerance and `contributionsAddUp`, the comparison through `forecastStoredInReportingCurrency`, the shared `ConversionNote` and `NoRateNotice` (now used by both pages), and the unit and PostgreSQL tests. The overview's notes keep their exact wording, which its browser tests check.
+
+Validation (2026-10-13, local, fresh PostgreSQL 16 database): see the PR description for the numbers of the final run.

@@ -11,6 +11,7 @@ import { PageHeading } from "@/components/page-heading";
 import { EmptyState } from "@/components/empty-state";
 import { ForecastFigure } from "@/components/placeholder-figures";
 import { LiquidityChart } from "@/components/liquidity-chart";
+import { ConversionNote, NoRateNotice } from "@/components/conversion-note";
 export const metadata = { title: "Liquidity overview" };
 type Module = { title: string; text: string; state: string; tone: "ready" | "pending" | "value"; href: string; action: string };
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -31,13 +32,13 @@ export default async function LiquidityOverview({ searchParams }: { searchParams
   const requested = firstParam(params.account);
   const account = accounts.find(item => item.id === requested) ?? accounts[0];
   const window = forecastWindow(new Date(), horizon);
-  const forecast = account ? await getLiquidityForecast(token, { accountId: account.id, ...window }) : null;
+  const forecast = account ? await getLiquidityForecast(token, { accountId: account.id, ...window }, reporting) : null;
 
   const modules: Module[] = [
     { title: "Workspace", text: workspace ? "Your workspace is saved and only you can access it." : "Name your workspace to get started.", state: workspace ? "Ready" : "Not created", tone: workspace ? "ready" : "pending", href: "/workspace", action: "Open workspace" },
-    { title: "Reporting currency", text: `Figures will be reported in ${currencyLabel(reporting)}. Until exchange-rate conversion is connected, each forecast is shown in its account's currency.`, state: reporting, tone: "value", href: "/settings", action: "Change currency" },
+    { title: "Reporting currency", text: `Figures will be reported in ${currencyLabel(reporting)}. An account in another currency is converted with the latest ECB rate, which is shown next to the forecast.`, state: reporting, tone: "value", href: "/settings", action: "Change currency" },
     { title: "Cash events", text: accounts.length > 0 ? "Accounts and planned income and expenses feed the forecast above." : "Add a cash account, then record expected income and expenses.", state: accounts.length > 0 ? `${events.length} ${events.length === 1 ? "event" : "events"}` : "Set up", tone: accounts.length > 0 ? "ready" : "pending", href: "/cash-events", action: "Open cash events" },
-    { title: "Scenario lab", text: "What-if scenarios, including exchange-rate shocks, will appear once scenario analysis is delivered.", state: "Not connected yet", tone: "pending", href: "/scenarios", action: "Open scenario lab" },
+    { title: "Scenario lab", text: "Delay an invoice or preview and save an ECB exchange-rate shock without changing the real events.", state: workspace ? "Available" : "Set up", tone: workspace ? "ready" : "pending", href: "/scenarios", action: "Open scenario lab" },
   ];
   return <>
     <PageHeading eyebrow="Liquidity" title="Liquidity overview" intro={workspace ? workspace.name : "Your financial twin starts here."}>
@@ -48,7 +49,7 @@ export default async function LiquidityOverview({ searchParams }: { searchParams
       <Link className="button inverse" href="/workspace">Create your workspace</Link>
     </section>}
     {account && forecast
-      ? <Forecast accounts={accounts} account={account} horizon={horizon} forecast={forecast} reporting={reporting} />
+      ? <Forecast accounts={accounts} account={account} horizon={horizon} forecast={forecast} window={window} />
       : <EmptyState eyebrow="No cash account yet" title="Add a cash account to see your forecast." figure={<ForecastFigure />}>
           <p>The forecast starts from an account&apos;s balance today and adds the income and expenses you expect. Nothing is estimated before that, so no number is shown until a real account exists.</p>
           <p><Link className="button secondary" href="/cash-events">Add a cash account</Link></p>
@@ -64,44 +65,54 @@ export default async function LiquidityOverview({ searchParams }: { searchParams
         </li>)}
       </ol>
     </section>
-    <aside className="footnote" aria-label="About this version"><p className="eyebrow">About this version</p><p>The forecast is deterministic: it adds the expected events of one account to its balance today, day by day, with no estimates or random paths. Each account is shown in its own currency; conversion into the reporting currency with ECB rates is the next step and is not applied yet.</p></aside>
+    <aside className="footnote" aria-label="About this version"><p className="eyebrow">About this version</p><p>The forecast is deterministic: it adds the expected events of one account to its balance today, day by day, with no estimates or random paths. An account in another currency is converted into the reporting currency with one persisted ECB rate for the whole forecast; when no rate is available, no figure is shown.</p></aside>
   </>;
 }
 
-function Forecast({ accounts, account, horizon, forecast, reporting }: {
-  accounts: CashAccount[]; account: CashAccount; horizon: Horizon; forecast: LiquidityForecast; reporting: string;
+function Forecast({ accounts, account, horizon, forecast, window }: {
+  accounts: CashAccount[]; account: CashAccount; horizon: Horizon; forecast: LiquidityForecast; window: { startDate: string; endDate: string };
 }) {
-  const { result } = forecast;
+  const { result, conversion } = forecast;
+  const controls = <form className="forecast-controls" method="get" action="/dashboard">
+    <div className="field">
+      <label htmlFor="forecast-account">Account</label>
+      <select id="forecast-account" name="account" defaultValue={account.id}>
+        {accounts.map(item => <option key={item.id} value={item.id}>{item.name} ({item.currency})</option>)}
+      </select>
+    </div>
+    <div className="field">
+      <label htmlFor="forecast-days">Horizon</label>
+      <select id="forecast-days" name="days" defaultValue={String(horizon)}>
+        {HORIZONS.map(days => <option key={days} value={days}>{days} days</option>)}
+      </select>
+    </div>
+    <button className="button secondary" type="submit">Show forecast</button>
+  </form>;
+  const heading = <div className="forecast-head">
+    <div>
+      <p className="eyebrow">{account.name} · {account.currency}{conversion.status !== "NONE" && ` shown in ${conversion.to}`}</p>
+      <h2 id="forecast-heading">Next {horizon} days</h2>
+      <p className="muted">{formatDate(window.startDate)} to {formatDate(window.endDate)}, end-of-day balances in {conversion.to}.</p>
+    </div>
+    {controls}
+  </div>;
+
+  if (!result || conversion.status === "UNAVAILABLE") {
+    return <section className="forecast" aria-labelledby="forecast-heading">
+      {heading}
+      <NoRateNotice conversion={conversion} what="forecast" />
+    </section>;
+  }
+
   const money = (value: string) => formatMoney(value, result.currency);
   const last = result.timeline[result.timeline.length - 1].date;
   return <section className="forecast" aria-labelledby="forecast-heading">
-    <div className="forecast-head">
-      <div>
-        <p className="eyebrow">{account.name} · {result.currency}</p>
-        <h2 id="forecast-heading">Next {horizon} days</h2>
-        <p className="muted">{formatDate(result.timeline[0].date)} to {formatDate(last)}, end-of-day balances in {result.currency}.</p>
-      </div>
-      <form className="forecast-controls" method="get" action="/dashboard">
-        <div className="field">
-          <label htmlFor="forecast-account">Account</label>
-          <select id="forecast-account" name="account" defaultValue={account.id}>
-            {accounts.map(item => <option key={item.id} value={item.id}>{item.name} ({item.currency})</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="forecast-days">Horizon</label>
-          <select id="forecast-days" name="days" defaultValue={String(horizon)}>
-            {HORIZONS.map(days => <option key={days} value={days}>{days} days</option>)}
-          </select>
-        </div>
-        <button className="button secondary" type="submit">Show forecast</button>
-      </form>
-    </div>
+    {heading}
 
     {result.firstDangerDate
       ? <p className="notice error" role="note">Cash falls below the danger threshold of {money(result.dangerThresholdAmount)} on {formatDate(result.firstDangerDate)}, {runway(result.runwayDays)}.</p>
       : <p className="notice success" role="note">Cash stays at or above the danger threshold of {money(result.dangerThresholdAmount)} for the next {horizon} days.</p>}
-    {result.currency !== reporting && <p className="notice" role="note">This account is in {result.currency}. Your reporting currency is {reporting}; amounts are not converted yet, so they are shown in {result.currency}.{result.dangerThresholdPercent === null && ` Your workspace danger threshold is also applied as ${result.currency}, not converted from ${reporting}.`}</p>}
+    <ConversionNote conversion={conversion} />
 
     <dl className="metrics">
       <div><dt>Balance today</dt><dd className="amount">{money(result.openingBalance)}</dd><dd>Settled money up to today, before today&apos;s expected events</dd></div>
