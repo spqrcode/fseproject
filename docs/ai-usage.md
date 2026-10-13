@@ -284,7 +284,6 @@ Headings and owner lines of two entries of Haina Liu were renamed from "Member B
 
 Not renamed on purpose: the session cookie `portfolio_session` (renaming it would sign every user out) and the pool variable in `src/lib/db.ts`.
 
-Reviewed and changed by the student: Validation: Reviewed and changed by the student: I set the scope of the cleanup and left README.md and docs/limitations.md out because Jiaxin’s PR #21 rewrites them. I checked the rewritten user stories and traceability rows against the current code. I agreed the “Member B” → Haina Liu rename with Haina. I kept the portfolio_session cookie name on purpose, because renaming it would sign out every existing session.
+Reviewed and changed by the student: I set the scope of the cleanup and left README.md and docs/limitations.md out because Jiaxin’s PR #21 rewrites them. I checked the rewritten user stories and traceability rows against the current code. I agreed the “Member B” → Haina Liu rename with Haina. I kept the portfolio_session cookie name on purpose, because renaming it would sign out every existing session.
 
 Validation: npm run verify passed locally on this branch: 313 unit, 196 integration and 39 Chromium tests, lint, typecheck and build. A search for @/lib/forecast-input found no remaining imports.
-
