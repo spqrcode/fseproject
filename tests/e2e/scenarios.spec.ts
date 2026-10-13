@@ -135,3 +135,91 @@ test("an invoice that is received after it was delayed is shown as no longer app
   await expect(comparison).not.toContainText("16 Nov 2026");
   await expect(page.getByRole("heading", { level: 2, name: "Late customer payment" })).toBeVisible();
 });
+
+const DAY_MS = 86_400_000;
+const iso = (offsetDays: number) => new Date(Date.now() + offsetDays * DAY_MS).toISOString().slice(0, 10);
+
+test("a delayed invoice is compared with the base forecast, side by side, and the effects add up", async ({ page, account }) => {
+  await signUpAndIn(page, account);
+  await page.goto("/workspace");
+  await page.getByLabel("Workspace name").fill("Comparison workspace");
+  await page.getByRole("button", { name: "Create workspace", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("Workspace saved.");
+
+  await page.goto("/cash-events");
+  await page.getByLabel("Account name").fill("Operating cash");
+  await page.getByLabel("Currency").selectOption("EUR");
+  await page.getByLabel("Opening balance").fill("1000");
+  await page.getByRole("button", { name: "Add cash account", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Cash account added." })).toBeVisible();
+  for (const [description, amount, date] of [["Customer invoice", "600", iso(5)], ["Office rent", "-700", iso(10)]] as const) {
+    // Once an event exists, its editor adds a second set of fields: the new-event form is always the first one.
+    await page.getByLabel("Description").first().fill(description);
+    await page.getByLabel("Signed amount").first().fill(amount);
+    await page.getByLabel("Expected date").first().fill(date);
+    await page.getByRole("button", { name: "Add cash event", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Cash event added." })).toBeVisible();
+  }
+
+  await page.goto("/scenarios");
+  await expect(page.getByRole("heading", { level: 2, name: "Start with a named scenario." })).toBeVisible();
+  await page.getByLabel("Scenario name").fill("Late customer");
+  await page.getByRole("button", { name: "Create scenario", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Scenario created." })).toBeVisible();
+  await expect(page.getByText("Delay an invoice above to see its effect")).toBeVisible();
+
+  await page.getByLabel("New expected date").fill(iso(20));
+  await page.getByRole("button", { name: "Delay invoice in scenario" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Invoice delayed in this scenario." })).toBeVisible();
+
+  // Opening 1000: base lowest 900 (the invoice arrives before the rent), scenario lowest 300 (it arrives after).
+  const table = page.getByRole("table", { name: "Base forecast and scenario forecast side by side" });
+  await expect(table.getByRole("row", { name: /Lowest balance/ }).first()).toContainText("€900.00");
+  await expect(table.getByRole("row", { name: /^Lowest balance/ })).toContainText("€300.00");
+  await expect(table.getByRole("row", { name: /^Lowest balance/ })).toContainText("-€600.00");
+  // 300 is below the 50% threshold of 500 only in the scenario.
+  await expect(table.getByRole("row", { name: /First day below/ })).toContainText("Not reached");
+  // The invoice still arrives inside the 90 days, so the closing balance does not change and the effects add up.
+  await expect(page.getByText("Difference in closing balance")).toContainText("€0.00");
+  await expect(page.getByText("Still arrives inside the forecast range")).toBeVisible();
+
+  // The real events are untouched.
+  await page.goto("/cash-events");
+  // ISO text or formatted, depending on whether the Cash events formatting change from #16 has reached this branch.
+  const written = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso(5)}T00:00:00Z`));
+  await expect(page.getByText(new RegExp(`^(${iso(5)}|${written})$`))).toBeVisible();
+  await expect(page.getByText(new RegExp(`^(${iso(20)}|${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso(20)}T00:00:00Z`))})$`))).toHaveCount(0);
+});
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the comparison passes WCAG 2.2 AA checks in ${scheme} mode and fits a phone`, async ({ page, account }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await signUpAndIn(page, account);
+    await page.goto("/workspace");
+    await page.getByLabel("Workspace name").fill("A11y workspace");
+    await page.getByRole("button", { name: "Create workspace", exact: true }).click();
+    await expect(page.getByRole("status")).toHaveText("Workspace saved.");
+    const created = (await account.db.query(`INSERT INTO cash_accounts(workspace_id, name, currency, opening_balance)
+      SELECT w.id, 'Operating cash', 'EUR', 1000 FROM workspaces w JOIN users u ON u.id = w.user_id WHERE u.email = $1 RETURNING id, workspace_id`, [account.email])).rows[0];
+    const rows = [["Customer invoice", 600, iso(5)], ["Office rent", -700, iso(10)]] as const;
+    for (const [description, amount, date] of rows) {
+      await account.db.query("INSERT INTO cash_events(workspace_id, account_id, description, amount, expected_date) VALUES ($1,$2,$3,$4,$5)",
+        [created.workspace_id, created.id, description, amount, date]);
+    }
+    await page.goto("/scenarios");
+    await page.getByLabel("Scenario name").fill("Late customer");
+    await page.getByRole("button", { name: "Create scenario", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Scenario created." })).toBeVisible();
+    await page.getByLabel("New expected date").fill(iso(20));
+    await page.getByRole("button", { name: "Delay invoice in scenario" }).click();
+    // The delay redirects back to this page; wait until that navigation has finished (its status message and its
+    // title are in place) before scanning, so axe does not see the page between two documents.
+    await expect(page.getByRole("status").filter({ hasText: "Invoice delayed in this scenario." })).toBeVisible();
+    await expect(page).toHaveTitle("Scenario lab · FinTwin Global");
+    await expect(page.getByRole("table", { name: "Base forecast and scenario forecast side by side" })).toBeVisible();
+    expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
+    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+    expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(" ")).join(" | ")}`)).toEqual([]);
+  });
+}

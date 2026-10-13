@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireUser, sessionToken } from "@/lib/auth";
 import { getWorkspace } from "@/lib/workspace-store";
-import { listCashEvents } from "@/lib/cash-events-store";
+import { listCashAccounts, listCashEvents } from "@/lib/cash-events-store";
 import { getScenarios, getAdjustments } from "@/lib/scenario-store";
 import { getScenarioFxShocks } from "@/lib/fx/shock-store";
 import { getRate } from "@/lib/fx/rate-service";
+import { getScenarioComparison } from "@/lib/scenario-comparison";
+import { HORIZONS, firstParam, forecastWindow, parseHorizon } from "@/lib/liquidity-overview";
 import { buildScenarioFxResult, type ScenarioFxResult } from "@/lib/fx/fx-shock";
 import { parseDecimal } from "@/lib/forecast/decimal";
 import { getReportingCurrency } from "@/lib/preferences-store";
@@ -15,9 +17,11 @@ import { PageHeading } from "@/components/page-heading";
 import { EmptyState } from "@/components/empty-state";
 import { ScenarioFigure } from "@/components/placeholder-figures";
 import { DelayForm, SaveShockForm, ScenarioForm } from "@/components/scenario-forms";
+import { ScenarioComparisonPanel } from "@/components/scenario-comparison";
+import { ConversionNote, NoRateNotice } from "@/components/conversion-note";
 
 export const metadata = { title: "Scenario lab" };
-type Params = { scenario?: string; base?: string; quote?: string; shock?: string; preview?: string; success?: string };
+type Params = { scenario?: string; base?: string; quote?: string; shock?: string; preview?: string; success?: string; account?: string; days?: string };
 const successMessages: Record<string, string> = {
   "scenario-added": "Scenario created.",
   "delay-added": "Invoice delayed in this scenario. The original event is unchanged.",
@@ -28,8 +32,8 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
   await requireUser();
   const token = await sessionToken();
   const params = await searchParams;
-  const [workspace, reporting, scenarios, events] = await Promise.all([
-    getWorkspace(token), getReportingCurrency(token), getScenarios(token), listCashEvents(token),
+  const [workspace, reporting, scenarios, events, accounts] = await Promise.all([
+    getWorkspace(token), getReportingCurrency(token), getScenarios(token), listCashEvents(token), listCashAccounts(token),
   ]);
   const selected = scenarios.find(item => item.id === params.scenario) ?? scenarios[0];
   const adjustmentsPromise = selected ? getAdjustments(token, selected.id) : Promise.resolve([]);
@@ -56,6 +60,17 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
   const adjustedIds = new Set(adjustments.filter(item => item.status === "active").map(item => item.cashEventId));
   const invoices = events.filter(item => item.status === "expected" && parseDecimal(item.amount).greaterThan(0) && !adjustedIds.has(item.id));
   const eventById = new Map(events.map(item => [item.id, item]));
+  // The comparison is per account: a scenario belongs to the workspace, a forecast to one account. Only the
+  // caller's own accounts can be chosen; an unknown id falls back to the first one and the store checks again.
+  const comparedAccount = accounts.find(item => item.id === firstParam(params.account)) ?? accounts[0];
+  const horizon = parseHorizon(params.days);
+  const comparison = selected && comparedAccount && adjustments.length > 0
+    ? await getScenarioComparison(token, { scenarioId: selected.id, accountId: comparedAccount.id, ...forecastWindow(new Date(), horizon) }, reporting ?? DEFAULT_REPORTING_CURRENCY)
+    : null;
+  const described = adjustments.flatMap(item => {
+    const event = eventById.get(item.cashEventId);
+    return event ? [{ id: item.id, description: event.description, originalDate: event.expectedDate, overrideDate: item.dateOverride }] : [];
+  });
 
   return <>
     <PageHeading eyebrow="What if" title="Scenario lab" intro="Keep real cash events intact while exploring a delayed invoice or an exchange-rate shock." />
@@ -77,7 +92,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
       <div className="scenario-main">
         {selected ? <section className="scenario-section" aria-labelledby="delay-heading">
           <p className="eyebrow">Selected scenario</p><h2 id="delay-heading">{selected.name}</h2>
-          <p className="muted">Original and delayed dates are shown side by side. The real cash event keeps its date.</p>
+          <p className="muted">Original and delayed dates are shown side by side, followed by the effect on one account&apos;s forecast. The real cash event keeps its date.</p>
           {adjustments.length > 0 && <table className="data-table scenario-comparison">
             <caption className="visually-hidden">Invoice delay comparison</caption>
             <thead><tr><th scope="col">Invoice</th><th scope="col">Base date</th><th scope="col">Scenario date</th></tr></thead>
@@ -98,6 +113,28 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
         </section> : <EmptyState eyebrow="No scenario selected" title="Start with a named scenario." figure={<ScenarioFigure />}>
           <p>Once you create one, you can delay an invoice without changing the real event.</p>
         </EmptyState>}
+        {selected && <section className="scenario-section" aria-labelledby="comparison-heading">
+          <p className="eyebrow">Impact on one account</p><h2 id="comparison-heading">Base versus scenario</h2>
+          {accounts.length === 0 ? <p className="muted">Add a cash account in <Link href="/cash-events">Cash events</Link> to see what the scenario does to a forecast.</p> : <>
+            <form method="get" action="/scenarios" className="scenario-preview-form comparison-form">
+              <input type="hidden" name="scenario" value={selected.id} />
+              <div className="field"><label htmlFor="compare-account">Account</label><select id="compare-account" name="account" defaultValue={comparedAccount?.id}>{accounts.map(item => <option value={item.id} key={item.id}>{item.name} ({item.currency})</option>)}</select></div>
+              <div className="field"><label htmlFor="compare-days">Horizon</label><select id="compare-days" name="days" defaultValue={String(horizon)}>{HORIZONS.map(days => <option value={days} key={days}>{days} days</option>)}</select></div>
+              <button className="button secondary" type="submit">Compare</button>
+            </form>
+            {comparison
+              ? comparison.comparison
+                ? <>
+                    <ConversionNote conversion={comparison.conversion} />
+                    <ScenarioComparisonPanel comparison={comparison.comparison} currency={comparison.conversion.to} horizon={horizon} described={described} />
+                  </>
+                : <NoRateNotice conversion={comparison.conversion} what="comparison" />
+              : adjustments.length === 0
+                ? <p className="muted">Delay an invoice above to see its effect on the lowest balance and the runway.</p>
+                : <p role="status" className="muted">The comparison is not available for this account.</p>}
+            <p className="muted comparison-note">Amounts are in your reporting currency, converted with the same ECB rate as the Liquidity overview. Exchange-rate shocks are not part of this comparison yet.</p>
+          </>}
+        </section>}
         <section className="scenario-section" aria-labelledby="fx-heading">
           <p className="eyebrow">ECB exchange rates</p><h2 id="fx-heading">Percentage FX shock</h2>
           <p className="muted">Previewing retrieves the latest available ECB snapshot; it does not change it.</p>
@@ -125,6 +162,6 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
         </section>
       </div>
     </div>}
-    <aside className="footnote" aria-label="About scenario results"><p className="eyebrow">About results</p><p>Rates are decimal strings from ECB snapshots. Stale or unavailable data is labelled. This page shows rates and dates; it does not compute a cash-flow forecast, so no balance is estimated here. Reporting currency: {currencyLabel(reporting ?? DEFAULT_REPORTING_CURRENCY)}.</p></aside>
+    <aside className="footnote" aria-label="About scenario results"><p className="eyebrow">About results</p><p>Rates are decimal strings from ECB snapshots. Stale or unavailable data is labelled. The base-versus-scenario comparison uses the same deterministic forecast engine as the Liquidity overview; no number is estimated. Reporting currency: {currencyLabel(reporting ?? DEFAULT_REPORTING_CURRENCY)}.</p></aside>
   </>;
 }

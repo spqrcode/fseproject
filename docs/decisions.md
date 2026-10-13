@@ -147,3 +147,24 @@ Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`); the statu
 
 Tests: `tests/integration/forecast-input.test.ts`, the settling tests in `tests/integration/cash-events.test.ts`, `tests/unit/forecast-input.test.ts`.
 
+## 2026-10-12 — Forecasts in the reporting currency
+
+**Decision.** An account's forecast is converted into the reporting currency before it is run: the opening balance and every event with one rate from the persisted ECB snapshots (through the rate service, so a fresh cache is used without a network call and at most one refresh is attempted per hour). The workspace danger threshold is not converted, because it is already an amount in the reporting currency (decision 2 of 2026-10-08). `CURRENT` and `STALE` rates are both used and labelled; with no usable rate the forecast is unavailable and no number is shown. Code: `convertForecastInput` (pure) and `getForecastInReportingCurrency` (server).
+
+**Requirement.** US-06 (proposal): use EUR, USD or SGD as display currency, with a visible effective date, provider and data state. It also fixes the known limit that the threshold was compared in the account's own currency.
+
+**Alternatives.** Convert each event with the rate of its own date: more realistic for settled history but makes a forecast a mix of rates that nobody can reproduce from one snapshot. Convert only the totals: the threshold and runway would still be computed in the wrong currency.
+
+**Trade-off.** One rate for a whole forecast means the converted figures are the base figures scaled by that rate; it does not model future rate moves (that is what FX shocks are for).
+
+**Verification.** Unit tests: no-op in the same currency, both directions of a pair, no rounding, the threshold passed through and changing the warning, a missing or wrong-pair rate refused, purity. PostgreSQL tests with a provider double: fresh cache without a provider call, the threshold in the reporting currency, the cross rate, STALE when the provider is down, unavailable without a rate, ownership.
+
+## 2026-10-13 — The comparison in the reporting currency, and a tolerance for its sum check
+
+**Decision.** The base-versus-scenario comparison uses the same conversion as the Liquidity overview (one persisted ECB rate per forecast, `forecastStoredInReportingCurrency`), so both pages show the same figures in the same currency. The check that the per-invoice contributions add up to the closing-balance difference accepts a gap of at most `CONTRIBUTION_TOLERANCE` (10⁻¹⁰).
+
+**Why the tolerance.** Converted amounts carry the engine's 40 significant digits, so adding them rounds in the last digit, and the two ways of adding the same numbers (each contribution, then the total) can differ around the 34th decimal. With the real EUR/SGD rate 1.4127 the exact check threw for an ordinary account. 10⁻¹⁰ is eight orders of magnitude below one cent, so a missing, double-counted or wrongly attributed invoice still fails; for unconverted amounts the gap stays exactly zero.
+
+**Alternatives.** Round converted amounts to a fixed scale before the engine runs: exact sums, but it would change #26's rule of rounding only for display. Compare in the account currency and convert the results: the workspace threshold would then be compared in the wrong currency, the problem #26 fixed.
+
+**Verification.** Unit tests with the rates that used to throw (1.4127, 3, 1.123456789) and the tolerance boundary (10⁻¹⁰ accepted, 10⁻⁹, a cent and a missing invoice refused); a PostgreSQL test comparing a dollar account in euro; a test that no comparison is shown without a rate.

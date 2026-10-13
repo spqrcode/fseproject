@@ -31,6 +31,8 @@ Review follow-up on the same branch (2026-10-12): a saved shock now carries a re
 
 The Scenario lab's server actions are covered the same way in `tests/integration/scenario-actions.test.ts`: a scenario, a delay and a saved shock for the signed-in user; validation; another user's scenario or invoice refused with nothing changed; a missing or foreign origin saving nothing; anonymous and expired sessions sent to sign in.
 
+`tests/integration/demo-seed.test.ts` runs the demo seed against PostgreSQL and reads it back through the real stores and the engine: it checks what is written, that the base forecast of the euro account stays above its threshold while the late-invoice scenario falls below it on payroll day, and that a workspace with existing accounts or an unknown user is refused with nothing written.
+
 ## Test isolation
 
 `scripts/test.mjs` requires `TEST_DATABASE_URL` ending in `_test` and passes it as the child's `DATABASE_URL`. Playwright also checks they match. It starts a new server at `http://localhost:3100`, with `APP_ORIGIN` set to that address, and refuses to reuse another server. Tests cannot silently hit development/staging through the ordinary script commands.
