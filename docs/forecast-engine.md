@@ -1,6 +1,6 @@
 # Forecast Engine
 
-Status: the Decimal, Money and FX foundation (PR #8), deterministic cash projection (PR #12), database-to-engine adapter (PR #19), delayed-invoice projection, and reporting-currency conversion (PR #26) are merged into `main`. The Liquidity overview calls this path with real session-scoped data. Base-versus-scenario comparison remains in PR #23 and is not described as merged here.
+Status: the Decimal, Money and FX foundation (PR #8), deterministic cash projection (PR #12), database-to-engine adapter (PR #19), delayed-invoice projection, reporting-currency conversion (PR #26), and base-versus-scenario comparison (PR #23) are merged into `main`. The Liquidity overview and Scenario lab call the shared Forecast Engine path with real session-scoped data. PR #30 proposes expressing the comparison in the reporting currency; it remains under review and is not described as merged here.
 
 ## Boundary and data flow
 
@@ -14,6 +14,10 @@ PostgreSQL + session
   -> convertForecastInput
   -> runForecast
   -> Liquidity overview
+
+converted input + base result + delayed-invoice adjustments
+  -> compareScenario
+  -> Scenario lab
 ```
 
 The Forecast Engine never fetches a rate and never invents a fallback. The FX service supplies one resolved `FxRate`; the pure conversion step converts the opening balance and every pending event before the engine runs.
@@ -66,7 +70,8 @@ The Forecast Engine never fetches a rate and never invents a fallback. The FX se
 - A delayed-invoice adjustment creates a new in-memory event list with a date override. It never changes the cash event or base forecast.
 - Adjustments that no longer apply are reported as `invalid`, `not_applicable` or `not_in_forecast` instead of breaking the whole scenario.
 - `scenarioContribution` is scenario closing balance minus base closing balance in the same currency.
-- PR #23 proposes the side-by-side base/scenario result and an additive contribution breakdown. Until it is merged, that UI and comparison service are pending work.
+- PR #23 supplies the side-by-side base/scenario result and an additive per-adjustment contribution breakdown. It checks that the contribution total equals the scenario-minus-base closing-balance difference instead of silently showing an inconsistent breakdown.
+- The comparison currently runs in the selected account's currency. PR #30 proposes reusing `forecastStoredInReportingCurrency` so the Liquidity overview and Scenario lab use the same persisted ECB rate and both suppress figures when no usable rate exists.
 - FX-shock provenance, freshness and percentage calculations remain owned by the FX/scenario modules; the Forecast Engine consumes only resolved rates and cash-event inputs.
 
 ## Verified boundary cases
@@ -82,12 +87,12 @@ The Forecast Engine never fetches a rate and never invents a fallback. The FX se
 | Missing required FX rate | Explicit unavailable/error result; never zero or fallback |
 | Negative opening balance with default threshold | Warning on the first forecast day |
 
-On 2026-10-13, after updating local `main` through PR #26, `npm run check` passed ESLint, TypeScript, 325 unit tests and the Next.js production build.
+On 2026-10-13, after updating the documentation branch through PR #23, `npm run check` passed ESLint, TypeScript, 335 unit tests and the Next.js production build. Database integration and browser validation remain recorded in the individual feature PRs and the final `npm run verify` run.
 
 ## Remaining work requiring team scope
 
-- PR #23 must be reviewed and merged before base-versus-scenario comparison can be called complete.
-- The Scenario comparison still needs an explicit decision on whether it must always be converted to the workspace reporting currency after PR #26.
+- PR #30 must be reviewed and merged before the base-versus-scenario comparison can be described as using the workspace reporting currency.
+- Saved FX shocks are displayed with provenance but are not yet applied to the base-versus-scenario cash-flow comparison.
 - There is no combined forecast across several accounts. Adding one requires an agreed rule for combining accounts converted with different rates and effective dates; it is not silently assumed by the current engine.
 - Scenarios that combine delayed events and FX shocks need an agreed attribution rule before individual contributions can claim to explain the total effect.
 - Recurrence, interpolation, probabilistic forecasting and predicted future FX rates remain outside the agreed MVP.
