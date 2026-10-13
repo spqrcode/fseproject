@@ -159,3 +159,12 @@ Tests: `tests/integration/forecast-input.test.ts`, the settling tests in `tests/
 
 **Verification.** Unit tests: no-op in the same currency, both directions of a pair, no rounding, the threshold passed through and changing the warning, a missing or wrong-pair rate refused, purity. PostgreSQL tests with a provider double: fresh cache without a provider call, the threshold in the reporting currency, the cross rate, STALE when the provider is down, unavailable without a rate, ownership.
 
+## 2026-10-13 — The comparison in the reporting currency, and a tolerance for its sum check
+
+**Decision.** The base-versus-scenario comparison uses the same conversion as the Liquidity overview (one persisted ECB rate per forecast, `forecastStoredInReportingCurrency`), so both pages show the same figures in the same currency. The check that the per-invoice contributions add up to the closing-balance difference accepts a gap of at most `CONTRIBUTION_TOLERANCE` (10⁻¹⁰).
+
+**Why the tolerance.** Converted amounts carry the engine's 40 significant digits, so adding them rounds in the last digit, and the two ways of adding the same numbers (each contribution, then the total) can differ around the 34th decimal. With the real EUR/SGD rate 1.4127 the exact check threw for an ordinary account. 10⁻¹⁰ is eight orders of magnitude below one cent, so a missing, double-counted or wrongly attributed invoice still fails; for unconverted amounts the gap stays exactly zero.
+
+**Alternatives.** Round converted amounts to a fixed scale before the engine runs: exact sums, but it would change #26's rule of rounding only for display. Compare in the account currency and convert the results: the workspace threshold would then be compared in the wrong currency, the problem #26 fixed.
+
+**Verification.** Unit tests with the rates that used to throw (1.4127, 3, 1.123456789) and the tolerance boundary (10⁻¹⁰ accepted, 10⁻⁹, a cent and a missing invoice refused); a PostgreSQL test comparing a dollar account in euro; a test that no comparison is shown without a rate.

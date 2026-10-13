@@ -18,7 +18,7 @@ A cash event's status can only move once, from `expected` to `received`, `paid` 
 
 ## Liquidity overview
 
-One account at a time, in that account's own currency: amounts are not converted into the reporting currency yet, and the page says so. The workspace danger threshold is an amount in the reporting currency (decision 2 of 2026-10-08) but is applied unconverted to an account in another currency; the page says this too. Both are fixed by the later FX integration layer. Chart coordinates use floating point for pixel positions only; every amount shown as text is formatted from the exact decimal string. The forecast always starts on today's UTC date.
+One account at a time, shown in the reporting currency: an account in another currency is converted with one persisted ECB rate for the whole forecast (#26), and the workspace danger threshold is compared in the reporting currency. The Scenario lab's base-versus-scenario comparison uses the same conversion. One rate per forecast means future exchange-rate moves are not modelled; that is what FX shocks are for, and shocks are not yet part of the comparison. Without a usable rate no figure is shown. Chart coordinates use floating point for pixel positions only; every amount shown as text is formatted from the exact decimal string. The forecast always starts on today's UTC date.
 
 ## Exchange rates
 

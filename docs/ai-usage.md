@@ -267,3 +267,13 @@ Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel (Product Experience). Delive
 Request: while reviewing PR #18 the student ran the Scenario lab with seeded ECB snapshots and saw cross and reciprocal rates printed with about 40 digits ("1 USD = 1.30130803242446573323507737656595431098 SGD"). AI-generated: `formatRate` in `src/lib/format.ts`, its unit tests and the presentation rule in `docs/product-experience.md`. Rates are shown with four decimals, half to even like amounts; the calculation keeps every digit and pages keep the exact value next to the text.
 
 Validation: ESLint and TypeScript clean, all unit tests passed including the new ones, production build passed. Removing the half-even rounding mode makes the rounding test fail (1.23445 becomes 1.2345).
+
+## Comparison in the reporting currency (branch `feat/comparison-reporting-currency`)
+
+Date: 2026-10-13. Tool: Claude Code. Owner: Jiaxin. Follow-up requested by Haina in her approval of #23.
+
+Found before writing the change: a probe with converted inputs showed that the exact sum check in `compareScenario` throws for real rates such as EUR/SGD 1.4127, because converted amounts carry 40 significant digits and sums round in the last digit. Connecting the comparison to the conversion as it was would have broken the Scenario lab for every Singapore-dollar account. The student chose a documented tolerance (10⁻¹⁰) over rounding converted amounts, to keep #26's rule that amounts are rounded only for display.
+
+AI-generated: the tolerance and `contributionsAddUp`, the comparison through `forecastStoredInReportingCurrency`, the shared `ConversionNote` and `NoRateNotice` (now used by both pages), and the unit and PostgreSQL tests. The overview's notes keep their exact wording, which its browser tests check.
+
+Validation (2026-10-13, local, fresh PostgreSQL 16 database): see the PR description for the numbers of the final run.

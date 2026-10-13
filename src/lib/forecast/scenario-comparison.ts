@@ -7,11 +7,18 @@
  * closing balance into one contribution per applied adjustment.
  *
  * Rule (proposal US-05, US-12 in requirements.md): the displayed difference equals the sum of the contributions.
- * It holds exactly, because the closing balance is the opening balance plus
- * the sum of the events dated inside the forecast range, so it is additive
- * across events and each event has at most one adjustment per scenario.
- * compareScenario checks the equality and throws if it ever fails, rather
- * than showing a breakdown that does not add up.
+ * It holds because the closing balance is the opening balance plus the sum of
+ * the events dated inside the forecast range, so it is additive across events
+ * and each event has at most one adjustment per scenario. compareScenario
+ * checks the equality and throws if it fails, rather than showing a breakdown
+ * that does not add up.
+ *
+ * For amounts as stored (two decimals) the equality is exact. After conversion
+ * into the reporting currency an amount carries the engine's 40 significant
+ * digits, so a sum can round in its last digit and two ways of adding the same
+ * numbers can differ around the 34th decimal. The check therefore accepts a
+ * difference of at most CONTRIBUTION_TOLERANCE, eight orders of magnitude below
+ * one cent: it still catches a missing or double-counted invoice.
  */
 
 import { decimalString, parseDecimal } from "@/lib/forecast/decimal";
@@ -46,6 +53,14 @@ export type ScenarioComparison = Readonly<{
   skipped: readonly SkippedAdjustment[];
 }>;
 
+/** Largest accepted gap between the difference and the sum of contributions. */
+export const CONTRIBUTION_TOLERANCE = "0.0000000001";
+
+export function contributionsAddUp(contributionsTotal: string, closingDelta: string): boolean {
+  return parseDecimal(contributionsTotal).minus(parseDecimal(closingDelta)).abs()
+    .lessThanOrEqualTo(parseDecimal(CONTRIBUTION_TOLERANCE));
+}
+
 export class ContributionMismatchError extends Error {
   constructor(readonly closingDelta: string, readonly contributionsTotal: string) {
     super(`Scenario contributions (${contributionsTotal}) do not add up to the closing balance difference (${closingDelta}).`);
@@ -78,7 +93,7 @@ export function compareScenario(params: {
 
   const total = contributions.reduce((sum, item) => sum.plus(parseDecimal(item.closingDelta)), parseDecimal("0"));
   const contributionsTotal = decimalString(total);
-  if (!total.equals(parseDecimal(whole.contributionDelta))) {
+  if (!contributionsAddUp(contributionsTotal, whole.contributionDelta)) {
     throw new ContributionMismatchError(whole.contributionDelta, contributionsTotal);
   }
 

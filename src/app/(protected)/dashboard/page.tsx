@@ -6,11 +6,12 @@ import { DEFAULT_REPORTING_CURRENCY, currencyLabel } from "@/lib/currency";
 import { listCashAccounts, listCashEvents, type CashAccount } from "@/lib/cash-events-store";
 import { getLiquidityForecast, type LiquidityForecast } from "@/lib/liquidity-forecast";
 import { HORIZONS, firstParam, forecastWindow, parseHorizon, type Horizon } from "@/lib/liquidity-overview";
-import { formatDate, formatMoney, formatRate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyState } from "@/components/empty-state";
 import { ForecastFigure } from "@/components/placeholder-figures";
 import { LiquidityChart } from "@/components/liquidity-chart";
+import { ConversionNote, NoRateNotice } from "@/components/conversion-note";
 export const metadata = { title: "Liquidity overview" };
 type Module = { title: string; text: string; state: string; tone: "ready" | "pending" | "value"; href: string; action: string };
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -97,10 +98,9 @@ function Forecast({ accounts, account, horizon, forecast, window }: {
   </div>;
 
   if (!result || conversion.status === "UNAVAILABLE") {
-    const failure = conversion.status === "UNAVAILABLE" ? conversion.failure.message : "";
     return <section className="forecast" aria-labelledby="forecast-heading">
       {heading}
-      <p className="notice error" role="note">No exchange rate from {conversion.from} to {conversion.to} is available. {failure} No forecast is shown in {conversion.to}, because a figure in the wrong currency or with an invented rate would be misleading. Change the reporting currency in settings to see this account in {conversion.from}.</p>
+      <NoRateNotice conversion={conversion} what="forecast" />
     </section>;
   }
 
@@ -112,7 +112,7 @@ function Forecast({ accounts, account, horizon, forecast, window }: {
     {result.firstDangerDate
       ? <p className="notice error" role="note">Cash falls below the danger threshold of {money(result.dangerThresholdAmount)} on {formatDate(result.firstDangerDate)}, {runway(result.runwayDays)}.</p>
       : <p className="notice success" role="note">Cash stays at or above the danger threshold of {money(result.dangerThresholdAmount)} for the next {horizon} days.</p>}
-    {conversion.status !== "NONE" && <p className="notice" role="note">This account is in {conversion.from}. Amounts are converted into {conversion.to} at 1 {conversion.from} = <data value={conversion.factor}>{formatRate(conversion.factor)}</data> {conversion.to}, the {conversion.provider.toUpperCase()} rate effective {formatDate(conversion.effectiveDate)}.{conversion.status === "STALE" && " This is the latest rate available: it could not be refreshed, so it may be out of date."}</p>}
+    <ConversionNote conversion={conversion} />
 
     <dl className="metrics">
       <div><dt>Balance today</dt><dd className="amount">{money(result.openingBalance)}</dd><dd>Settled money up to today, before today&apos;s expected events</dd></div>
