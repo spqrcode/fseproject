@@ -30,6 +30,23 @@ npm run dev
 
 Open [localhost:3000](http://localhost:3000), register with an email address and a 15–128 character passphrase, then sign in. Email delivery and password recovery are not implemented; registration does not verify ownership of the email address.
 
+## Demo data
+
+For a presentation, register a demo user in the browser first (the password stays with the person who chose it), then seed a workspace for it:
+
+```sh
+npm run demo:seed -- --email demo@example.com --dry-run
+npm run demo:seed -- --email demo@example.com
+```
+
+`DATABASE_URL` selects the database. Use the restricted runtime role (`fse_runtime`), not the owner: the script only reads users and inserts into tables the application writes to anyway. With `DATABASE_URL` set, `--dry-run` also checks, in a read-only transaction, that the user exists and the workspace has no cash accounts yet. The script adds a euro operating account, US receivables and a Singapore office with sixteen expected events dated from today, and two scenarios: a customer invoice three weeks late (the euro account falls below its danger threshold on payroll day) and a US client paying 30 days late. It creates no user or password, inserts no exchange rate, runs in one transaction, and refuses a workspace that already has cash accounts. See `scripts/demo-seed.mjs`.
+
+Before the demo:
+
+1. Seed on the day of the demo or the day before. Every date is relative to today, so seeding earlier moves the invoices closer and changes the story.
+2. Run the `--dry-run` with `DATABASE_URL` set the day before, to catch a missing user or a workspace that already has data.
+3. The seed inserts no exchange rate, so pages that convert currencies depend on a fresh ECB fetch. Open the Scenario lab once beforehand and preview a shock (and, once forecasts are shown in the reporting currency, open the overview of the dollar account), so a validated snapshot is already cached when presenting.
+
 ## Verify Issue 1
 
 ```sh
