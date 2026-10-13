@@ -252,6 +252,18 @@ Merge with `main` (2026-10-12, after PRs #12, #13 and #19): Claude Code resolved
 
 Review correction: the first AI-assisted FX-shock code validated only "greater than -100" in two places (a private parser and the store) and left the column an unbounded `numeric`. Bastian found that +5000% or a 40-digit value was accepted. Neither the AI nor the first human review had tried the upper end, and the duplicated parser had already drifted from the one in `calculateShockedRate`. Change: one exported `parseShockPercent` (-99.99 to 100, four decimals) used by the preview and the save, migration 009 for the column and a range check, a domain error for a duplicate shock, and "Authentication required." for an expired session. One existing unit test relied on an 18-decimal input and was rewritten to test what it meant to (the shocked rate is not rounded) with a four-decimal input; one integration assertion now expects the column's four decimals. Validation (2026-10-12, local, PostgreSQL 16): lint and TypeScript clean, unit tests, 169 integration tests, production build.
 
+## Base versus scenario comparison (branch `feat/scenario-comparison`)
+
+Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin (Scenarios & Exchange Rates), covering the Scenario lab for Product Experience.
+
+Student direction: build the side-by-side view on the merged forecast input, adapter and scenario calculation, make the breakdown add up to the difference by construction and not by rounding, and show what was not applied instead of hiding it (a consequence of Bastian's review of #9).
+
+AI-generated: `compareScenario`, the server composition, the comparison panel, and the unit, integration and browser tests. Design check by the student: the closing balance is the opening balance plus the events dated inside the range, so it is additive across events and one adjustment per event makes the per-adjustment effects sum exactly to the total; the function checks the equality and throws instead of showing a breakdown that does not add up. Found while testing: a first browser test used the wrong locator once an event existed (two Description fields); a final assertion assumed the Cash events date format from another branch and was made independent of it.
+
+Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — lint and TypeScript clean, 318 unit tests, 173 integration tests, production build, 32 Chromium tests including WCAG 2.2 AA checks of the comparison in light and dark mode at 375 px.
+
+Follow-up merge (2026-10-12): Codex incorporated the latest Scenario Lab branch after its saved-ECB-snapshot review change. The comparison code and tests remain in this branch; the merged page now refreshes the FX preview before reading saved shocks and then computes the account comparison. Local `npm run verify` passed with 318 unit, 190 PostgreSQL integration and 36 Chromium tests, plus lint, typecheck and production build, against a fresh dedicated test database.
+
 ## Product experience: exchange-rate display
 
 Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel (Product Experience). Delivered as a patch that the student inspected, tested and committed.

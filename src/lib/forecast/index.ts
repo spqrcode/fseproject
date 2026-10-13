@@ -49,3 +49,10 @@ export {
   type DelayAdjustment,
   type ScenarioProjection,
 } from "@/lib/forecast/scenario";
+export { appliedFactor, convertForecastInput } from "@/lib/forecast/reporting-currency";
+export {
+  compareScenario,
+  ContributionMismatchError,
+  type AdjustmentContribution,
+  type ScenarioComparison,
+} from "@/lib/forecast/scenario-comparison";

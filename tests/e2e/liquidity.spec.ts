@@ -64,8 +64,10 @@ test("shows the real forecast, the first breach and overdue events, and changes 
   await page.getByRole("button", { name: "Show forecast", exact: true }).click();
   const sgd = page.getByRole("region", { name: "Next 30 days" });
   await expect(sgd).toContainText("Singapore · SGD");
-  await expect(sgd.getByRole("note").filter({ hasText: "not converted yet" })).toBeVisible();
-  await expect(sgd.locator(".metrics")).toContainText("SGD 80.00");
+  // Converted into the reporting currency (EUR by default) with the cached ECB rate seeded for the run:
+  // 80 SGD / 1.4127 = 56.63 EUR. The rate and its date are stated next to the figures.
+  await expect(sgd.getByRole("note").filter({ hasText: "converted into EUR" })).toContainText("1 SGD = 0.7079 EUR");
+  await expect(sgd.locator(".metrics")).toContainText("€56.63");
   expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
 });
 
