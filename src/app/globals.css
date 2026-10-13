@@ -470,3 +470,21 @@ button:disabled { opacity: .6; cursor: progress; }
   @keyframes pulse { 50% { opacity: .55; } }
   @keyframes drift { to { stroke-dashoffset: -20; } }
 }
+
+/* Base versus scenario */
+.comparison { display: grid; gap: 28px; margin-top: 24px; }
+.comparison-form { margin-bottom: 8px; }
+.comparison-table th[scope="row"] { font-weight: 400; text-align: left; padding: 14px 12px 14px 0; border-bottom: 1px solid var(--line); }
+.comparison-table td { text-align: right; }
+.comparison-table th[scope="col"]:not(:first-child) { text-align: right; }
+.comparison-effects h3, .comparison-skipped h3 { margin-bottom: 10px; font-size: 15px; }
+.comparison-effects ul, .comparison-skipped ul { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.comparison-effects li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.comparison-effects li small { flex-basis: 100%; }
+.comparison-skipped li { padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.comparison-total { margin-top: 14px; font-size: 14px; }
+.comparison-note { font-size: 13px; }
+@media (max-width: 760px) {
+  .comparison-table { font-size: 13px; }
+  .comparison-table td, .comparison-table th { overflow-wrap: anywhere; }
+}
