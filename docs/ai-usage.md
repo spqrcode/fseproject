@@ -2,6 +2,22 @@
 
 AI-generated work must meet the same requirements as student-written work. Students remain responsible for understanding, reviewing, testing, and accepting every change.
 
+## Summary
+
+**Tools.** As recorded in the entries below: OpenAI Codex (documentation baseline, authentication scaffold, Forecast Engine, scenarios, exchange rates, Cash events and Scenario lab pages), Claude Code (Foundation & Security work, Product Experience, Liquidity overview) and Antigravity (delayed-invoice scenarios, ECB snapshot cache).
+
+**Team rules**, as stated in this document and in the entries:
+- The AI does not stage, commit or push. The student inspects the change, runs the tests and commits it.
+- AI-generated work meets the same requirements and goes through the same review and CI as code written by students.
+- Every meaningful AI-assisted change is recorded here, with the tool, what was generated, what was corrected and how it was verified.
+
+| Member · Area | Where AI was used | Example correction |
+| --- | --- | --- |
+| Bastian · Foundation & Security | Authentication scaffold, migration runner and CI (Codex, [foundation](#issue-1-foundation-and-verification)); [login throttle](#login-throttle-fix-and-origin-test-coverage-branch-fixauth-throttle), [workspace and cash-event schema](#workspace-and-cash-events-schema-migration-005) and stores, [forecast input](#forecast-input-starting-balance-overdue-events-status-mapping-branch-featforecast-input) (Claude Code) | The agent deployed staging with `vercel deploy` and uploaded files that Git ignores; found in the upload manifest, passwords rotated, deployments moved to Git-only builds ([credential exposure](#issue-1--ai-caused-credential-exposure-detected-and-corrected)) |
+| Haina Liu · Forecast Engine | [money and FX foundation](#haina-liu--forecast-money-and-fx-foundation), [cash projection](#haina-liu--cash-projection-and-review-follow-up) and [PR #12 corrections](#haina-liu--pr-12-review-corrections) (Codex) | A first revision made the engine use the database statuses directly; rejected because the team decision gives the adapter that mapping ([PR #12 corrections](#haina-liu--pr-12-review-corrections)) |
+| Jiaxin Huang · Scenarios & Exchange Rates | [delayed-invoice scenarios](#jiaxin-huang--delayed-invoice-scenarios) (Antigravity, Codex); [ECB snapshot cache](#jiaxin--ecb-snapshot-cache-and-failure-handling-migration-006), [FX shocks](#jiaxin-huang--percentage-based-fx-shocks), [Cash events page](#cash-events-product-integration) and [Scenario lab page](#jiaxin--scenario-lab-product-integration) (Codex); [Liquidity overview](#jiaxin-covering-product-experience--liquidity-overview-connected-to-the-forecast-branch-featproduct-liquidity-overview) (Claude Code) | The first ECB snapshot draft updated a stored rate in place when ECB republished it, which would silently change reproducible scenarios; changed so a corrected rate is a new immutable snapshot ([ECB snapshot cache](#jiaxin--ecb-snapshot-cache-and-failure-handling-migration-006)) |
+| Gabriel Piraccini · Product Experience | [interface shell, formatting and reporting currency](#product-experience-increment-fintwin-global-shell-formatting-and-reporting-currency), [home page, sessions, appearance and accessibility checks](#product-experience-follow-ups-home-page-sessions-appearance-and-accessibility-checks) and [exchange-rate display](#product-experience-exchange-rate-display) (Claude Code) | The first currency form made the select jump back to EUR after saving USD; the browser test caught it and the select is now keyed by the saved currency ([interface shell, formatting and reporting currency](#product-experience-increment-fintwin-global-shell-formatting-and-reporting-currency)) |
+
 ## 2026-09-13 — Documentation baseline
 
 - Tool: OpenAI Codex in the desktop app.
@@ -124,7 +140,7 @@ Validation (2026-10-04, cloud container with Node 22.22 and PostgreSQL 16): four
 
 ## Login throttle fix and origin test coverage (branch `fix/auth-throttle`)
 
-Date: 2026-09-29. Tool: Claude Code (Claude Sonnet 5.5). Owner: Foundation & Security student.
+Date: 2026-09-29. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian
 
 Problem found by the student: the throttle counted successful logins (10 correct sign-ins in 15 minutes locked the account) and shared its counter with registration, so anyone could lock a known email through the register form. The origin (CSRF) test covered only `register` and `login`.
 
@@ -138,9 +154,9 @@ AI-flagged trade-off: check-then-increment is not atomic, so parallel wrong gues
 
 Validation (2026-09-29, local, Node 24, PostgreSQL 16): npm run verify passed. ESLint (zero warnings) and strict TypeScript clean; 8 unit tests, 26 integration tests (previously 20), 4 Chromium tests passed; production build succeeded; test migrations applied.
 
-## Member B — Cash projection and review follow-up
+## Haina Liu — Cash projection and review follow-up
 
-- Date: 2026-10-07. Tool: OpenAI Codex. Owner: Member B.
+- Date: 2026-10-07. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
 - Request: implement and review deterministic cash-event projection, minimum balance, liquidity runway and agreed forecast rules.
 - AI-assisted work: proposed code, tests and documentation for the fixed 50% warning threshold, deterministic same-day ordering, shared reporting-currency allowlist and negative half-even rounding cases.
 - Student review: inspected the diff, confirmed the business rules, ran the tests and created the commits personally.
@@ -149,7 +165,7 @@ Validation (2026-09-29, local, Node 24, PostgreSQL 16): npm run verify passed. E
 
 ## Workspace and cash events schema (migration 005)
 
-Date: 2026-10-07. Tool: Claude Code (Claude Sonnet 5.5). Owner: Foundation & Security student.
+Date: 2026-10-07. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian
 
 Task given by the student: rename `portfolios` to `workspaces`; add cash accounts and cash events with the agreed rules (EUR/USD/SGD, signed amounts, date-only, four statuses, one workspace per user); a session-scoped store; integration tests against real PostgreSQL; documentation. The student required a plan and a list of unclear points before any code, and answered six questions (narrower grants, no auto-created workspace, `expected`-only status transitions, 2000–2100 dates, a danger-threshold reader and writer, full rename scope).
 
@@ -193,9 +209,9 @@ Review correction (PR #13, Bastian, 2026-10-10): the first draft updated `rate` 
 
 Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify` exited 0 — ESLint with zero warnings, strict TypeScript, 162 unit tests, production build, 111 integration tests and 24 Chromium tests passed. Migrations 001–006 were applied successfully from an empty database. The 12 FX integration tests passed with the application connected as `fse_runtime` and fixtures connected as the database owner; direct privilege checks returned SELECT=true, INSERT=true, DELETE=false, UPDATE `fetched_at`=true, UPDATE `rate`=false and UPDATE `provider`=false. Phase 3 percentage-shock work and Scenario Lab UI are deliberately not part of this increment.
 
-## Member B — PR #12 review corrections
+## Haina Liu — PR #12 review corrections
 
-- Date: 2026-10-11. Tool: OpenAI Codex. Owner: Member B.
+- Date: 2026-10-11. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
 - Request: address the changes requested on PR #12 and align the Forecast Engine with migration 005 and the forecast-input boundary.
 - AI-assisted work: added a 366-day maximum horizon, canonical UTC timestamp precision, consistent `ForecastInputError` handling, overdue-event handling, nullable workspace-threshold support, negative opening-balance handling, documentation and regression tests.
 - Review correction: the first revision changed the Forecast Engine to use the database statuses directly. After merging the latest `main`, the existing team decision showed that PR #14 owns the adapter mapping from `expected / received / paid / cancelled` to the engine's `pending / completed / cancelled` contract. The direct-status change was therefore rejected and corrected.
@@ -255,3 +271,20 @@ Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel (Product Experience). Delive
 Request: while reviewing PR #18 the student ran the Scenario lab with seeded ECB snapshots and saw cross and reciprocal rates printed with about 40 digits ("1 USD = 1.30130803242446573323507737656595431098 SGD"). AI-generated: `formatRate` in `src/lib/format.ts`, its unit tests and the presentation rule in `docs/product-experience.md`. Rates are shown with four decimals, half to even like amounts; the calculation keeps every digit and pages keep the exact value next to the text.
 
 Validation: ESLint and TypeScript clean, all unit tests passed including the new ones, production build passed. Removing the half-even rounding mode makes the rounding test fail (1.23445 becomes 1.2345).
+
+## Submission cleanup (branch `chore/submission-cleanup`)
+
+Date: 2026-10-13. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian
+
+Task given by the student: prepare the repository for the professor's access without touching `README.md` or `docs/limitations.md` (both are being rewritten in PR #21). The AI did not stage, commit or push.
+
+AI-generated: the `.gitignore` guard against macOS and iCloud duplicate files; workspace wording on the sign-in and registration pages; the rewrite of `docs/requirements.md` (US-02 as the workspace story, US-03 to US-06 replaced by a paragraph "Earlier scope (replaced)", US-07 for the current data, the engineering acceptance criteria and the traceability table); the package rename to `fintwin-global`; the removal of `toEngineStatus` and its unit test, because `toForecastInput` already marks every stored expected event pending; the decision sentence that named it; the summary at the top of this document. Before the rewrite the AI listed every reference to US-02 to US-07 (only `docs/requirements.md` referred to them).
+
+Headings and owner lines of two entries of Haina Liu were renamed from "Member B" to her name and role. The rename was agreed with her; nothing else in her entries was changed, and no other member's entry was edited. The summary table was written only from what the entries already say.
+
+Not renamed on purpose: the session cookie `portfolio_session` (renaming it would sign every user out) and the pool variable in `src/lib/db.ts`.
+
+Reviewed and changed by the student: Validation: Reviewed and changed by the student: I set the scope of the cleanup and left README.md and docs/limitations.md out because Jiaxin’s PR #21 rewrites them. I checked the rewritten user stories and traceability rows against the current code. I agreed the “Member B” → Haina Liu rename with Haina. I kept the portfolio_session cookie name on purpose, because renaming it would sign out every existing session.
+
+Validation: npm run verify passed locally on this branch: 313 unit, 196 integration and 39 Chromium tests, lint, typecheck and build. A search for @/lib/forecast-input found no remaining imports.
+
