@@ -131,10 +131,10 @@ Scenarios and events meet through composite `(id, workspace_id)` foreign keys. A
 
 ## 2026-10-10 — Forecast input implemented; a settled event's date is the date the money moved
 
-Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`) and `src/lib/forecast-input.ts` (`toEngineStatus`). Since PR #12 (engine) and PR #19 (`toForecastInput`) are merged, the store's output goes through `toForecastInput` into `runForecast`; an integration test in `tests/integration/forecast-input.test.ts` runs the whole path.
+Implemented in `src/lib/forecast-input-store.ts` (`getForecastInput`); the status mapping lives in `toForecastInput` (PR #19). Since PR #12 (engine) and PR #19 (`toForecastInput`) are merged, the store's output goes through `toForecastInput` into `runForecast`; an integration test in `tests/integration/forecast-input.test.ts` runs the whole path.
 
 **Status of the 2026-10-08 decisions**
-1. Status mapping: implemented as `toEngineStatus` (expected → pending, received and paid → completed, cancelled → excluded, checked for every status at compile time). The adapter from PR #19 marks every returned event `pending`; that is the same mapping, because the store only returns `expected` events.
+1. Status mapping: implemented in `toForecastInput` (PR #19). The store returns only `expected` events (received and paid events are summed into the starting balance, cancelled events never appear), and the adapter marks every returned event `pending`, which is the agreed mapping. A separate `toEngineStatus` function written for this was removed on 2026-10-13 because nothing called it.
 2. Default danger threshold: the store returns the workspace value as stored (`null` when none is set). The 50% default belongs to the engine (PR #12) and is not applied by the store.
 3. Starting balance: implemented, with one correction found in review (PR #14, 2026-10-11). It is the account's opening balance plus its `received` and `paid` events dated **on or before** the start date, summed by PostgreSQL in `numeric`. The first version used "before", which left money that moved on the start day in neither the balance nor the event list, because the engine ignores completed events. Decision 3 of 2026-10-08 is read as "on or before" from here on.
 4. Overdue events: implemented as decided. An `expected` event dated before the start date is returned with `expectedDate` set to the start date, its stored date kept as `originalDate`, and `overdue: true`.

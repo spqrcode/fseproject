@@ -1,6 +1,6 @@
 # Requirements
 
-Status: Issue 1 foundation implemented; later features remain planned. See the traceability table below.
+Status: the stories below are implemented as the traceability table at the end of this document states; stories that belonged to the earlier portfolio dashboard are recorded under "Earlier scope (replaced)".
 
 ## US-01 — Account and session
 
@@ -12,70 +12,32 @@ Acceptance criteria:
 - Protected pages and server operations reject unauthenticated or expired sessions.
 - Logout removes the current session and protected navigation requires login again.
 
-## US-02 — Portfolio management
+## US-02 — Workspace
 
-As a signed-in user, I can create, view, and rename my own portfolio.
-
-Acceptance criteria:
-- A user can create at most one portfolio; the database enforces this invariant.
-- A valid nonempty bounded name is persisted and survives reload.
-- Empty and invalid names are rejected server-side.
-- Other users cannot read or modify the portfolio, including through direct application endpoint requests.
-
-## US-03 — Holdings
-
-As a portfolio owner, I can add, edit, and remove positions.
+As a signed-in user, I can create, view and rename my own workspace, the container for my cash accounts, cash events and scenarios.
 
 Acceptance criteria:
-- A position contains a supported USD instrument, positive quantity, and positive average purchase price.
-- Input must be finite and within documented precision and size limits; limits are agreed before implementation.
-- Duplicate instruments in the same portfolio are rejected with guidance to edit the existing position.
-- Valid changes persist after reload; invalid changes leave stored data unchanged.
-- Users cannot move or attach holdings to another user's portfolio.
-- Removing a holding requires an explicit user action and handles persistence errors visibly.
+- A user has at most one workspace; the database enforces this with a unique owner column.
+- A valid name (trimmed, 1 to 80 characters) is persisted and survives reload. Creating and renaming use the same form.
+- Empty and invalid names are rejected server-side, and the database checks the same rule.
+- Changing the workspace requires a valid session and a request from the application's own origin.
+- Other users cannot read or change the workspace, including through direct requests to the server action.
 
-## US-04 — Quotes
+## Earlier scope (replaced)
 
-As a portfolio owner, I can retrieve market prices for my holdings.
-
-Acceptance criteria:
-- At least one real external API provides quotes through server-side code; provider credentials never reach the browser.
-- Every usable quote has a validated instrument, currency, positive finite price, and observation timestamp.
-- Quotes show observation time and freshness; refresh time is not presented as market observation time.
-- Timeouts, rate limits, network errors, unsupported instruments, and malformed responses produce useful states.
-- Refreshes are bounded and throttled; stale data is labeled and missing prices are never treated as zero.
-
-## US-05 — Valuation
-
-As a portfolio owner, I can see portfolio value and unrealized profit/loss.
-
-Acceptance criteria:
-- Position cost is quantity × average purchase price; value is quantity × quote; unrealized P/L is value − cost.
-- Portfolio amounts are sums of position amounts; P/L percentage uses total cost as the denominator.
-- Empty portfolios show an onboarding state; undefined percentages show unavailable, not NaN or infinity.
-- Missing quotes prevent a complete total; any available subtotal is explicitly labeled partial.
-- Stale quotes remain visibly stale, including at aggregate level.
-- Calculation and rounding behavior is covered by automated tests.
-
-## US-06 — Allocation and P/L contribution
-
-As a portfolio owner, I can see how portfolio value is distributed across instruments.
-
-Acceptance criteria:
-- Allocation uses position market value divided by complete portfolio market value.
-- Each position’s unrealized P/L is shown as its absolute contribution to total P/L; contributions sum to the portfolio P/L. Do not divide by total P/L, which can be zero.
-- Incomplete prices prevent complete allocation claims; zero-value portfolios show unavailable allocation.
-- The UI does not describe allocation or P/L contribution as a complete assessment of investment risk.
+US-03 (Holdings), US-04 (Quotes), US-05 (Valuation) and US-06 (Allocation and P/L contribution) described the portfolio dashboard that FinTwin Global replaced after the group consultation. They were removed as stories, no holdings, quotes or valuations exist in the code, and the numbers US-03 to US-06 are not reused.
 
 ## US-07 — Ownership isolation
 
-As a user, my portfolio and holdings are accessible only to me.
+As a user, my workspace and everything stored in it (cash accounts, cash events, scenarios, delayed-invoice adjustments and FX shocks) are accessible only to me.
 
 Acceptance criteria:
-- Server-side data access enforces ownership for every read, insert, update, and delete; the database is not exposed to browser clients.
-- Automated tests use two users and an unauthenticated client to attempt unauthorized operations.
-- Tests cover forged ownership, guessed identifiers, and changes to parent portfolio references.
-- Server responses, logs, and caches do not disclose another user's holdings.
+- Server-side data access starts at an unexpired session and reaches rows through the session's user and workspace; no user, workspace or ownership id is taken from input, and unknown keys such as a submitted `workspaceId` are ignored. The database is not exposed to browser clients.
+- Another user's id and a non-existent id give the same result, and a malformed id is treated like a missing one, without a distinguishable database error.
+- Anonymous, unknown and expired sessions can neither read nor change data.
+- PostgreSQL refuses cross-workspace references even if the application check is bypassed: composite foreign keys tie an event to an account of its own workspace, and an adjustment or FX shock to a scenario of its own workspace, and an adjustment to an event of its own workspace.
+- Deleting a user removes their workspace, accounts, events, scenarios and adjustments.
+- Automated tests use two users and unauthenticated or expired clients to attempt unauthorized operations on each of these data sets; the cash-event and forecast-input tests can also be run with the application connected as the restricted staging role (see [testing](testing.md)).
 
 ## US-08 Reporting currency and navigation (FinTwin Global)
 
@@ -85,7 +47,7 @@ Supported reporting currencies: EUR, USD and SGD, agreed at the team meeting on 
 
 ## US-11 Cash accounts and cash events (data layer)
 
-As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD and cash events (expected income and expenses) on them. Acceptance criteria for this increment (no page yet):
+As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD and cash events (expected income and expenses) on them. Acceptance criteria for the data layer, which the Cash events page uses:
 - Amounts are signed decimal strings with at most 2 decimals: income above zero, expense below zero, zero invalid; NaN, exponents and extra decimals are rejected.
 - An event's date is a date without time. Statuses are expected, received, paid and cancelled; received applies only to income and paid only to expenses; cancelled events are left out of forecasts.
 - An event's currency is its account's currency; an event can never belong to another workspace's account.
@@ -131,7 +93,7 @@ As a signed-in user, I can apply a percentage shock to a resolved EUR, USD or SG
 
 ## Engineering acceptance criteria
 
-- At least three distinct functional views: authentication, portfolio management, and dashboard analytics.
+- Authentication plus three distinct product views: Cash events, Liquidity overview and Scenario lab (with the Workspace and Settings pages around them).
 - A persistent database, secure authentication, authorization, and meaningful external API integration are demonstrated.
 - Pull requests run automated tests, lint, TypeScript checks, and a production build.
 - GitHub history includes genuine contributions and reviews from all four students.
@@ -139,28 +101,26 @@ As a signed-in user, I can apply a percentage shock to a resolved EUR, USD or SG
 - Requirements, architecture, decisions, tests, security, deployment, limitations, and AI use are documented.
 - AI-generated changes receive the same review and verification as human-authored changes.
 
-## Issue 1 traceability
+## Traceability
 
 | Requirement | Implementation | Verification | Delivery |
 | --- | --- | --- | --- |
 | US-01 registration, login, logout | `src/app/actions/auth.ts`, password/session modules | Unit security tests; integration server-action tests; all four E2E scenarios | `feat/auth-foundation`; staging record in deployment document |
 | US-01 session expiration/revocation | Session SQL and protected page/action checks | Integration expiry/replay; browser expiry, logout replay, expired open form | Same branch and deployment |
-| US-07 existing ownership boundary | `src/lib/workspace-store.ts`, `src/lib/cash-events-store.ts`, `requireUser` | Real database two-user, anonymous, forged-owner and expired-token tests | Existing foundation only; no holdings claims |
+| US-07 ownership isolation | `src/lib/workspace-store.ts`, `src/lib/cash-events-store.ts`, `src/lib/forecast-input-store.ts`, `src/lib/scenario-store.ts`, `src/lib/fx/shock-store.ts`, `requireUser`, composite foreign keys in migrations 005, 007 and 008 | Real-database two-user, anonymous, expired, forged-owner and malformed-id tests in `ownership`, `cash-events`, `cash-event-actions`, `forecast-input`, `liquidity-forecast`, `scenario` and `fx-shock`; cross-workspace insert refused by the database with application checks bypassed; the cash-event and forecast tests were also run as the staging role | Foundation & Security branches, extended by each feature branch |
 | Reproducible automated checks | `scripts/test.mjs`, `.github/workflows/ci.yml` | Migration rerun; full `npm run verify` | GitHub PR CI |
-| US-02 portfolio setup | Existing create/read/rename implementation | Existing behavior checked as an authentication regression | Issue 2 not started or declared complete |
-| US-03–06 | Not implemented | Pending | Later increments |
 | US-08 reporting currency | `src/lib/preferences-store.ts`, `src/app/actions/preferences.ts`, migration 003 | Unit currency validation; integration ownership, origin, expiry and constraint tests; Playwright persistence and expired-session tests | Product experience branch |
 | US-08 public home page | `src/app/page.tsx` | Playwright content, links, signed-in redirect and phone-width tests | Product experience branch |
 | US-10 appearance | Migration 004, `src/lib/preferences-store.ts`, `updateAppearance`, `src/components/appearance-form.tsx`, dark palette | Unit choice validation; integration ownership, origin, expiry and constraint tests; Playwright device-following, saved dark and light overrides and persistence | Product experience branch |
 | US-09 active sessions | `src/lib/account-sessions.ts`, `src/app/actions/account.ts`, settings page | Integration own-sessions listing, other-user isolation, expired caller, origin and redirect tests; Playwright two-browser sign-out test | Product experience branch |
 | US-08 navigation and states | `src/components/navigation.tsx`, `(protected)` loading, error, forecast, scenarios and settings pages | Playwright navigation, signed-out redirects, keyboard and phone-width tests | Product experience branch |
-| US-11 cash accounts and events | Migration 005, `src/lib/cash-events-store.ts`, `src/lib/workspace-store.ts`, cash schemas in `src/lib/validation.ts` | Integration constraints by direct SQL, two-user ownership matrix, anonymous/unknown/expired sessions, malformed ids, status transitions, cascade, and a run as the staging role; unit amount and date validation | Foundation & Security branch; the Cash events page is separate work |
+| US-11 cash accounts and events | Migration 005, `src/lib/cash-events-store.ts`, `src/lib/workspace-store.ts`, cash schemas in `src/lib/validation.ts` | Integration constraints by direct SQL, two-user ownership matrix, anonymous/unknown/expired sessions, malformed ids, status transitions, cascade, and a run as the staging role; unit amount and date validation | Foundation & Security branch; the Cash events page (`/cash-events`) is built on it |
 | US-11 settled events immutable | `updateCashEvent` and `deleteCashEvent` in `src/lib/cash-events-store.ts` (status condition in the `WHERE` clause) | Integration: editing and deleting received, paid and cancelled events refused with the row unchanged; expected events still work; another user's settled event gives the same null as a missing one | Foundation & Security branch (review feedback on PR #10) |
-| US-11 forecast input (decisions of 2026-10-08, implemented 2026-10-10) | `src/lib/forecast-input-store.ts` (starting balance, overdue events, threshold), `src/lib/forecast-input.ts` (status mapping), date rule in `setCashEventStatus`; see [decisions](decisions.md#2026-10-10--forecast-input-implemented-a-settled-events-date-is-the-date-the-money-moved) | Integration: starting balance with events before, on and after the start date (on or before counts), cancelled and other accounts and users ignored, early-settled event in the balance, overdue events, ranges, ownership matrix; unit: status mapping and range; also run as the staging role | Foundation & Security branch `feat/forecast-input`. The call into the engine is not delivered: it waits for PR #12 |
+| US-11 forecast input (decisions of 2026-10-08, implemented 2026-10-10) | `src/lib/forecast-input-store.ts` (starting balance, overdue events, threshold), `toForecastInput` in `src/lib/forecast/input-adapter.ts` (status mapping), date rule in `setCashEventStatus`; see [decisions](decisions.md#2026-10-10--forecast-input-implemented-a-settled-events-date-is-the-date-the-money-moved) | Integration: starting balance with events before, on and after the start date (on or before counts), cancelled and other accounts and users ignored, early-settled event in the balance, overdue events, ranges, ownership matrix; unit: range and the adapter (`input-adapter.test.ts`); also run as the staging role | Foundation & Security branch `feat/forecast-input`. The Liquidity overview (`src/lib/liquidity-forecast.ts`) calls the store, `toForecastInput` and the engine |
 | US-12 delayed-invoice scenarios | Migration 007, `src/lib/scenario-store.ts`, immutable scenario projection in `src/lib/forecast/scenario.ts` | Unit immutability and delta tests; PostgreSQL ownership, composite-FK, eligibility, date-only, cascade and base-forecast isolation tests | PR #9; aligned to the merged PR #12 engine; adjustments that cannot apply are skipped and reported (decision of 2026-10-12) |
 | US-12 base versus scenario comparison | `src/lib/forecast/scenario-comparison.ts` (`compareScenario`), `src/lib/scenario-comparison.ts`, the Scenario lab page | Unit: contributions add up to the closing-balance difference, skipped adjustments, purity, overdue events; PostgreSQL: one account's comparison, isolation, ownership; browser: side by side, effects add up, WCAG, 375 px | PR on top of the Scenario lab; delayed invoices only, exchange-rate shocks are not part of the comparison yet |
-| US-13 reliable ECB exchange rates | Migration 006 and `src/lib/fx/*` | Parser/provider/cache unit tests; PostgreSQL constraints, atomic persistence, stale fallback and restricted-role integration tests | Scenarios & Exchange Rates Phase 2 branch; no UI in this increment |
-| US-14 percentage-based FX shocks | Migration 008, `src/lib/fx/fx-shock.ts`, `src/lib/fx/shock-store.ts` | Decimal shock/result-contract unit tests; PostgreSQL constraint, provenance, invalidation, malformed-id and cross-workspace tests | Scenarios & Exchange Rates Phase 3 branch; no UI in this increment |
-| US-02 workspace (renamed) | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts` | The existing ownership and origin tests, renamed | Same branch |
+| US-13 reliable ECB exchange rates | Migration 006 and `src/lib/fx/*` | Parser/provider/cache unit tests; PostgreSQL constraints, atomic persistence, stale fallback and restricted-role integration tests | Scenarios & Exchange Rates Phase 2 branch; the Scenario lab reads the rates |
+| US-14 percentage-based FX shocks | Migration 008, `src/lib/fx/fx-shock.ts`, `src/lib/fx/shock-store.ts` | Decimal shock/result-contract unit tests; PostgreSQL constraint, provenance, invalidation, malformed-id and cross-workspace tests | Scenarios & Exchange Rates Phase 3 branch; the Scenario lab saves and shows the shocks |
+| US-02 workspace | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts`, `src/components/workspace-form.tsx`, migration 002 renamed to `workspaces` by 005 | Integration: two-user isolation, invalid and anonymous writes, SQL name and uniqueness constraints, origin check; unit name validation; Playwright persistence after reload and expired-session submit | Foundation & Security branch; the table was a portfolio before 005 renamed it |
 
-Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR. No holding deletion or cross-user holding test is claimed before holdings exist.
+Every later feature needs its own issue, acceptance criteria, tests, and reviewed PR.
