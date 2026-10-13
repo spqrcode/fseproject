@@ -255,3 +255,11 @@ Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel (Product Experience). Delive
 Request: while reviewing PR #18 the student ran the Scenario lab with seeded ECB snapshots and saw cross and reciprocal rates printed with about 40 digits ("1 USD = 1.30130803242446573323507737656595431098 SGD"). AI-generated: `formatRate` in `src/lib/format.ts`, its unit tests and the presentation rule in `docs/product-experience.md`. Rates are shown with four decimals, half to even like amounts; the calculation keeps every digit and pages keep the exact value next to the text.
 
 Validation: ESLint and TypeScript clean, all unit tests passed including the new ones, production build passed. Removing the half-even rounding mode makes the rounding test fail (1.23445 becomes 1.2345).
+
+## Haina Liu — Forecast Engine status reconciliation after PR #26
+
+- Date: 2026-10-13. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
+- Request: update local `main`, inspect the merged implementation and continue the next independent Forecast Engine task without duplicating open pull requests.
+- AI-assisted work: audited the merged Forecast Engine, input adapter, reporting-currency service and open branches; updated `docs/forecast-engine.md` so it distinguishes merged behavior from PR #23 and records the actual store → adapter → FX conversion → engine → UI boundary.
+- Scope decision for student review: no multi-account forecast was added. That would require a team rule for combining accounts converted with different rates and effective dates, so it remains explicit future scope rather than an AI assumption.
+- Validation: after fast-forwarding `main` through PR #26, `npm run check` passed ESLint, TypeScript, 325 unit tests and the Next.js production build. The student must inspect this documentation diff and remains responsible for staging, committing, pushing and opening the PR.

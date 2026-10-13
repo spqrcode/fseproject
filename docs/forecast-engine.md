@@ -1,90 +1,100 @@
-# Forecast Engine working draft
+# Forecast Engine
 
-Status: the Decimal/Money/FX foundation was merged in PR #8. Validated cash events and deterministic daily projection are implemented on `feat/haina-cash-projection`; Scenario and provider integration remain separate work.
+Status: the Decimal, Money and FX foundation (PR #8), deterministic cash projection (PR #12), database-to-engine adapter (PR #19), delayed-invoice projection, and reporting-currency conversion (PR #26) are merged into `main`. The Liquidity overview calls this path with real session-scoped data. Base-versus-scenario comparison remains in PR #23 and is not described as merged here.
 
-## Boundary
+## Boundary and data flow
 
-The forecast module is a pure TypeScript domain layer under `src/lib/forecast`. It has no database, network, authentication, React, or Next.js dependency. Callers must supply validated domain input and explicit FX rates; UI components format results but do not calculate them.
+The domain module under `src/lib/forecast` is pure TypeScript. It has no database, network, authentication, React or Next.js dependency. Server-side adapters own persistence, sessions and ECB access; UI components only format results.
 
-## Implemented technical foundation
+```text
+PostgreSQL + session
+  -> getForecastInput
+  -> toForecastInput
+  -> FX rate service (only when currencies differ)
+  -> convertForecastInput
+  -> runForecast
+  -> Liquidity overview
+```
+
+The Forecast Engine never fetches a rate and never invents a fallback. The FX service supplies one resolved `FxRate`; the pure conversion step converts the opening balance and every pending event before the engine runs.
+
+## Decimal, Money and FX rules
 
 - Amounts enter and leave the domain layer as plain decimal strings, never JavaScript numbers.
 - `decimal.js` uses 40 significant digits and half-even rounding.
-- Parsing rejects exponent notation, signs other than a leading minus, separators, surrounding whitespace, non-finite values, and leading zeroes such as `01`.
-- Supported runtime currency codes are exactly `EUR`, `USD`, and `SGD`.
-- Different currencies cannot be added, subtracted, or compared without conversion.
-- An FX rate means quote-currency units per one base-currency unit. A matching direct rate multiplies; the reciprocal direction divides.
-- Conversion keeps calculation precision. Rounding is a separate explicit operation and is not applied automatically.
-- Cross-rate lookup is not implemented. A caller currently supplies one matching direct or reciprocal rate.
+- Parsing rejects exponent notation, misplaced signs, separators, whitespace, non-finite values and invalid leading zeroes.
+- Runtime currencies are exactly EUR, USD and SGD, matching the application allowlist.
+- Money values in different currencies cannot be added, subtracted or compared before conversion.
+- A rate is quote-currency units per one base-currency unit. Direct conversion multiplies and reciprocal conversion divides.
+- The FX service owns ECB fetching, caching, freshness and EUR-derived USD/SGD cross-rates. The core `convertMoney` function only applies the matching rate it receives.
+- Conversion retains calculation precision. Currency-minor-unit rounding happens only when values are displayed.
+- A forecast uses one rate for its opening balance and all events. It does not attempt to predict future exchange rates.
 
-## Decided forecast rules
+## Forecast input rules
 
-### Cash events and dates
+- Cash-event amounts are signed and non-zero: income is positive and expense is negative.
+- The store returns only database events with status `expected`. Received and paid events dated on or before the start date are included in `startingBalance`; cancelled events appear nowhere.
+- `toForecastInput` maps every returned expected event to the engine status `pending` and copies the account currency onto it. The engine also validates `completed` and `cancelled` inputs defensively, but neither affects a projection.
+- Dates are real UTC `YYYY-MM-DD` calendar dates. `startDate` and `endDate` are inclusive.
+- An overdue pending event is projected on `startDate`; an event after `endDate` is ignored.
+- One forecast contains at most 366 inclusive dates between 2000 and 2100.
+- Events on the same projected date are ordered by creation time, then expense before income for equal timestamps, then event ID. The order makes Decimal arithmetic deterministic.
+- Inputs and their event objects are never mutated.
 
-- Amounts are signed decimal strings: income is positive, expense is negative, and zero is invalid.
-- Forecast statuses are `pending`, `completed`, and `cancelled`. The Input adapter maps database `expected` to `pending`, maps `received` and `paid` to `completed`, and omits database `cancelled` events. Only `pending` events affect a projection.
-- The Store/Input layer supplies the starting balance by combining account opening balances with settled `received` and `paid` events up to the forecast start. The Forecast Engine does not query persistence or add settled events again.
-- Forecast dates are real `YYYY-MM-DD` calendar dates interpreted in UTC. Both `startDate` and `endDate` are inclusive. An overdue `pending` event before `startDate` is applied on `startDate`; an event after `endDate` is ignored.
-- The timeline contains one end-of-day balance for every calendar date in the range.
-- Events on the same date are ordered by canonical creation time. Equal timestamps put expenses before income, then use the event ID as a stable final tie-breaker. Because the current timeline records only end-of-day balances, this order does not change the reported daily minimum; it preserves deterministic arithmetic and a future intraday extension.
-- A forecast contains at most 366 inclusive calendar dates so one request cannot create an unbounded server-side loop.
-- Recurring-event expansion is not part of the current contract.
+## Projection, threshold and runway
 
-### Minimum balance and runway
-
+- The timeline contains one end-of-day balance for every date in the range.
 - Minimum balance includes the opening balance and uses the first date when a repeated minimum is reached.
-- `dangerThreshold` is a workspace amount in the reporting currency. When it is `null`, the engine defaults to 50% of opening balance. Both paths use Decimal without settlement rounding.
-- A warning is triggered only when the end-of-day balance is strictly below the threshold; equality does not trigger it.
-- Runway is the number of calendar days from `startDate` to the first warning date. It is `0` when breached on the first day and `null` when not breached within the horizon.
-- Negative opening balances are accepted. With the default percentage threshold, an opening overdraft produces an immediate warning on the first forecast day; callers can supply an explicit workspace threshold instead.
+- `dangerThreshold` is an amount in the reporting currency. When it is `null`, the engine computes 50% of the opening balance without settlement rounding.
+- A warning begins only when an end-of-day balance is strictly below the threshold; equality does not trigger it.
+- Runway is the number of calendar days from `startDate` to the first warning date. It is `0` for a breach on the first day and `null` when no breach occurs in the horizon.
+- A negative opening balance is valid. With the default threshold it warns on the first forecast day.
 
-### Scenario boundary
+## Reporting-currency integration
 
-- Scenario application copies events and applies overrides without mutating persisted cash events or the base forecast.
-- Phase 1 contribution delta is scenario closing balance minus base closing balance in the same reporting currency.
+`forecastStoredInReportingCurrency` connects the server-side input and FX services to the pure domain functions:
 
-### FX observations
+- If the account already uses the reporting currency, it runs the engine without an FX lookup.
+- For a different currency, `getRate` returns a direct, reciprocal or EUR-derived cross-rate from persisted ECB snapshots.
+- `convertForecastInput` converts the opening balance and all events with that one rate. The workspace threshold passes through because it is already stored in the reporting currency.
+- `CURRENT` and `STALE` rates are both usable and visibly labelled with provider and effective date.
+- When no usable snapshot exists, the result is `UNAVAILABLE`; the page shows no forecast rather than a wrong-currency or fabricated number.
+- The current cache freshness window is one hour. If refresh fails, the latest validated older snapshot may be returned as `STALE`.
 
-- Each forecast has one reporting currency: EUR, USD, or SGD.
-- The FX service owns ECB fetching, caching, freshness and EUR-derived cross-rates. The Forecast Engine will receive resolved decimal `FxRate` values and fail explicitly when a required pair is missing.
-- When the effective-date observation is unavailable, the provider layer selects the newest usable earlier snapshot and reports its effective date and freshness state; the Forecast Engine does not fetch or invent rates.
+## Scenario boundary
 
-## Team decisions still required
+- A delayed-invoice adjustment creates a new in-memory event list with a date override. It never changes the cash event or base forecast.
+- Adjustments that no longer apply are reported as `invalid`, `not_applicable` or `not_in_forecast` instead of breaking the whole scenario.
+- `scenarioContribution` is scenario closing balance minus base closing balance in the same currency.
+- PR #23 proposes the side-by-side base/scenario result and an additive contribution breakdown. Until it is merged, that UI and comparison service are pending work.
+- FX-shock provenance, freshness and percentage calculations remain owned by the FX/scenario modules; the Forecast Engine consumes only resolved rates and cash-event inputs.
 
-### FX
+## Verified boundary cases
 
-1. What age changes a cached snapshot from current to stale, and when must a forecast become unavailable?
-2. When, if ever, is a converted amount settled to currency minor units rather than kept at calculation precision?
+| Case | Result |
+| --- | --- |
+| Same-day `+100` and `-250`, opening `100` | One end-of-day balance of `-50`; equal timestamps apply the expense first |
+| Balance equals threshold | No warning; the comparison is strictly below |
+| Repeated minimum | The first date is returned |
+| Overdue expected event | Applied on `startDate` |
+| 366 inclusive dates | Accepted |
+| 367 inclusive dates | Rejected |
+| Missing required FX rate | Explicit unavailable/error result; never zero or fallback |
+| Negative opening balance with default threshold | Warning on the first forecast day |
 
-### Base and scenario contribution
+On 2026-10-13, after updating local `main` through PR #26, `npm run check` passed ESLint, TypeScript, 325 unit tests and the Next.js production build.
 
-1. Beyond delayed dates and FX shocks, can a scenario add, remove, or resize events?
-2. When several changes interact, what attribution order produces the contribution breakdown?
-3. Must individual contributions add exactly to the scenario-minus-base closing-balance difference?
+## Remaining work requiring team scope
 
-## Examples awaiting expected outcomes
+- PR #23 must be reviewed and merged before base-versus-scenario comparison can be called complete.
+- The Scenario comparison still needs an explicit decision on whether it must always be converted to the workspace reporting currency after PR #26.
+- There is no combined forecast across several accounts. Adding one requires an agreed rule for combining accounts converted with different rates and effective dates; it is not silently assumed by the current engine.
+- Scenarios that combine delayed events and FX shocks need an agreed attribution rule before individual contributions can claim to explain the total effect.
+- Recurrence, interpolation, probabilistic forecasting and predicted future FX rates remain outside the agreed MVP.
 
-| Scenario | Example | Decision needed |
-| --- | --- | --- |
-| Same-day inflow and outflow | Opening 100; +100 and -250 on one date | One end-of-day balance of -50; equal timestamps apply the expense first |
-| Balance equals warning threshold | Threshold 50; ending balance 50 | No warning; the comparison is strictly below the threshold |
-| Repeated minimum | Balance reaches -20 on two dates | Return the first date |
-| Overdue expected event | Event dated one day before forecast | Apply it on `startDate` |
-| Missing USD/SGD cross-rate | No resolved USD/SGD pair was supplied | Return an explicit missing-rate error |
-| Scenario changes two events | One expense removed and another delayed | Contribution attribution order |
+## Deliberately outside the pure engine
 
-## Implementation status and next work
-
-1. Implemented: `CashEvent`, `ForecastInput`, `ForecastPoint`, and `ForecastResult` contracts.
-2. Implemented: immutable validation, daily balance timeline, overdue-pending-event handling, workspace/default threshold, minimum balance, and runway.
-3. Next: implement the agreed resolved-rate collection boundary with the ECB adapter owner.
-4. Next: expose base-versus-scenario closing delta and reconcile the later contribution breakdown.
-5. Next: connect the pure domain result to persistence and UI without moving calculations into those layers.
-
-## Out of scope until explicitly agreed
-
-- Fetching live or historical FX rates.
-- Fetching or silently inventing fallback FX rates inside the Forecast Engine.
-- Database schema or persistence for forecasts.
-- UI design and formatting.
-- Recurrence syntax, interpolation between dates, or probabilistic forecasting.
+- Database queries, session ownership and persistence of forecast results.
+- ECB network access, caching and cross-rate discovery.
+- UI design, formatting and minor-unit display rounding.
+- Silent fallback values for missing data.
