@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseCashEvent, runForecast, type CashEvent } from "@/lib/forecast";
-import { compareScenario, ContributionMismatchError } from "@/lib/forecast/scenario-comparison";
+import { compareScenario, contributionsAddUp, ContributionMismatchError, CONTRIBUTION_TOLERANCE } from "@/lib/forecast/scenario-comparison";
+import { convertForecastInput, fxRate, type ForecastInput } from "@/lib/forecast";
 import type { DelayAdjustment } from "@/lib/forecast/scenario";
 
 // Proposal US-05 (US-12 in requirements.md): the difference between the scenario and the base equals the sum of the per-adjustment contributions.
@@ -121,5 +122,32 @@ describe("base versus scenario", () => {
     expect(error.closingDelta).toBe("-400");
     expect(error.contributionsTotal).toBe("-399.99");
     expect(error.message).toContain("do not add up");
+  });
+});
+
+describe("after conversion into the reporting currency", () => {
+  // Converted amounts carry the engine's 40 significant digits, so sums round in their last digit. Before the
+  // tolerance, these real and synthetic rates made compareScenario throw on a difference around the 34th decimal.
+  it.each(["1.4127", "3", "1.123456789", "1.0856", "0.7079"])("still adds up with a rate of %s", rate => {
+    const amounts = ["9000", "10000.01", "-7000", "2499.99", "123.45", "8000", "333.33"];
+    const events = amounts.map((amount, i) => parseCashEvent({ id: `e${i}`, amount, currency: "USD", expectedDate: `2025-01-${String(5 + i * 3).padStart(2, "0")}`, createdAt: "2025-01-01T00:00:00.000Z", status: "pending" }));
+    const input: ForecastInput = { startDate: "2025-01-01", endDate: "2025-03-31", openingBalance: "20000.37", dangerThreshold: null, currency: "USD", events };
+    const converted = convertForecastInput(input, "EUR", fxRate("EUR", "USD", rate));
+    const baseForecast = runForecast(converted);
+    const adjustments = [0, 1, 3, 5, 6].map(i => delay(`a${i}`, `e${i}`, i % 2 ? "2025-05-01" : "2025-03-20"));
+    const result = compareScenario({ scenarioId: "sc-1", adjustments, baseEvents: converted.events, baseForecast, startDate: converted.startDate, endDate: converted.endDate, currency: "EUR" });
+    expect(result.contributions).toHaveLength(5);
+    expect(contributionsAddUp(result.contributionsTotal, result.closingDelta)).toBe(true);
+  });
+
+  it("accepts rounding in the last digits but still refuses a real gap", () => {
+    expect(CONTRIBUTION_TOLERANCE).toBe("0.0000000001");
+    expect(contributionsAddUp("-400", "-400")).toBe(true);
+    expect(contributionsAddUp("-14511.21965031499964606781340695122814468", "-14511.21965031499964606781340695122814467")).toBe(true);
+    expect(contributionsAddUp("-400.0000000001", "-400")).toBe(true);
+    // A cent, a fraction of a cent and a missing invoice are all real errors.
+    expect(contributionsAddUp("-399.99", "-400")).toBe(false);
+    expect(contributionsAddUp("-400.000000001", "-400")).toBe(false);
+    expect(contributionsAddUp("-150", "-400")).toBe(false);
   });
 });

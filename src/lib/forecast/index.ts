@@ -52,6 +52,8 @@ export {
 export { appliedFactor, convertForecastInput } from "@/lib/forecast/reporting-currency";
 export {
   compareScenario,
+  CONTRIBUTION_TOLERANCE,
+  contributionsAddUp,
   ContributionMismatchError,
   type AdjustmentContribution,
   type ScenarioComparison,

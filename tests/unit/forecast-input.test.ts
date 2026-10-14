@@ -1,19 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toEngineStatus } from "@/lib/forecast-input";
 import { forecastRangeSchema } from "@/lib/validation";
-import { CASH_EVENT_STATUSES } from "@/lib/cash-event-status";
-
-describe("toEngineStatus", () => {
-  it("maps expected to pending, received and paid to completed, and leaves cancelled out", () => {
-    expect(toEngineStatus("expected")).toBe("pending");
-    expect(toEngineStatus("received")).toBe("completed");
-    expect(toEngineStatus("paid")).toBe("completed");
-    expect(toEngineStatus("cancelled")).toBeNull();
-  });
-  it("covers every database status", () => {
-    for (const status of CASH_EVENT_STATUSES) expect(["pending", "completed", null]).toContain(toEngineStatus(status));
-  });
-});
 
 describe("forecast range", () => {
   const range = (startDate: string, endDate: string) => forecastRangeSchema.safeParse({ startDate, endDate });

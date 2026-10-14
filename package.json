@@ -1,5 +1,5 @@
 {
-  "name": "portfolio-risk-dashboard",
+  "name": "fintwin-global",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
     "test:integration": "node --env-file-if-exists=.env.local scripts/test.mjs integration",
+    "test:integration:runtime": "node --env-file-if-exists=.env.local scripts/test.mjs integration:runtime",
     "test:e2e": "node --env-file-if-exists=.env.local scripts/test.mjs e2e",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "demo:seed": "node --env-file-if-exists=.env.local scripts/demo-seed.mjs",

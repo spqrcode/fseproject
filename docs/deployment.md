@@ -8,7 +8,7 @@ Existing Vercel project: `fseproject`, project ID `prj_kDOrGWxd4htfHHHHTVbUtuQVX
 
 PostgreSQL: dedicated Neon resource `fseproject-staging`, free_v3 plan, Frankfurt, managed authentication disabled. The service provisioned PostgreSQL 18.6; local/CI PostgreSQL is 16.15/16. The SQL uses features common to both. Staging migrations were applied successfully. Certificate-verified TLS was checked on the actual client connection; backend `pg_stat_ssl` is not evidence of client TLS when a provider proxy terminates it.
 
-Runtime role `fse_runtime` has only SELECT/INSERT on users, SELECT/INSERT/DELETE on sessions, and SELECT/INSERT/UPDATE on auth_limits and workspaces (the former `portfolios` table; the renamed table keeps its grants), and UPDATE on the `users.reporting_currency` and `users.appearance` columns only (granted by migrations 003 and 004). Migration 005 grants, only if the role exists:
+The base grants below (those on `users`, `sessions`, `auth_limits` and `workspaces`, which no migration gives) also exist as executable code in `scripts/ci-runtime-role.mjs`, which CI uses to run the data-store integration tests as this role (see [testing](testing.md)); change both together. The grant table in this section (the base grants and the grants of migrations 003-008) is checked by `tests/integration/runtime-privileges.test.ts`, which compares what `fse_runtime` can actually do, table by table and column by column, with an explicit map and fails on a missing or an extra privilege; the table, that map and the grants must change together. Runtime role `fse_runtime` has only SELECT/INSERT on users, SELECT/INSERT/DELETE on sessions, and SELECT/INSERT/UPDATE on auth_limits and workspaces (the former `portfolios` table; the renamed table keeps its grants), and UPDATE on the `users.reporting_currency` and `users.appearance` columns only (granted by migrations 003 and 004). Migration 005 grants, only if the role exists:
 
 | Table | Grant | Why |
 | --- | --- | --- |
@@ -48,3 +48,8 @@ Migration `005_workspace_cash_events.sql` renames the table `portfolios` to `wor
 ## Production
 
 The project has no working production deployment. The only production-target build is an errored one from the documentation-only commit made before any application code existed. Production comes with the merge to `main` plus production-target environment variables and its own database; that is deliberately outside Issue 1, which asked for staging.
+
+## Preview deployments blocked by commit author
+
+Vercel can report a preview as "Deployment was blocked" with the message that GitHub could not verify an account for the commit. This is not a build or test failure: it happens when the commit's author email is not linked to a GitHub account that is a member of the Vercel team. The pull request's own checks (`verify` in GitHub Actions) run independently of it. To fix it, add the commit email to the author's GitHub account and connect that account to the Vercel team, then push a new commit. Until then, treat the preview as unavailable and do not count it as a successful deployment.
+
