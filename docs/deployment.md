@@ -48,3 +48,8 @@ Migration `005_workspace_cash_events.sql` renames the table `portfolios` to `wor
 ## Production
 
 The project has no working production deployment. The only production-target build is an errored one from the documentation-only commit made before any application code existed. Production comes with the merge to `main` plus production-target environment variables and its own database; that is deliberately outside Issue 1, which asked for staging.
+
+## Preview deployments blocked by commit author
+
+Vercel can report a preview as "Deployment was blocked" with the message that GitHub could not verify an account for the commit. This is not a build or test failure: it happens when the commit's author email is not linked to a GitHub account that is a member of the Vercel team. The pull request's own checks (`verify` in GitHub Actions) run independently of it. To fix it, add the commit email to the author's GitHub account and connect that account to the Vercel team, then push a new commit. Until then, treat the preview as unavailable and do not count it as a successful deployment.
+

@@ -127,7 +127,7 @@ A skip link is the first keyboard stop on every page. Headings follow one `h1` p
 
 ## How the Forecast Engine and Scenarios & FX plug in
 
-1. The Liquidity overview reads the forecast input, the adapter and the engine (#20). The numerical base-versus-scenario comparison in `scenarios/page.tsx` came with #23 and is in the reporting currency since this change. Cash events, scenario adjustments and FX preview are connected already.
+1. The Liquidity overview reads the forecast input, the adapter and the engine (#20). The numerical base-versus-scenario comparison in `scenarios/page.tsx` came with #23 and is in the reporting currency since #30. Cash events, scenario adjustments and FX preview are connected already.
 2. Read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
 3. Pass amounts as decimal strings from the calculation layer; pass `null` when a value is unavailable.
 4. Update the module row on the liquidity overview from "Not connected yet" to the real status.
