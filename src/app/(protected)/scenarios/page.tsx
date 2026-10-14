@@ -7,7 +7,7 @@ import { getScenarioFxShocks } from "@/lib/fx/shock-store";
 import { getRate } from "@/lib/fx/rate-service";
 import { getScenarioComparison } from "@/lib/scenario-comparison";
 import { HORIZONS, firstParam, forecastWindow, parseHorizon } from "@/lib/liquidity-overview";
-import { buildScenarioFxResult, type ScenarioFxResult } from "@/lib/fx/fx-shock";
+import { buildScenarioFxResult, InvalidShockPercentageError, SHOCK_PERCENT_MESSAGE, type ScenarioFxResult } from "@/lib/fx/fx-shock";
 import { parseDecimal } from "@/lib/forecast/decimal";
 import { getReportingCurrency } from "@/lib/preferences-store";
 import { DEFAULT_REPORTING_CURRENCY, REPORTING_CURRENCIES, currencyLabel } from "@/lib/currency";
@@ -48,8 +48,11 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
     } else {
       try {
         preview = buildScenarioFxResult(await getRate(base, quote), { baseCurrency: base, quoteCurrency: quote }, shock);
-      } catch {
-        previewError = "The rate preview could not be calculated. Check the percentage and try again.";
+      } catch (error) {
+        // The same bounds as saving (#24), so a percentage that can be previewed can also be saved.
+        previewError = error instanceof InvalidShockPercentageError
+          ? SHOCK_PERCENT_MESSAGE
+          : "The rate preview could not be calculated. Check the percentage and try again.";
       }
     }
   }
@@ -143,7 +146,7 @@ export default async function ScenariosPage({ searchParams }: { searchParams: Pr
             <input type="hidden" name="preview" value="1" />
             <div className="field"><label htmlFor="fx-base">Base currency</label><select id="fx-base" name="base" defaultValue={base}>{REPORTING_CURRENCIES.map(item => <option value={item} key={item}>{item}</option>)}</select></div>
             <div className="field"><label htmlFor="fx-quote">Quote currency</label><select id="fx-quote" name="quote" defaultValue={quote}>{REPORTING_CURRENCIES.map(item => <option value={item} key={item}>{item}</option>)}</select></div>
-            <div className="field"><label htmlFor="fx-shock">Shock (%)</label><input id="fx-shock" name="shock" inputMode="decimal" required maxLength={32} defaultValue={shock} aria-describedby="fx-shock-hint" /><small id="fx-shock-hint">-10 means minus 10%, not a ratio of -0.1. Must be greater than -100%.</small></div>
+            <div className="field"><label htmlFor="fx-shock">Shock (%)</label><input id="fx-shock" name="shock" inputMode="decimal" required maxLength={32} defaultValue={shock} aria-describedby="fx-shock-hint" /><small id="fx-shock-hint">-10 means minus 10%, not a ratio of -0.1. From -99.99% to 100%, at most four decimals.</small></div>
             <button className="button" type="submit">Preview shock</button>
           </form>
           {previewError && <p role="alert" className="notice error">{previewError}</p>}

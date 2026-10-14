@@ -264,6 +264,10 @@ Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — 
 
 Merge with `main` (2026-10-12, after PRs #12, #13 and #19): Claude Code resolved the conflicts in four documentation files by keeping both sides; the student compared the result line by line with `main` (no line from `main` lost except text that this branch deliberately updates) and with Gabriel's resolution on `feat/product-liquidity-overview`, and updated the 2026-10-10 decision entry now that the engine and `toForecastInput` are merged. AI-generated: one integration test that runs `getForecastInput` → `toForecastInput` → `runForecast` for an account with a settled, an overdue and a future event. Validation: CI on the merge commit 6c7bf18 passed: 238 unit, 141 integration and 24 Chromium tests, lint, typecheck and build.
 
+## FX shock bounds and errors (PR #17 review, Bastian, 2026-10-12)
+
+Review correction: the first AI-assisted FX-shock code validated only "greater than -100" in two places (a private parser and the store) and left the column an unbounded `numeric`. Bastian found that +5000% or a 40-digit value was accepted. Neither the AI nor the first human review had tried the upper end, and the duplicated parser had already drifted from the one in `calculateShockedRate`. Change: one exported `parseShockPercent` (-99.99 to 100, four decimals) used by the preview and the save, migration 009 for the column and a range check, a domain error for a duplicate shock, and "Authentication required." for an expired session. One existing unit test relied on an 18-decimal input and was rewritten to test what it meant to (the shocked rate is not rounded) with a four-decimal input; one integration assertion now expects the column's four decimals. Validation (2026-10-12, local, PostgreSQL 16): lint and TypeScript clean, unit tests, 169 integration tests, production build.
+
 ## Base versus scenario comparison (branch `feat/scenario-comparison`)
 
 Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin (Scenarios & Exchange Rates), covering the Scenario lab for Product Experience.

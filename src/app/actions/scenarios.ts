@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser, sessionToken } from "@/lib/auth";
 import { addDelayAdjustment, createScenario, DuplicateDelayAdjustmentError } from "@/lib/scenario-store";
 import { addScenarioFxShock } from "@/lib/fx/shock-store";
-import { InvalidShockPercentageError } from "@/lib/fx/fx-shock";
+import { DuplicateFxShockError, InvalidShockPercentageError, SHOCK_PERCENT_MESSAGE } from "@/lib/fx/fx-shock";
 import { verifyOrigin } from "@/lib/request-security";
 import { isoDateSchema, scenarioNameSchema, uuidSchema, type FormState } from "@/lib/validation";
 
@@ -61,8 +61,9 @@ export async function saveFxShock(_state: FormState, form: FormData): Promise<Fo
     await verifyOrigin();
     await addScenarioFxShock(await sessionToken(), scenarioId.data, snapshotId.data, shockPercent);
   } catch (error) {
-    if (error instanceof InvalidShockPercentageError) return { error: "Enter a percentage greater than -100." };
-    return { error: "Unable to save this shock. It may already be saved in the scenario." };
+    if (error instanceof InvalidShockPercentageError) return { error: SHOCK_PERCENT_MESSAGE };
+    if (error instanceof DuplicateFxShockError) return { error: error.message };
+    return { error: "Unable to save this shock. Please try again." };
   }
   revalidatePath("/scenarios");
   redirect(`/scenarios?scenario=${scenarioId.data}&success=shock-added`);

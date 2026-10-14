@@ -89,15 +89,21 @@ describe("the three actions for the signed-in user", () => {
     const stored = await database().query("SELECT to_char(expected_date, 'YYYY-MM-DD') AS d FROM cash_events WHERE id = $1", [alice.invoiceId]);
     expect(stored.rows[0].d).toBe("2026-11-02");
   });
-  it("saves a shock on a stored snapshot", async () => {
+  it("saves a shock on a stored snapshot, and says so when the same snapshot already has one", async () => {
     expect(await redirected(saveFxShock({}, shock(alice)))).toBe(`redirect:/scenarios?scenario=${alice.scenarioId}&success=shock-added`);
     expect((await getScenarioFxShocks(alice.token, alice.scenarioId)).map(item => item.shockPercent)).toEqual(["-10"]);
+    expect((await saveFxShock({}, shock(alice, { shockPercent: "-5" }))).error).toBe("This scenario already has a shock for this exchange-rate snapshot.");
+    expect(await getScenarioFxShocks(alice.token, alice.scenarioId)).toHaveLength(1);
   });
   it("shows validation messages and saves nothing", async () => {
     expect((await addScenario({}, form({ name: "  " }))).error).toBeTruthy();
     expect((await addInvoiceDelay({}, delay(alice, { dateOverride: "2026-02-30" }))).error).toBeTruthy();
     expect((await addInvoiceDelay({}, delay(alice, { dateOverride: "2026-10-01" }))).error).toBe("Choose an expected income event and a date later than its original date.");
-    expect((await saveFxShock({}, shock(alice, { shockPercent: "-100" }))).error).toBeTruthy();
+    // The bounds from #24, with the same message for the preview and for saving.
+    for (const value of ["-100", "100.0001", "5000", "1.00001"]) {
+      expect((await saveFxShock({}, shock(alice, { shockPercent: value }))).error, value)
+        .toBe("Shock percentage must be a plain number from -99.99% to 100% with at most 4 decimals.");
+    }
     expect((await saveFxShock({}, shock(alice, { snapshotId: "not-a-uuid" }))).error).toBe("Choose a valid scenario, snapshot and percentage.");
     expect(await getAdjustments(alice.token, alice.scenarioId)).toEqual([]);
     expect(await getScenarioFxShocks(alice.token, alice.scenarioId)).toEqual([]);

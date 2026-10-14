@@ -29,16 +29,31 @@ import type { RateFailure, RateResult } from "@/lib/fx/rate-service";
 import type { FxSnapshot } from "@/lib/fx/snapshot-store";
 
 // ---------------------------------------------------------------------------
+// The accepted shock
+// ---------------------------------------------------------------------------
+
+/** Inclusive bounds of a stored shock, in percent, and the decimals it keeps (numeric(7,4) in the database). */
+export const MIN_SHOCK_PERCENT = "-99.99";
+export const MAX_SHOCK_PERCENT = "100";
+export const SHOCK_PERCENT_DECIMALS = 4;
+export const SHOCK_PERCENT_MESSAGE =
+  `Shock percentage must be a plain number from ${MIN_SHOCK_PERCENT}% to ${MAX_SHOCK_PERCENT}% with at most ${SHOCK_PERCENT_DECIMALS} decimals.`;
+
+// ---------------------------------------------------------------------------
 // Error classes
 // ---------------------------------------------------------------------------
 
 export class InvalidShockPercentageError extends Error {
   constructor(readonly value: unknown, message?: string) {
-    super(
-      message ??
-        `Invalid shock percentage ${JSON.stringify(value)}: must be a plain decimal strictly greater than -100%.`,
-    );
+    super(message ?? `Invalid shock percentage ${JSON.stringify(value)}. ${SHOCK_PERCENT_MESSAGE}`);
     this.name = "InvalidShockPercentageError";
+  }
+}
+
+export class DuplicateFxShockError extends Error {
+  constructor() {
+    super("This scenario already has a shock for this exchange-rate snapshot.");
+    this.name = "DuplicateFxShockError";
   }
 }
 
@@ -139,30 +154,37 @@ export type ScenarioFxResult =
  *   shockedRate = sourceRate × (1 + shockPercent / 100)
  *
  * Rules:
- *  - shockPercent must be a finite plain decimal strictly > -100.
+ *  - shockPercent must be a plain decimal from -99.99 to 100 with at most four decimals.
  *  - sourceRate must be a finite plain decimal > 0.
  *  - All calculations use ForecastDecimal.
  *  - No intermediate rounding is performed.
  */
-export function calculateShockedRate(sourceRate: string, shockPercent: string): string {
-  // Validate shockPercent
-  let shockDec;
+/**
+ * Parse and range-check a shock percentage: a plain decimal from -99.99 to 100
+ * with at most four decimals, the same rule as the database column. Throws
+ * InvalidShockPercentageError otherwise. Used for the preview and for saving,
+ * so a value that can be previewed can also be saved.
+ */
+export function parseShockPercent(shockPercent: string) {
+  let value;
   try {
-    shockDec = parseDecimal(shockPercent);
+    value = parseDecimal(shockPercent);
   } catch (err) {
-    if (err instanceof DecimalInputError) {
-      throw new InvalidShockPercentageError(shockPercent);
-    }
+    if (err instanceof DecimalInputError) throw new InvalidShockPercentageError(shockPercent);
     throw err;
   }
-
-  // Shock of -100% or lower would produce zero or negative rate
-  if (shockDec.lessThanOrEqualTo(-100)) {
-    throw new InvalidShockPercentageError(
-      shockPercent,
-      `Shock percentage ${JSON.stringify(shockPercent)} is invalid: shock must be strictly greater than -100%.`,
-    );
+  if (
+    value.lessThan(parseDecimal(MIN_SHOCK_PERCENT)) ||
+    value.greaterThan(parseDecimal(MAX_SHOCK_PERCENT)) ||
+    value.decimalPlaces() > SHOCK_PERCENT_DECIMALS
+  ) {
+    throw new InvalidShockPercentageError(shockPercent);
   }
+  return value;
+}
+
+export function calculateShockedRate(sourceRate: string, shockPercent: string): string {
+  const shockDec = parseShockPercent(shockPercent);
 
   // Validate sourceRate
   let sourceDec;
@@ -200,7 +222,7 @@ export function calculateShockedRate(sourceRate: string, shockPercent: string): 
  *
  * Throws MissingSnapshotError if snapshot is null or undefined.
  * Throws UnusableSnapshotError if the persisted rate is invalid.
- * Throws InvalidShockPercentageError if shockPercent <= -100 or malformed.
+ * Throws InvalidShockPercentageError if shockPercent is out of range, too precise or malformed.
  */
 export function evaluateFxShock(
   snapshot: FxSnapshot | null | undefined,
@@ -288,18 +310,6 @@ export function buildScenarioFxResult(
     adjustedFxRate: fxRate(baseCurrency, quoteCurrency, adjustedRate),
     isHypothetical: true,
   });
-}
-
-function parseShockPercent(value: string) {
-  let parsed;
-  try {
-    parsed = parseDecimal(value);
-  } catch (error) {
-    if (error instanceof DecimalInputError) throw new InvalidShockPercentageError(value);
-    throw error;
-  }
-  if (parsed.lessThanOrEqualTo(-100)) throw new InvalidShockPercentageError(value);
-  return parsed;
 }
 
 /**

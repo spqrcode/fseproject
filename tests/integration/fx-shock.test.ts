@@ -11,6 +11,8 @@
  */
 
 import { beforeEach, afterEach, afterAll, describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { Client } from "pg";
 import { database } from "@/lib/db";
 import { createSession } from "@/lib/session-store";
 import { createScenario } from "@/lib/scenario-store";
@@ -22,7 +24,7 @@ import {
   evaluateScenarioFxShock,
   invalidateScenarioFxShock,
 } from "@/lib/fx/shock-store";
-import { convertWithShock, UnusableSnapshotError } from "@/lib/fx/fx-shock";
+import { convertWithShock, DuplicateFxShockError, InvalidShockPercentageError, UnusableSnapshotError } from "@/lib/fx/fx-shock";
 import { money, roundMoney } from "@/lib/forecast";
 
 // ---------------------------------------------------------------------------
@@ -100,6 +102,76 @@ describe("Scenario FX shock persistence (PostgreSQL)", () => {
     await database().end();
   });
 
+  it("bounds a stored shock to -99.99..100 with four decimals, in the application and in the database", async () => {
+    // The application refuses it before any SQL...
+    for (const value of ["5000", "100.0001", "-99.995", "1.00001", "1e5"]) {
+      await expect(addScenarioFxShock(token, scenarioId, snapshotId, value)).rejects.toBeInstanceOf(InvalidShockPercentageError);
+    }
+    // ...and the database refuses it even when the application is bypassed.
+    for (const value of ["100.0001", "-99.9901", "5000"]) {
+      await expect(database().query(
+        "INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent) VALUES ($1, $2, $3, $4)",
+        [workspaceId, scenarioId, snapshotId, value],
+      ), value).rejects.toMatchObject({ code: expect.stringMatching(/^(23514|22003)$/) });
+    }
+    expect(await getScenarioFxShocks(token, scenarioId)).toEqual([]);
+
+    // The bounds themselves are accepted and read back unchanged.
+    const upper = await addScenarioFxShock(token, scenarioId, snapshotId, "100");
+    expect(upper.shockPercent).toBe("100");
+    await database().query("DELETE FROM scenario_fx_shocks WHERE id = $1", [upper.id]);
+    const lower = await addScenarioFxShock(token, scenarioId, snapshotId, "-99.99");
+    expect(lower.shockPercent).toBe("-99.99");
+  });
+
+  it("reports a second shock for the same scenario and snapshot as a domain error, and an expired session as authentication", async () => {
+    await addScenarioFxShock(token, scenarioId, snapshotId, "5");
+    await expect(addScenarioFxShock(token, scenarioId, snapshotId, "7")).rejects.toBeInstanceOf(DuplicateFxShockError);
+    expect(await getScenarioFxShocks(token, scenarioId)).toHaveLength(1);
+
+    await database().query("UPDATE sessions SET expires_at = now() - interval '1 second' WHERE user_id = (SELECT user_id FROM workspaces WHERE id = $1)", [workspaceId]);
+    await expect(addScenarioFxShock(token, scenarioId, snapshotId, "9")).rejects.toThrow("Authentication required.");
+  });
+
+  // Migration 009 on a database that still has saved shocks from before it (review of #24): the cast to
+  // numeric(7,4) would round extra decimals silently, so the migration must refuse instead of changing a saved
+  // scenario. Each case puts the column back into its 008 state inside a transaction, inserts a shock, runs the
+  // migration's SQL and rolls everything back, so the test database ends unchanged.
+  async function inState008(run: (client: Client) => Promise<void>) {
+    const client = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("ALTER TABLE scenario_fx_shocks DROP CONSTRAINT scenario_fx_shocks_percent_range");
+      await client.query("ALTER TABLE scenario_fx_shocks ALTER COLUMN shock_percent TYPE numeric");
+      await run(client);
+    } finally {
+      await client.query("ROLLBACK");
+      await client.end();
+    }
+  }
+  const migration009 = readFileSync("db/migrations/009_scenario_fx_shock_bounds.sql", "utf8");
+  const insertShock = (client: Client, value: string) => client.query(
+    "INSERT INTO scenario_fx_shocks (workspace_id, scenario_id, snapshot_id, shock_percent) VALUES ($1, $2, $3, $4) RETURNING id",
+    [workspaceId, scenarioId, snapshotId, value]);
+
+  it.each(["1.23456", "-99.995", "150", "-99.9901"])("migration 009 refuses an existing shock of %s instead of rounding or keeping it", async value => {
+    await inState008(async client => {
+      await insertShock(client, value);
+      await expect(client.query(migration009)).rejects.toThrow("Migration 009");
+    });
+  });
+
+  it("migration 009 keeps existing valid shocks exactly as they were", async () => {
+    await inState008(async client => {
+      const id = (await insertShock(client, "-10.5")).rows[0].id as string;
+      await client.query(migration009);
+      const row = await client.query("SELECT shock_percent::text AS value FROM scenario_fx_shocks WHERE id = $1", [id]);
+      expect(row.rows[0].value).toBe("-10.5000");
+      await expect(client.query("SELECT 1 WHERE -10.5000::numeric = $1::numeric", [row.rows[0].value])).resolves.toMatchObject({ rowCount: 1 });
+    });
+  });
+
   it("persists a scenario FX shock in PostgreSQL with correct types and status", async () => {
     const shock = await addScenarioFxShock(token, scenarioId, snapshotId, "5");
     expect(shock.id).toBeDefined();
@@ -114,7 +186,8 @@ describe("Scenario FX shock persistence (PostgreSQL)", () => {
       [shock.id],
     );
     expect(dbRow.rows).toHaveLength(1);
-    expect(dbRow.rows[0].shock_percent).toBe("5");
+    // numeric(7,4) since migration 009: the column keeps four decimals; the store trims them when it reads.
+    expect(dbRow.rows[0].shock_percent).toBe("5.0000");
     expect(dbRow.rows[0].status).toBe("active");
   });
 
