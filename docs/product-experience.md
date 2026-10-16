@@ -6,7 +6,7 @@ Owner: Gabriel (Product Experience), with Cash events and Scenario lab integrati
 
 | Route | Purpose | State in this increment |
 | --- | --- | --- |
-| `/` | Public home page: what FinTwin Global is, which views are available or in development, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
+| `/` | Public home page: what FinTwin Global is, what each of the three views does today, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
 | `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented: one account's deterministic forecast for 30, 90, 180 or 365 days (balance today, lowest point, closing balance, runway, danger threshold, overdue events, a step chart and a day-by-day table); an empty state asks for a cash account when there is none |
 | `/cash-events` | Cash accounts and planned income and expenses by date | Connected to the session-scoped cash-event store; create, edit, settle, cancel and delete expected events |
@@ -20,7 +20,7 @@ Every private route checks the session on the server (`requireUser`) and reads d
 
 Section names follow the MVP views agreed by the team on 2 October 2026: Liquidity overview, Cash events and Scenario lab, then Workspace (which replaces the Portfolio page of the earlier project) and Settings. The forecast has no page of its own, because the projected balance is the main content of the liquidity overview. Routes keep short, stable paths (`/dashboard` is where sign-in lands), so renaming a label never breaks a link.
 
-The home page marks Cash events as available and keeps the complete forecast and Scenario lab comparison in development. The logo on the sign-in and registration pages links back to it.
+The home page marks all three views as available, now that the forecast and the Scenario lab comparison are on main, and describes each one only as far as it works today: exchange-rate shocks are previewed, not yet part of the comparison. The logo on the sign-in and registration pages links back to it.
 
 Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the overview states that it has no projected balance yet. The Scenario lab displays persisted invoice dates and real ECB snapshot rates, but does not invent a cash-flow comparison. The Cash events page shows only persisted account and event values.
 

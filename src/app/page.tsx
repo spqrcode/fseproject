@@ -5,12 +5,12 @@ import { findSession } from "@/lib/session-store";
 import { Brand } from "@/components/brand";
 
 const views = [
-  { title: "Liquidity overview", text: "Your projected balance over time, its lowest point and how long your cash lasts.", state: "In development", tone: "pending" },
+  { title: "Liquidity overview", text: "Your projected balance over time, its lowest point and how long your cash lasts.", state: "Available", tone: "ready" },
   { title: "Cash events", text: "Record cash accounts and dated income or expenses, each in its own currency.", state: "Available", tone: "ready" },
-  { title: "Scenario lab", text: "What-if comparisons against your base case, such as a delayed invoice or an exchange-rate shock.", state: "In development", tone: "pending" },
+  { title: "Scenario lab", text: "Delay an invoice and compare it with your base case, or preview an exchange-rate shock on a stored ECB rate.", state: "Available", tone: "ready" },
 ];
 const principles = [
-  { title: "No invented numbers", text: "A missing value is shown as unavailable, never as zero, and sections that are not connected yet say so." },
+  { title: "No invented numbers", text: "A missing value is shown as unavailable, never as zero, and an exchange rate is never guessed." },
   { title: "Exact amounts", text: "Amounts travel as decimal strings from the database to the screen and are rounded only when they are displayed." },
   { title: "Private by default", text: "Every query is scoped to your own session. Fonts are served by the application itself, with no trackers or third-party font services." },
   { title: "Tested on every change", text: "Unit, database, browser and automated accessibility tests run on every pull request before anything reaches the main branch." },
@@ -42,7 +42,7 @@ export default async function Home() {
             <p className={`state state-${view.tone}`}>{view.state}</p>
           </li>)}
         </ol>
-        <p className="views-note">Available today: a private account, workspace, cash events and reporting currency in euro, US dollar or Singapore dollar.</p>
+        <p className="views-note">Available today: a private account and workspace, cash events, the liquidity forecast and delayed-invoice scenarios, reported in euro, US dollar or Singapore dollar.</p>
       </section>
       <section className="landing-principles" aria-labelledby="principles-heading">
         <h2 id="principles-heading">How it is built</h2>
