@@ -342,3 +342,15 @@ Validation (2026-10-13, local, fresh PostgreSQL 16 database): see the PR descrip
 - Scope decision for student review: no multi-account forecast was added. That would require a team rule for combining accounts converted with different rates and effective dates, so it remains explicit future scope rather than an AI assumption.
 - Validation: after fast-forwarding `main` through PR #26, `npm run check` passed ESLint, TypeScript, 325 unit tests and the Next.js production build. The student must inspect this documentation diff and remains responsible for staging, committing, pushing and opening the PR.
 - Follow-up: after PRs #23 and #30 merged, Codex merged the latest `main` into the documentation branch, retained both appended AI usage entries, and updated the Forecast Engine status, reporting-currency comparison, contribution tolerance and date-validation boundary in response to review. The student reviewed PR #30 separately before it merged. `npm run check` then passed ESLint, TypeScript, 341 unit tests and the Next.js production build.
+
+## Product experience: home page after the forecast and Scenario lab merges
+
+Date: 2026-10-16. Tool: Claude Code. Owner: Gabriel Piraccini, Product Experience.
+
+Task given by the student: check what a signed-out visitor sees on the deployed app before the presentation. The AI did not stage, commit or push.
+
+Found: the public home page still labelled the Liquidity overview and the Scenario lab "In development" and said only cash events were available, although both views have been on main since #20, #18 and #23. It is the first page the examiner opens, so it contradicted the demo.
+
+AI-generated: the three view states set to Available, the Scenario lab description and the "Available today" note rewritten to what works today (exchange-rate shocks are previewed and are not part of the comparison), the first principle no longer mentions sections that are not connected, the landing browser test and the home page paragraph in docs/product-experience.md.
+
+Reviewed and changed by the student: I checked each sentence against the Liquidity overview and Scenario lab on main, and kept the FX shock wording to "preview" so the page does not claim more than the comparison does.

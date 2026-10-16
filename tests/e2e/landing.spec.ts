@@ -8,9 +8,9 @@ test("signed-out visitors see what FinTwin Global is and can start from there", 
   const views = page.getByRole("region", { name: "Three views of the same money" });
   await expect(views.getByRole("listitem")).toHaveCount(3);
   await expect(views.getByRole("heading", { level: 3 })).toHaveText(["Liquidity overview", "Cash events", "Scenario lab"]);
-  await expect(views.getByText("In development")).toHaveCount(2);
-  await expect(views.getByText("Available", { exact: true })).toHaveCount(1);
-  await expect(views).toContainText("Available today: a private account, workspace, cash events and reporting currency");
+  await expect(views.getByText("Available", { exact: true })).toHaveCount(3);
+  await expect(views.getByText("In development")).toHaveCount(0);
+  await expect(views).toContainText("Available today: a private account and workspace, cash events, the liquidity forecast and delayed-invoice scenarios");
   await page.getByRole("link", { name: "Create your account", exact: true }).click();
   await expect(page).toHaveURL(/\/register$/);
   await page.getByRole("link", { name: "FinTwin Global home" }).click();
