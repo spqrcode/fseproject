@@ -354,3 +354,13 @@ Found: the public home page still labelled the Liquidity overview and the Scenar
 AI-generated: the three view states set to Available, the Scenario lab description and the "Available today" note rewritten to what works today (exchange-rate shocks are previewed and are not part of the comparison), the first principle no longer mentions sections that are not connected, the landing browser test and the home page paragraph in docs/product-experience.md.
 
 Reviewed and changed by the student: I checked each sentence against the Liquidity overview and Scenario lab on main, and kept the FX shock wording to "preview" so the page does not claim more than the comparison does.
+
+## Jiaxin Huang — presentation feedback log
+
+Date: 2026-10-17. Tool: Claude Code. Owner: Jiaxin Huang.
+
+Task given by the student: record the consultation notes of 13 October and the written assessment of 17 October in `docs/presentation-feedback.md`, with a decision per item and a plan until 28 October.
+
+AI-generated: the eleven feedback rows, the plan table and the added weakness row, drafted from the student's meeting recap and the assessment sheet.
+
+Reviewed by the student: the wording of each row against the recap and the assessment sheet; the decision to reject "add one or two scenarios" because the later feedback replaced it; owners are left for the team to agree. Documentation only; no code or test changed.
