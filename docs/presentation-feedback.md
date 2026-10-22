@@ -22,8 +22,8 @@ This file is the evidence that feedback from the presentation was incorporated, 
 | 5 | Show the target users and their needs, and explain why some scenarios were prioritised | Sofie Sharaf (consultation) | 2026-10-13 | implement | The use case was well defined but not on the slides | Presentation: target-user and scenario-prioritisation slides | done |
 | 6 | For the final submission, possibly add one or two more scenarios | Sofie Sharaf (consultation) | 2026-10-13 | reject | Superseded by #10: after seeing the demo, the recommendation is to polish existing features instead | See #10 | done |
 | 7 | The reasoning for the danger threshold is not properly backed: why this threshold? | Sofie Sharaf (presentation) | 2026-10-17 | implement | The fixed 50% default is a convention, and users cannot change it in the interface although the backend supports it | Planned: a business rationale for the default in [decisions](decisions.md) and a threshold setting on the Workspace page, with tests | open |
-| 8 | Define the "business view" better, for example how user impact is measured | Sofie Sharaf (presentation) | 2026-10-17 | implement | Our metrics (lowest balance, first day below the threshold, runway, scenario difference) are computed but not defined as business measures | Planned: a business-metrics section in [requirements](requirements.md) that defines each measure and the question it answers | open |
-| 9 | Some ideas felt not fully realised, e.g. recurring expenses and the danger threshold | Sofie Sharaf (presentation) | 2026-10-17 | to decide by 20 October | Threshold: covered by #7. Recurring expenses: decide between a simple monthly recurrence and a documented limitation, depending on effort | Team decision recorded here | open |
+| 8 | Define the "business view" better, for example how user impact is measured | Sofie Sharaf (presentation) | 2026-10-17 | implement | Our metrics (lowest balance, first day below the threshold, runway, scenario difference) are computed but not defined as business measures | [business metrics](business-metrics.md): each measure with its definition, code field and business question; the lowest-balance change as the primary impact measure; a worked example and the known gaps | done |
+| 9 | Some ideas felt not fully realised, e.g. recurring expenses and the danger threshold | Sofie Sharaf (presentation) | 2026-10-17 | to decide by 22 October | Threshold: covered by #7. Recurring expenses: decide between a simple monthly recurrence and a documented limitation, depending on effort | Team decision recorded here | open |
 | 10 | Polish the application on the feature side rather than adding more scenarios; the architecture is strong as it is | Sofie Sharaf (presentation) | 2026-10-17 | implement | Depth of existing features is valued over breadth | No new scenario types before 28 October; remaining work limited to #7–#9 and #11 | done |
 | 11 | Document the feature ideas and re-evaluate whether existing features can reach their full potential | Sofie Sharaf (presentation) | 2026-10-17 | implement | Ideas that are mentioned should be traceable to a decision | Planned: a feature-ideas section in [limitations](limitations.md) with a decision per idea (built, planned, out of scope) | open |
 
@@ -35,11 +35,11 @@ Presentation result on 17 October: 10 of 10 points (assessment sheet). Noted str
 
 | Item | Feedback rows | Owner | Target |
 | --- | --- | --- | --- |
-| Danger threshold: business rationale for the default, setting on the Workspace page, tests | 7, 9 | to be agreed | 23 October |
-| Business metrics: definition of each measure and how scenario impact is measured | 8 | to be agreed | 21 October |
-| Recurring expenses: decision, then either a simple monthly recurrence or a documented limitation | 9 | to be agreed | decision 20 October |
-| Feature ideas: one table with a decision per idea | 11 | to be agreed | 24 October |
-| Final pass: `npm run verify`, deployed checks, status of every row above | all | all | 27 October |
+| Danger threshold: business rationale for the default, setting on the Workspace page, tests | 7, 9 | Haina | 26 October |
+| Business metrics: definition of each measure and how scenario impact is measured | 8 | Jiaxin | 26 October |
+| Recurring expenses: decision, then either a simple monthly recurrence or a documented limitation | 9 | Bastian | decision before 22 October, then 26 October |
+| Feature ideas: one table with a decision per idea | 11 | Gabriel | 26 October |
+| Final pass: `npm run verify`, deployed checks, status of every row above | all | all | 27 October; submission 28 October |
 
 ## Weaknesses we will state ourselves
 

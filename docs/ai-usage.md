@@ -364,3 +364,5 @@ Task given by the student: record the consultation notes of 13 October and the w
 AI-generated: the eleven feedback rows, the plan table and the added weakness row, drafted from the student's meeting recap and the assessment sheet.
 
 Reviewed by the student: the wording of each row against the recap and the assessment sheet; the decision to reject "add one or two scenarios" because the later feedback replaced it; owners are left for the team to agree. Documentation only; no code or test changed.
+
+Follow-up (2026-10-23): AI-drafted `docs/business-metrics.md` (feedback #8) from the engine and comparison code: each measure with its definition, code field and business question, the change in the lowest balance as the primary impact measure, the demo as a worked example. The student checked every definition against `forecast-engine.ts` and `scenario-comparison.ts`, the example numbers against the deployed demo, and added the known gap that per-invoice contributions explain only the closing balance. The owners in the plan table are those agreed in the team chat on 20 October.
