@@ -354,3 +354,13 @@ Found: the public home page still labelled the Liquidity overview and the Scenar
 AI-generated: the three view states set to Available, the Scenario lab description and the "Available today" note rewritten to what works today (exchange-rate shocks are previewed and are not part of the comparison), the first principle no longer mentions sections that are not connected, the landing browser test and the home page paragraph in docs/product-experience.md.
 
 Reviewed and changed by the student: I checked each sentence against the Liquidity overview and Scenario lab on main, and kept the FX shock wording to "preview" so the page does not claim more than the comparison does.
+
+## Repeating cash events (branch `feat/monthly-recurring-events`)
+
+Date: 2026-10-26. Tool: Claude (Cowork). Owner: Bastian Bundschuh, Foundation & Security. Task from #34 after the presentation feedback: check whether a simple version of recurring expenses is doable, build it if so, otherwise document it as a limitation. The AI did not stage, commit or push.
+
+Decisions made by the student: a repeat creates separate ordinary events instead of a stored recurrence rule. That needs no migration and no change to the forecast engine, the forecast input or the scenario store, and every occurrence keeps its own status. After a first monthly-only version, the student asked for monthly, quarterly and annual repeats with an end after a number of occurrences or on a date. The AI pointed out that open-ended repeats do not fit separate events (they need a stored rule the forecast expands, which touches Haina's forecast input and the scenarios); the student chose to leave open-ended repeats out and document them as a limitation.
+
+AI-generated: `recurringDates` and `recurringDatesUntil`, the repeat schemas, `createCashEvents` (one INSERT over `unnest`, so all occurrences are saved or none, with the same session → workspace → account ownership chain as `createCashEvent`), the Repeat and Ends fields and the success message, the unit and integration tests, and the documentation changes.
+
+Validation: TypeScript and ESLint passed in the AI's environment, and the date functions were checked against month-end, leap-year, quarterly, annual and end-date cases. The student ran `npm run verify` locally before opening the PR (numbers in the PR description).

@@ -13,6 +13,7 @@ export const metadata = { title: "Cash events" };
 const successMessages: Record<string, string> = {
   "account-added": "Cash account added.",
   "event-added": "Cash event added.",
+  "events-added": "Repeating cash events added: one event per occurrence, each with its own status.",
   "event-updated": "Cash event updated.",
   "event-received": "Cash event marked received.",
   "event-paid": "Cash event marked paid.",
