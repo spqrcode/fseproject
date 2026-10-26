@@ -6,6 +6,7 @@ import { requireUser, sessionToken } from "@/lib/auth";
 import {
   createCashAccount,
   createCashEvent,
+  createCashEvents,
   deleteCashEvent,
   DuplicateAccountNameError,
   listCashEvents,
@@ -13,11 +14,15 @@ import {
   StatusConflictError,
   updateCashEvent,
 } from "@/lib/cash-events-store";
+import { MAX_OCCURRENCES, REPEAT_STEP_MONTHS, recurringDates, recurringDatesUntil } from "@/lib/recurring-dates";
 import { verifyOrigin } from "@/lib/request-security";
 import {
   cashAccountSchema,
   cashEventSchema,
   eventStatusSchema,
+  isoDateSchema,
+  repeatEndSchema,
+  repeatFrequencySchema,
   uuidSchema,
   type FormState,
 } from "@/lib/validation";
@@ -61,19 +66,35 @@ export async function addCashEvent(_state: FormState, form: FormData): Promise<F
     amount: form.get("amount"),
     expectedDate: form.get("expectedDate"),
   });
+  // A form without the field (older page, scripted request) means "once".
+  const frequency = repeatFrequencySchema.safeParse(form.get("repeatFrequency") ?? "once");
   if (!accountId.success) return { error: "Choose a valid cash account." };
   if (!event.success) return { error: firstIssue(event.error) };
+  if (!frequency.success) return { error: firstIssue(frequency.error) };
+  let dates = [event.data.expectedDate];
+  if (frequency.data !== "once") {
+    const end = repeatEndSchema.safeParse({ mode: form.get("repeatEnd"), count: form.get("repeatCount"), until: form.get("repeatUntil") });
+    if (!end.success) return { error: firstIssue(end.error) };
+    const start = event.data.expectedDate, step = REPEAT_STEP_MONTHS[frequency.data];
+    if (end.data.mode === "date" && end.data.until < start) return { error: "The end date must not be before the first date." };
+    dates = end.data.mode === "count" ? recurringDates(start, step, end.data.count) : recurringDatesUntil(start, step, end.data.until);
+    if (dates.length > MAX_OCCURRENCES) return { error: `A repeating event can have at most ${MAX_OCCURRENCES} occurrences. Choose an earlier end date.` };
+    if (!dates.every(date => isoDateSchema.safeParse(date).success)) return { error: "The last occurrence must be on or before 31 December 2100." };
+  }
 
   try {
     await verifyOrigin();
-    const created = await createCashEvent(await sessionToken(), accountId.data, event.data);
+    const token = await sessionToken();
+    const created = dates.length === 1
+      ? await createCashEvent(token, accountId.data, event.data)
+      : await createCashEvents(token, accountId.data, { description: event.data.description, amount: event.data.amount }, dates);
     if (!created) return { error: "That cash account is unavailable." };
   } catch {
     return { error: "Unable to add the cash event. Please try again." };
   }
 
   refreshCashPages();
-  redirect("/cash-events?success=event-added");
+  redirect(dates.length === 1 ? "/cash-events?success=event-added" : "/cash-events?success=events-added");
 }
 
 export async function editCashEvent(eventId: string, _state: FormState, form: FormData): Promise<FormState> {

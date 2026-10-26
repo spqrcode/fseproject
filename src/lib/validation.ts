@@ -40,4 +40,19 @@ export const forecastRangeSchema = z.object({ startDate: isoDateSchema, endDate:
 });
 export const cashAccountSchema = z.object({ name: accountNameSchema, currency: reportingCurrencySchema, openingBalance: balanceSchema });
 export const cashEventSchema = z.object({ description: eventDescriptionSchema, amount: eventAmountSchema, expectedDate: isoDateSchema });
+// How a new cash event repeats. "once" is a single event; the others create one ordinary event per occurrence
+// (see recurring-dates.ts), so statuses, edits and scenarios work per occurrence. Form values arrive as strings.
+export const repeatFrequencySchema = z.enum(["once", "monthly", "quarterly", "annually"], { error: "Choose how often the event repeats." });
+// Every repeat has an end: a number of occurrences (2 to 60) or an end date.
+export const repeatEndSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("count"),
+    count: z.string().regex(/^\d{1,2}$/, "Enter how many times it occurs, from 2 to 60.").transform(Number)
+      .refine(value => value >= 2 && value <= 60, "Enter how many times it occurs, from 2 to 60."),
+  }),
+  z.object({ mode: z.literal("date"), until: isoDateSchema }),
+], { error: "Choose when the repeat ends." });
+// The occurrences of one repeating event: at most 60 real dates.
+export const repeatDatesSchema = z.array(isoDateSchema).min(1).max(60);
+export const repeatedEventSchema = cashEventSchema.omit({ expectedDate: true });
 export type FormState = { error?: string; success?: string };
