@@ -5,7 +5,7 @@ import { database } from "@/lib/db";
 import { createSession } from "@/lib/session-store";
 import { getDangerThreshold, saveDangerThreshold, saveWorkspace } from "@/lib/workspace-store";
 import {
-  DuplicateAccountNameError, StatusConflictError, createCashAccount, createCashEvent, deleteCashEvent,
+  DuplicateAccountNameError, StatusConflictError, createCashAccount, createCashEvent, createCashEvents, deleteCashEvent,
   listCashAccounts, listCashEvents, renameCashAccount, setCashEventStatus, updateCashEvent,
 } from "@/lib/cash-events-store";
 
@@ -323,5 +323,44 @@ describe("cascade", () => {
   });
   it("does not delete an account that still has events", async () => {
     await expect(fixtures.query("DELETE FROM cash_accounts WHERE id = $1", [alice.accountId])).rejects.toMatchObject({ code: "23503" });
+  });
+});
+
+describe("repeating events", () => {
+  const dates = ["2027-01-31", "2027-02-28", "2027-03-31"];
+  it("creates one ordinary expected event per date, in date order, for the caller's account", async () => {
+    const created = await createCashEvents(alice.token, alice.accountId, { description: "Office rent", amount: "-2600.00" }, dates);
+    expect(created?.map(item => item.expectedDate)).toEqual(dates);
+    expect(created?.every(item => item.status === "expected" && item.amount === "-2600.00" && item.currency === "EUR" && item.accountId === alice.accountId)).toBe(true);
+    expect(new Set(created?.map(item => item.id)).size).toBe(3);
+    const stored = await listCashEvents(alice.token, { from: "2027-01-01", to: "2027-12-31" });
+    expect(stored.map(item => item.expectedDate)).toEqual(dates);
+  });
+  it("lets each occurrence be settled on its own", async () => {
+    const created = (await createCashEvents(alice.token, alice.accountId, { description: "Office rent", amount: "-2600.00" }, dates))!;
+    await setCashEventStatus(alice.token, created[0].id, "cancelled");
+    expect((await eventRow(created[0].id)).status).toBe("cancelled");
+    expect((await eventRow(created[1].id)).status).toBe("expected");
+  });
+  it("saves nothing for another user's account and gives the same null as for a missing one", async () => {
+    const before = await count("cash_events", "workspace_id", bob.workspaceId);
+    expect(await createCashEvents(alice.token, bob.accountId, { description: "Steal", amount: "-1" }, dates)).toBeNull();
+    expect(await createCashEvents(alice.token, randomUUID(), { description: "Steal", amount: "-1" }, dates)).toBeNull();
+    expect(await createCashEvents(alice.token, "not-a-uuid", { description: "Steal", amount: "-1" }, dates)).toBeNull();
+    expect(await count("cash_events", "workspace_id", bob.workspaceId)).toBe(before);
+    expect(await count("cash_events", "workspace_id", alice.workspaceId)).toBe(1);
+  });
+  it("rejects invalid input before it reaches the database", async () => {
+    await expect(createCashEvents(alice.token, alice.accountId, { description: "X", amount: "0" }, dates)).rejects.toThrow();
+    await expect(createCashEvents(alice.token, alice.accountId, { description: "X", amount: "-1" }, [])).rejects.toThrow();
+    await expect(createCashEvents(alice.token, alice.accountId, { description: "X", amount: "-1" }, ["2027-02-30"])).rejects.toThrow();
+    await expect(createCashEvents(alice.token, alice.accountId, { description: "X", amount: "-1" }, Array(61).fill("2027-01-01"))).rejects.toThrow();
+    expect(await count("cash_events", "workspace_id", alice.workspaceId)).toBe(1);
+  });
+  it("is signed out for anonymous and unknown sessions", async () => {
+    await expect(createCashEvents(undefined, alice.accountId, { description: "X", amount: "-1" }, dates)).rejects.toThrow("Authentication required.");
+    await expect(createCashEvents("a".repeat(43), alice.accountId, { description: "X", amount: "-1" }, dates)).rejects.toThrow("Authentication required.");
+    await expect(createCashEvents("a".repeat(64), alice.accountId, { description: "X", amount: "-1" }, dates)).rejects.toThrow("Authentication required.");
+    expect(await count("cash_events", "workspace_id", alice.workspaceId)).toBe(1);
   });
 });

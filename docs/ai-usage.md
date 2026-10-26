@@ -355,6 +355,7 @@ AI-generated: the three view states set to Available, the Scenario lab descripti
 
 Reviewed and changed by the student: I checked each sentence against the Liquidity overview and Scenario lab on main, and kept the FX shock wording to "preview" so the page does not claim more than the comparison does.
 
+
 ## Haina Liu — configurable workspace danger threshold
 
 - Date: 2026-10-26. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
@@ -363,3 +364,13 @@ Reviewed and changed by the student: I checked each sentence against the Liquidi
 - Scope decision for student review: 50% remains a zero-setup convention rather than being presented as a universal financial rule. The user sets an absolute amount because that is the existing database and Forecast Input contract; a configurable percentage remains out of scope.
 - Student review: Haina Liu confirmed on 2026-10-26 that she completed her review of the diff. She remains responsible for personally staging, committing, pushing and opening the PR.
 - Validation (2026-10-26, local, Node 24 and PostgreSQL 16): ESLint with zero warnings, strict TypeScript, all 344 unit tests and the production build passed; migrations 001–009 applied to a fresh test database; 228 PostgreSQL integration tests passed with one runtime-privilege test intentionally skipped in the ordinary integration step; after installing the required Playwright Chromium binary, all 42 browser tests passed, including the new threshold save/restore flow and the existing WCAG 2.2 AA checks.
+
+## Repeating cash events (branch `feat/monthly-recurring-events`)
+
+Date: 2026-10-26. Tool: Claude (Cowork). Owner: Bastian Bundschuh, Foundation & Security. Task from #34 after the presentation feedback: check whether a simple version of recurring expenses is doable, build it if so, otherwise document it as a limitation. The AI did not stage, commit or push.
+
+Decisions made by the student: a repeat creates separate ordinary events instead of a stored recurrence rule. That needs no migration and no change to the forecast engine, the forecast input or the scenario store, and every occurrence keeps its own status. After a first monthly-only version, the student asked for monthly, quarterly and annual repeats with an end after a number of occurrences or on a date. The AI pointed out that open-ended repeats do not fit separate events (they need a stored rule the forecast expands, which touches Haina's forecast input and the scenarios); the student chose to leave open-ended repeats out and document them as a limitation.
+
+AI-generated: `recurringDates` and `recurringDatesUntil`, the repeat schemas, `createCashEvents` (one INSERT over `unnest`, so all occurrences are saved or none, with the same session → workspace → account ownership chain as `createCashEvent`), the Repeat and Ends fields and the success message, the unit and integration tests, and the documentation changes.
+
+Validation: TypeScript and ESLint passed in the AI's environment, and the date functions were checked against month-end, leap-year, quarterly, annual and end-date cases. The student ran `npm run verify` locally before opening the PR (numbers in the PR description).
