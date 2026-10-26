@@ -366,3 +366,13 @@ AI-generated: the eleven feedback rows, the plan table and the added weakness ro
 Reviewed by the student: the wording of each row against the recap and the assessment sheet; the decision to reject "add one or two scenarios" because the later feedback replaced it; owners are left for the team to agree. Documentation only; no code or test changed.
 
 Follow-up (2026-10-23): AI-drafted `docs/business-metrics.md` (feedback #8) from the engine and comparison code: each measure with its definition, code field and business question, the change in the lowest balance as the primary impact measure, the demo as a worked example. The student checked every definition against `forecast-engine.ts` and `scenario-comparison.ts`, the example numbers against the deployed demo, and added the known gap that per-invoice contributions explain only the closing balance. The owners in the plan table are those agreed in the team chat on 20 October.
+
+## Repeating cash events (branch `feat/monthly-recurring-events`)
+
+Date: 2026-10-26. Tool: Claude (Cowork). Owner: Bastian Bundschuh, Foundation & Security. Task from #34 after the presentation feedback: check whether a simple version of recurring expenses is doable, build it if so, otherwise document it as a limitation. The AI did not stage, commit or push.
+
+Decisions made by the student: a repeat creates separate ordinary events instead of a stored recurrence rule. That needs no migration and no change to the forecast engine, the forecast input or the scenario store, and every occurrence keeps its own status. After a first monthly-only version, the student asked for monthly, quarterly and annual repeats with an end after a number of occurrences or on a date. The AI pointed out that open-ended repeats do not fit separate events (they need a stored rule the forecast expands, which touches Haina's forecast input and the scenarios); the student chose to leave open-ended repeats out and document them as a limitation.
+
+AI-generated: `recurringDates` and `recurringDatesUntil`, the repeat schemas, `createCashEvents` (one INSERT over `unnest`, so all occurrences are saved or none, with the same session → workspace → account ownership chain as `createCashEvent`), the Repeat and Ends fields and the success message, the unit and integration tests, and the documentation changes.
+
+Validation: TypeScript and ESLint passed in the AI's environment, and the date functions were checked against month-end, leap-year, quarterly, annual and end-date cases. The student ran `npm run verify` locally before opening the PR (numbers in the PR description).

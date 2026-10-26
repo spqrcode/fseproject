@@ -95,6 +95,34 @@ describe("adding and editing", () => {
     expect((await addCashEvent({}, form({ accountId: "not-a-uuid", description: "Rent", amount: "-1", expectedDate: day(5) }))).error).toBe("Choose a valid cash account.");
     expect(await listCashEvents(alice.token)).toHaveLength(0);
   });
+  it("adds a monthly repeat with a number of occurrences as one event each and says so", async () => {
+    await expect(addCashEvent({}, form({ accountId: alice.accountId, description: "Office rent", amount: "-2600", expectedDate: "2027-01-31",
+      repeatFrequency: "monthly", repeatEnd: "count", repeatCount: "3" }))).rejects.toThrow("redirect:/cash-events?success=events-added");
+    expect((await listCashEvents(alice.token)).map(item => item.expectedDate)).toEqual(["2027-01-31", "2027-02-28", "2027-03-31"]);
+  });
+  it("adds a quarterly repeat up to an end date, including the end date", async () => {
+    await expect(addCashEvent({}, form({ accountId: alice.accountId, description: "VAT", amount: "-900", expectedDate: "2027-01-10",
+      repeatFrequency: "quarterly", repeatEnd: "date", repeatUntil: "2027-10-10" }))).rejects.toThrow("redirect:/cash-events?success=events-added");
+    expect((await listCashEvents(alice.token)).map(item => item.expectedDate)).toEqual(["2027-01-10", "2027-04-10", "2027-07-10", "2027-10-10"]);
+  });
+  it("treats 'once' as a single event and ignores end fields", async () => {
+    await expect(addCashEvent({}, form({ accountId: alice.accountId, description: "Once", amount: "-5", expectedDate: day(5), repeatFrequency: "once", repeatEnd: "count", repeatCount: "12" })))
+      .rejects.toThrow("redirect:/cash-events?success=event-added");
+    expect(await listCashEvents(alice.token)).toHaveLength(1);
+  });
+  it("refuses an unknown frequency, a missing or invalid end, an end before the start, too many occurrences, a repeat past 2100 and another user's account, saving nothing", async () => {
+    const base = { accountId: alice.accountId, description: "X", amount: "-5", expectedDate: "2027-01-15" };
+    const error = async (values: Record<string, string>) => (await addCashEvent({}, form({ ...base, ...values }))).error;
+    expect(await error({ repeatFrequency: "weekly" })).toBe("Choose how often the event repeats.");
+    expect(await error({ repeatFrequency: "monthly" })).toBe("Choose when the repeat ends.");
+    expect(await error({ repeatFrequency: "monthly", repeatEnd: "count", repeatCount: "61" })).toBe("Enter how many times it occurs, from 2 to 60.");
+    expect(await error({ repeatFrequency: "monthly", repeatEnd: "date", repeatUntil: "2026-12-31" })).toBe("The end date must not be before the first date.");
+    expect(await error({ repeatFrequency: "monthly", repeatEnd: "date", repeatUntil: "2035-01-15" })).toBe("A repeating event can have at most 60 occurrences. Choose an earlier end date.");
+    expect(await error({ expectedDate: "2100-11-15", repeatFrequency: "monthly", repeatEnd: "count", repeatCount: "3" })).toBe("The last occurrence must be on or before 31 December 2100.");
+    expect(await error({ accountId: bob.accountId, repeatFrequency: "annually", repeatEnd: "count", repeatCount: "5" })).toBe("That cash account is unavailable.");
+    expect(await listCashEvents(alice.token)).toHaveLength(0);
+    expect(await listCashEvents(bob.token)).toHaveLength(0);
+  });
   it("edits an expected event, and says so when it was settled meanwhile", async () => {
     const created = await event(alice, "-10", day(5), "Old name");
     await expect(editCashEvent(created.id, {}, form({ description: "New name", amount: "-12", expectedDate: day(6) })))

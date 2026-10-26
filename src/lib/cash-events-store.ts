@@ -3,7 +3,7 @@ import { database } from "@/lib/db";
 import { hasValidSession, tokenHash, validToken } from "@/lib/session-store";
 import { type CashEventStatus } from "@/lib/cash-event-status";
 import { type ReportingCurrency } from "@/lib/currency";
-import { accountNameSchema, cashAccountSchema, cashEventSchema, eventStatusSchema, isoDateSchema, uuidSchema } from "@/lib/validation";
+import { accountNameSchema, cashAccountSchema, cashEventSchema, eventStatusSchema, isoDateSchema, repeatDatesSchema, repeatedEventSchema, uuidSchema } from "@/lib/validation";
 
 export type CashAccount = { id: string; name: string; currency: ReportingCurrency; openingBalance: string; createdAt: Date };
 export type CashEvent = {
@@ -128,6 +128,25 @@ export async function createCashEvent(token: string | undefined, accountId: unkn
       RETURNING id, account_id, description, amount, expected_date, status, created_at, updated_at
     ) ${EVENT_OF_CHANGE}`, [tokenHash(token), id.data, data.description, data.amount, data.expectedDate]);
   return result.rows[0] ? event(result.rows[0]) : notFound(token);
+}
+
+// A monthly repeat: one ordinary event per date, all with the same description and amount. One INSERT
+// statement, so either every occurrence is saved or none. Same ownership rule as createCashEvent: the account must
+// belong to the caller's workspace, otherwise null and nothing is written.
+export async function createCashEvents(token: string | undefined, accountId: unknown, input: unknown, dates: unknown): Promise<CashEvent[] | null> {
+  const data = repeatedEventSchema.parse(input);
+  const days = repeatDatesSchema.parse(dates);
+  if (!token || !validToken(token)) throw new Error("Authentication required.");
+  const id = uuidSchema.safeParse(accountId);
+  if (!id.success) return notFound(token);
+  const result = await database().query<EventRow>(`WITH changed AS (
+      INSERT INTO cash_events(workspace_id, account_id, description, amount, expected_date)
+      SELECT w.id, a.id, $3, $4, d.day FROM sessions s JOIN workspaces w ON w.user_id = s.user_id
+      JOIN cash_accounts a ON a.workspace_id = w.id CROSS JOIN unnest($5::date[]) AS d(day)
+      WHERE s.token_hash = $1 AND s.expires_at > now() AND a.id = $2
+      RETURNING id, account_id, description, amount, expected_date, status, created_at, updated_at
+    ) ${EVENT_OF_CHANGE} ORDER BY c.expected_date`, [tokenHash(token), id.data, data.description, data.amount, days]);
+  return result.rows.length ? result.rows.map(event) : notFound(token);
 }
 
 // Description, amount and date only; the account and status do not change here. Only an "expected" event can be
