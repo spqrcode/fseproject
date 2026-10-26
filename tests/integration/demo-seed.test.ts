@@ -62,7 +62,8 @@ describe("demo seed", () => {
     expect(invoice.expectedDate).toBe(isoDay(today, 8));
 
     const scenarios = await getScenarios(user.token);
-    expect(scenarios.map(scenario => scenario.name)).toEqual(DEMO_PLAN.scenarios.map(scenario => scenario.name));
+    // Both scenarios are inserted in one transaction, so they share created_at and their order is not defined.
+    expect(scenarios.map(scenario => scenario.name).sort()).toEqual(DEMO_PLAN.scenarios.map(scenario => scenario.name).sort());
     for (const scenario of scenarios) {
       const adjustments = await getAdjustments(user.token, scenario.id);
       expect(adjustments.map(item => item.status)).toEqual(["active"]);
