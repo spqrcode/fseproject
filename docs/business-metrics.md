@@ -11,14 +11,14 @@ The user is the finance lead or founder of a small company with cash flows in EU
 3. How much time do we have to act?
 4. What does a late payment or a currency move do to that answer?
 
-All measures are computed per account, in the workspace's reporting currency, from end-of-day balances over the chosen horizon (30, 90, 180 or 365 days). The calculation is deterministic: the same events and the same stored exchange rate always give the same numbers.
+All measures are computed per account, in the workspace's reporting currency, from today's opening balance and the end-of-day balances over the chosen horizon (30, 90, 180 or 365 days). The calculation is deterministic: the same events and the same stored exchange rate always give the same numbers.
 
 ## Base forecast measures
 
 | Measure (screen label) | Definition | Code field | Question it answers |
 | --- | --- | --- | --- |
 | Balance today | Opening balance of the account plus all received and paid events dated on or before today | `openingBalance` | Where do we stand today? |
-| Lowest balance, with its date | The smallest end-of-day balance in the horizon, including today; if it occurs more than once, the first date | `minimumBalance`, `minimumDate` | What is the tightest point, and when? |
+| Lowest balance, with its date | The minimum of the opening balance and all end-of-day balances in the horizon. The opening balance is taken before today's expected events, so the minimum can be lower than every end-of-day point. If the opening balance is the minimum, the date is the start date; if a value occurs more than once, the first date | `minimumBalance`, `minimumDate` | What is the tightest point, and when? |
 | Balance at the end of the horizon | End-of-day balance on the last date | `closingBalance` | Where do we end up? |
 | Danger threshold | The minimum cash the company wants to keep: an amount set for the workspace, or by default 50% of today's balance | `dangerThresholdAmount`, `dangerThresholdPercent` | What is "too little cash" for us? |
 | First day below the threshold | The first date whose end-of-day balance is strictly below the threshold | `firstDangerDate` | When do we have to act? |
