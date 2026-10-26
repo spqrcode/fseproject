@@ -54,7 +54,9 @@ As a signed-in user, I have a workspace with cash accounts in EUR, USD or SGD an
 - Only the owner can list, create, change or delete accounts and events; another user's id and a non-existent id give the same result.
 - A status moves only from expected to received, paid or cancelled.
 - Received, paid and cancelled events cannot be edited or deleted; corrections are made with a new event.
-- A workspace can store an optional danger threshold.
+- A workspace can store an optional fixed danger threshold in the reporting currency; only its owner can change it from the Workspace page.
+- Clearing the custom threshold restores the engine default of 50% of the forecast opening balance. The default is a zero-setup convention, not financial advice.
+- Changing the reporting currency clears a custom threshold instead of silently reinterpreting its numeric value as another currency.
 - A settled event's date is the date the money moved: marking a future-dated event received or paid moves it to today (UTC).
 
 ## US-12 Delayed-invoice scenarios

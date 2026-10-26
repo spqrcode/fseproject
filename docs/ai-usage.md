@@ -354,3 +354,12 @@ Found: the public home page still labelled the Liquidity overview and the Scenar
 AI-generated: the three view states set to Available, the Scenario lab description and the "Available today" note rewritten to what works today (exchange-rate shocks are previewed and are not part of the comparison), the first principle no longer mentions sections that are not connected, the landing browser test and the home page paragraph in docs/product-experience.md.
 
 Reviewed and changed by the student: I checked each sentence against the Liquidity overview and Scenario lab on main, and kept the FX shock wording to "preview" so the page does not claim more than the comparison does.
+
+## Haina Liu — configurable workspace danger threshold
+
+- Date: 2026-10-26. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
+- Request: implement the presentation follow-up for the danger threshold while leaving staging, committing, pushing and PR creation to the student.
+- AI-assisted work: added the Workspace form and server action for a fixed threshold in the reporting currency, clearing it back to the engine's computed 50% default; reused the existing session-scoped store and validation; added origin, validation, ownership and browser regression coverage; documented the business rationale and its limitation.
+- Scope decision for student review: 50% remains a zero-setup convention rather than being presented as a universal financial rule. The user sets an absolute amount because that is the existing database and Forecast Input contract; a configurable percentage remains out of scope.
+- Student review: Haina Liu confirmed on 2026-10-26 that she completed her review of the diff. She remains responsible for personally staging, committing, pushing and opening the PR.
+- Validation (2026-10-26, local, Node 24 and PostgreSQL 16): ESLint with zero warnings, strict TypeScript, all 344 unit tests and the production build passed; migrations 001–009 applied to a fresh test database; 228 PostgreSQL integration tests passed with one runtime-privilege test intentionally skipped in the ordinary integration step; after installing the required Playwright Chromium binary, all 42 browser tests passed, including the new threshold save/restore flow and the existing WCAG 2.2 AA checks.

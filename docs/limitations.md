@@ -28,7 +28,7 @@ The ECB cache refreshes only when application code requests a rate; there is no 
 
 This is a teaching prototype that models liquidity; it does not hold or move money. Before an institution relied on it, these would have to change, roughly in order of importance.
 
-1. **Data and methodology.** ECB euro reference rates are published once per working day and are not tradable rates. A treasury needs licensed intraday or contracted rates, a documented rate-selection rule, and a reviewed forecasting and stress methodology. The 50% default danger threshold is a convention, not a finding.
+1. **Data and methodology.** ECB euro reference rates are published once per working day and are not tradable rates. A treasury needs licensed intraday or contracted rates, a documented rate-selection rule, and a reviewed forecasting and stress methodology. The 50% default danger threshold is a convention, not a finding; the interface lets the user replace it with a fixed amount, but FinTwin does not determine the right buffer for the business.
 2. **Source of truth.** Cash events are typed in by hand. A real system reconciles them against bank statements or an accounting ledger, handles partial payments, multiple legal entities and recurrence, and keeps an audit trail of every change. Here a settled event cannot be edited and there is no audit log.
 3. **Identity and access.** Email is not verified, there is no password recovery, MFA or SSO, and one user owns one workspace with no roles. An institution needs enterprise identity, role-based access, four-eyes approval for sensitive changes and session management under its own policy.
 4. **Authorization depth.** Ownership is enforced by application queries and composite foreign keys, not by database row-level security. A second layer in the database would protect against a faulty query.
@@ -43,4 +43,3 @@ What would we keep? The separation of a pure Decimal-based forecast engine from 
 Not built and not planned for this prototype: open banking or bank-statement import, payment execution, tax or financial advice, machine-learning forecasting, bank-grade regulatory metrics, microservices, complex role hierarchies, and arbitrary recurrence rules (simple monthly recurrence is a stretch goal only). Supported currencies are EUR, USD and SGD. Holdings, market quotes and portfolio analytics belong to the earlier portfolio version of the project and were removed; `/forecast` and `/portfolio` return 404.
 
 The product is a treasury-oriented educational prototype, not a regulated stress-testing or asset-liability management system, and it does not give financial advice. What a real deployment would require is set out in the reflection above.
-

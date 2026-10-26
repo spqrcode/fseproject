@@ -67,6 +67,14 @@ describe("reporting currency with a real database", () => {
     expect(await getReportingCurrency((await createSession(ids[0])).token)).toBe("USD");
     expect(await getReportingCurrency(bob)).toBe("EUR");
   });
+  it("clears a custom threshold when the reporting currency changes, but not when it stays the same", async () => {
+    await database().query("INSERT INTO workspaces(user_id, name, danger_threshold) VALUES ($1, 'Currency test', 500)", [ids[0]]);
+    request.cookies.set(SESSION_COOKIE, alice);
+    expect(await updateReportingCurrency({}, choose("EUR"))).toEqual({ success: "Reporting currency saved." });
+    expect((await database().query("SELECT danger_threshold::text AS value FROM workspaces WHERE user_id = $1", [ids[0]])).rows[0].value).toBe("500.00");
+    expect(await updateReportingCurrency({}, choose("USD"))).toEqual({ success: "Reporting currency saved. Set a new danger threshold for this currency." });
+    expect((await database().query("SELECT danger_threshold::text AS value FROM workspaces WHERE user_id = $1", [ids[0]])).rows[0].value).toBeNull();
+  });
   it("ignores a submitted user id and derives the owner from the session", async () => {
     request.cookies.set(SESSION_COOKIE, alice);
     await updateReportingCurrency({}, choose("SGD", { user_id: ids[1], userId: ids[1] }));
