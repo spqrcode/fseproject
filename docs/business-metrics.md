@@ -28,7 +28,7 @@ All measures are computed per account, in the workspace's reporting currency, fr
 
 **Why our runway is event-based.** The common startup definition is cash divided by monthly burn rate. It assumes spending is steady. Our users' spending is not, so we count the days until the projected balance actually falls below the threshold, using the dated events themselves. The trade-off: the result depends on the events being entered; an event that is missing from the plan is missing from the runway.
 
-**The threshold.** Whether the default should remain 50% of today's balance, and how a user sets their own amount, is feedback item #7 and is decided separately (see [presentation feedback](presentation-feedback.md)). The measures above work with either: the engine already uses a workspace amount when one is stored.
+**The threshold.** The 50% default is an onboarding convention: it gives a new workspace an immediate warning without asking for a policy first. The user can replace it on the Workspace page with a fixed amount in the reporting currency, for example the cash needed for the next payroll and rent (PR #37; see [decisions](decisions.md) of 26 October). Every measure above uses whichever threshold applies, and the overview says which one it is.
 
 ## How the impact of a scenario is measured
 
