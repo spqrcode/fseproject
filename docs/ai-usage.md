@@ -387,6 +387,16 @@ AI-generated: `recurringDates` and `recurringDatesUntil`, the repeat schemas, `c
 
 Validation: TypeScript and ESLint passed in the AI's environment, and the date functions were checked against month-end, leap-year, quarterly, annual and end-date cases. The student ran `npm run verify` locally before opening the PR (numbers in the PR description).
 
+## Jiaxin Huang — feature ideas and final feedback status
+
+Date: 2026-10-27. Tool: Claude Code. Owner: Jiaxin Huang (the feature-ideas table was planned for Gabriel and taken over to meet the deadline).
+
+Task given by the student: write the feature-ideas table (feedback #11), mark feedback #7, #9 and #11 done with their evidence, point the business-metrics threshold paragraph to the decision of PR #37, and refresh the outdated status lines in the README and `docs/limitations.md`.
+
+AI-generated: the table in `docs/limitations.md` and the status edits, drafted from the merged PRs and the existing docs.
+
+Reviewed by the student: every "built" row against the merged PR it cites (#9, #17, #18, #22, #23, #24, #26, #28, #30, #35, #37), every "planned" row against an existing limitation or known gap, and the rejection of more scenario types against feedback #10. Documentation only; no code or test changed.
+
 ## Jiaxin Huang — submission guide, Git workflow and deployment update
 
 Date: 2026-10-27. Tool: Claude Code. Owner: Jiaxin Huang.

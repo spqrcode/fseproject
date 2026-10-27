@@ -12,17 +12,17 @@ The interface is branded FinTwin Global. Signed-out visitors see a public home p
 
 ## Deployed application and demo access
 
-- **URL:** https://fseproject-staging.vercel.app, with a backup of the same code at https://fintwin-global.vercel.app (staging, a Vercel deployment of this repository with a managed PostgreSQL database in Frankfurt). How it is built, configured and promoted is in [deployment](docs/deployment.md). The staging address points at the deployment someone assigned to it, so it can lag `main`; the status table below says what is expected to be live.
+- **URL:** https://fseproject-staging.vercel.app, with a backup of the same code at https://fintwin-global.vercel.app (staging, a Vercel deployment of `main` with a managed PostgreSQL database in Frankfurt). Both are rebuilt from `main` after each merge; how they are built and configured is in [deployment](docs/deployment.md).
 - **Demo access:** there is no shared demo account and no credentials are committed. Open `/register`, create an account with any address and a 15–128 character passphrase (no email is sent and the address is not verified), and sign in. Use a throwaway address and a passphrase you do not use elsewhere.
 - **Suggested check in a private window:** `/dashboard` redirects to `/login` when signed out; register, sign in, name a workspace, change the reporting currency and appearance in settings, sign out, sign in again and confirm everything persisted; open another browser and confirm the second account sees none of it.
 
-Status of the three business views on `main`, as of 14 October 2026. Update this table when a pull request merges.
+Status of the three business views on `main`, as of 27 October 2026. Update this table when a pull request merges.
 
 | View | On `main` | Pull request |
 | --- | --- | --- |
-| Liquidity overview (`/dashboard`) | Live: one account's forecast for 30 to 365 days with chart, runway and danger threshold, in the reporting currency (one persisted ECB rate per forecast) | #20 and #26, merged |
-| Cash events (`/cash-events`) | Live: accounts and expected events; create, edit, settle, cancel and delete | #16, merged |
-| Scenario Lab (`/scenarios`) | Live: delayed invoices, base versus scenario comparison in the reporting currency, ECB shock preview and saved shocks with their snapshot | #18, #23 and #30, merged; shock bounds and error messages in #24, in review |
+| Liquidity overview (`/dashboard`) | Live: one account's forecast for 30 to 365 days with chart, runway and danger threshold (50% by default or set on the Workspace page), in the reporting currency (one persisted ECB rate per forecast) | #20, #26 and #37, merged |
+| Cash events (`/cash-events`) | Live: accounts and expected events; create, edit, settle, cancel and delete; monthly, quarterly or annual repeats | #16 and #35, merged |
+| Scenario Lab (`/scenarios`) | Live: delayed invoices, base versus scenario comparison in the reporting currency, ECB shock preview and saved shocks with their snapshot | #18, #23, #24 and #30, merged |
 
 ## Local setup
 

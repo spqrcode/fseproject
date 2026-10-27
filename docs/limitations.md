@@ -2,7 +2,7 @@
 
 ## Current application
 
-The product is FinTwin Global, a multi-currency cash-flow and liquidity scenario tool. On `main`, account registration and sessions, workspaces, the Cash events page, forecast input for one account, the deterministic Forecast Engine, the delayed-invoice scenario and percentage FX-shock data layer, and the ECB exchange-rate snapshot cache are implemented. All three business views are on `main`. Forecasts and the base-versus-scenario comparison are shown in the reporting currency (#23, #26, #30). Still in review: bounds and error messages for FX shock percentages (#24). The README status table lists the pull requests. Passing foundation tests does not mean the whole course specification is complete.
+The product is FinTwin Global, a multi-currency cash-flow and liquidity scenario tool. On `main`, account registration and sessions, workspaces, the Cash events page, forecast input for one account, the deterministic Forecast Engine, the delayed-invoice scenario and percentage FX-shock data layer, and the ECB exchange-rate snapshot cache are implemented. All three business views are on `main`. Forecasts and the base-versus-scenario comparison are shown in the reporting currency (#23, #26, #30). Cash events can repeat monthly, quarterly or annually (#35), and the danger threshold can be set on the Workspace page (#37). The README status table lists the pull requests. Passing foundation tests does not mean the whole course specification is complete.
 
 Email addresses are not verified. Password recovery, MFA, compromised-password screening, network-level abuse protection, and session housekeeping are absent. Per-address throttling can lock out a targeted address temporarily and does not stop attackers rotating addresses.
 
@@ -25,6 +25,32 @@ One account at a time, shown in the reporting currency: an account in another cu
 ## Exchange rates
 
 The ECB cache refreshes only when application code requests a rate; there is no background scheduler. A fetched snapshot is considered CURRENT for one hour. If ECB is unavailable after that, the latest validated observation may be returned indefinitely as STALE, but its status and effective date remain explicit. The UI must not present STALE as live, and UNAVAILABLE has no numeric fallback. Only EUR, USD and SGD are supported. Cross-rates require both ECB legs to have the same effective date. Provider corrections create a new immutable snapshot id and preserve the prior row. A provider request can wait up to ten seconds, and concurrent requests after cache expiry are not yet coalesced, so several refreshes can occur together.
+
+## Feature ideas and decisions
+
+Presentation feedback #11 (17 October 2026) asked us to document our feature ideas and decide for each whether it is built, planned or out of scope. Ideas mentioned in the proposal, the presentation or the docs are listed once here.
+
+| Idea | Decision | Reason and evidence |
+| --- | --- | --- |
+| Delayed-invoice scenarios | Built | The most common liquidity risk for a small company, and its effect can be checked to the cent. PRs #9, #18, #22; US-12 |
+| Base versus scenario comparison with a contribution per invoice | Built | Shows what a scenario changes without touching real data. PRs #23, #30; [business metrics](business-metrics.md) |
+| Percentage FX shocks on a stored ECB rate | Built (preview and save) | Answers the cross-border risk from an auditable snapshot. PRs #17, #24; US-14 |
+| Forecasts in one reporting currency | Built | One persisted ECB rate per forecast, nothing shown without a rate. PRs #26, #30 |
+| Repeating cash events (monthly, quarterly, annually) | Built | Presentation feedback #9: payroll and rent repeat. One ordinary event per occurrence, so the engine and scenarios stay unchanged. PR #35 |
+| A danger threshold the user can set | Built | Presentation feedback #7: the 50% default is an onboarding convention; a fixed amount can match a real buffer. PR #37; [decisions](decisions.md) of 26 October |
+| Demo data for a registered user | Built | Repeatable presentation without shared credentials. PR #28 |
+| FX shocks inside the base versus scenario comparison | Planned | Needs an attribution rule when a shock and a delay interact; today shocks are previewed next to the ECB rate only |
+| Per-invoice attribution of the timing impact (change in the lowest balance) | Planned | Today contributions explain the closing balance only; splitting the lowest-balance change depends on the order of interacting delays and needs an agreed rule. See [business metrics](business-metrics.md), known gaps |
+| A combined view of all accounts | Planned | Needs an agreed rule for combining accounts converted at different rates and effective dates |
+| Open-ended repeats, editing all future occurrences, weekly repeats | Planned | Needs a stored recurrence rule that the forecast input expands and scenarios can reference |
+| Scheduled ECB refresh and coalesced concurrent refreshes | Planned | Today a rate is refreshed when it is requested, and its freshness is always labelled |
+| Email verification, password recovery and MFA | Planned | Listed in [security](security.md) and in the reflection below |
+| Database row-level security as a second authorization layer | Planned | Ownership is enforced by session-scoped queries and composite foreign keys today |
+| More scenario types (for example an expense increase or a hypothetical one-off payment) | Rejected for this submission | Presentation feedback #10: polish existing features rather than add scenarios |
+| Bank-statement import or open banking | Out of scope | Needs external credentials and a reconciliation model; manual entry is a stated limitation |
+| Payment execution, financial advice, machine-learning or predicted exchange rates | Out of scope | Outside the purpose of a deterministic educational prototype |
+| Holdings, market quotes and portfolio analytics | Removed | Belonged to the earlier portfolio version of the project, replaced after the group consultation |
+| More currencies than EUR, USD and SGD | Out of scope for now | Adding one needs an ECB series, the currency allowlist and tests; three currencies keep the cases verifiable by hand |
 
 ## Reflection: what must change before real financial use
 
