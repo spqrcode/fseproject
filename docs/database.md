@@ -4,7 +4,7 @@ PostgreSQL 16, accessed through the server-only `pg` driver and parameterized SQ
 
 ## Entity-relationship diagram
 
-Tables created by migrations 001 to 006, which are on `main`. Only key columns are drawn; the full constraints are in the table below. `PK` is a primary key, `FK` a foreign key and `UK` a unique constraint.
+Core tables (migrations 001–006); the scenario tables (007–009) follow below. Only key columns are drawn; the full constraints are in the table below. `PK` is a primary key, `FK` a foreign key and `UK` a unique constraint.
 
 ```mermaid
 erDiagram
@@ -74,7 +74,7 @@ Reading the diagram:
 
 ### Scenario tables
 
-Migrations `007_scenarios.sql` (PR #9) and `008_scenario_fx_shocks.sql` (PR #17) are on `main`. `009_scenario_fx_shock_bounds.sql`, which bounds the stored shock percentage, is in PR #24 and still in review. A scenario stores only its adjustments; the base events are never copied or edited, which is what makes base and scenario comparable.
+Migrations `007_scenarios.sql` (PR #9) and `008_scenario_fx_shocks.sql` (PR #17) and `009_scenario_fx_shock_bounds.sql` (PR #24, bounds the stored shock percentage) are on `main`. A scenario stores only its adjustments and FX shocks; the base events are never copied or edited, which is what makes base and scenario comparable.
 
 ```mermaid
 erDiagram
@@ -100,7 +100,7 @@ erDiagram
     uuid id PK
     uuid scenario_id FK "with workspace_id"
     uuid snapshot_id FK "restrict delete"
-    numeric shock_percent "greater than -100"
+    numeric shock_percent "numeric(7,4), -99.99 to 100"
     text status "active or invalid"
   }
 ```
@@ -121,20 +121,20 @@ erDiagram
 | scenarios | A named hypothetical overlay for one workspace | UUID primary key; workspace FK with cascade; trimmed 1–200 character name; `UNIQUE (id, workspace_id)` |
 | scenario_adjustments | A delayed date for one cash event in one scenario | Composite workspace-safe FKs to `scenarios` and `cash_events`, both with cascade; finite date-only override; active or invalid status; one adjustment per scenario/event pair |
 | scenario_fx_shocks | A percentage shock tied to a scenario and immutable FX snapshot | Composite workspace-safe scenario FK; snapshot FK with delete restricted; shock from -99.99 to 100 as `numeric(7,4)` (migration 009) and not NaN; active or invalid status; one shock per scenario/snapshot pair |
-| fx_snapshots | Validated ECB EUR/USD and EUR/SGD observations | UUID primary key; provider and supported pair checks; positive non-NaN numeric(30,15) rate; finite effective date and fetch timestamp; one row per provider, pair and effective date |
+| fx_snapshots | Validated ECB EUR/USD and EUR/SGD observations | UUID primary key; provider and supported pair checks; positive non-NaN numeric(30,15) rate; finite effective date and fetch timestamp; one row per provider, pair, effective date and rate (an ECB correction is a new row) |
 | schema_migrations | Applied migration history | Unique migration filename |
 
-Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` is the existing portfolio schema. `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. `004_appearance.sql` does the same for the appearance preference. `005_workspace_cash_events.sql` renames `portfolios` to `workspaces`, adds `danger_threshold`, creates `cash_accounts` and `cash_events`, and grants the staging runtime role what the application needs on them. `006_fx_snapshots.sql` creates the global validated ECB cache; `007_scenarios.sql` creates the delayed-invoice overlay tables; `008_scenario_fx_shocks.sql` adds persisted percentage shocks. All three add narrow runtime grants (see [deployment](deployment.md)). Holdings are not present.
+Migration `001_accounts.sql` creates users, sessions, and counters. `002_portfolios.sql` created the one-per-user `portfolios` table (renamed by 005). `003_reporting_currency.sql` adds the reporting currency to `users` and, where the staging runtime role exists, grants it `UPDATE` on that single column. `004_appearance.sql` does the same for the appearance preference. `005_workspace_cash_events.sql` renames `portfolios` to `workspaces`, adds `danger_threshold`, creates `cash_accounts` and `cash_events`, and grants the staging runtime role what the application needs on them. `006_fx_snapshots.sql` creates the global validated ECB cache; `007_scenarios.sql` creates the delayed-invoice overlay tables; `008_scenario_fx_shocks.sql` adds persisted percentage shocks. 006–008 add narrow runtime grants (see [deployment](deployment.md)). `009_scenario_fx_shock_bounds.sql` bounds `shock_percent` to -99.99..100 as `numeric(7,4)` and grants nothing. Holdings are not present.
 
 ## Migrations
 
 `npm run db:migrate` applies migrations to `DATABASE_URL`. The runner locks migrations with a PostgreSQL advisory lock, applies each file in its own transaction, and records it only after success. A second run skips applied files. Do not edit a migration after sharing or applying it; add another migration instead.
 
-`npm run db:migrate:test` uses only `TEST_DATABASE_URL`, whose database name must end in `_test`. Migrations create tables in an existing database; they do not create the PostgreSQL database itself. Integration and browser fixtures remove their own users (cascading sessions, workspaces, accounts, events, scenarios and adjustments) and throttle keys after tests.
+`npm run db:migrate:test` uses only `TEST_DATABASE_URL`, whose database name must end in `_test`. Migrations create tables in an existing database; they do not create the PostgreSQL database itself. Integration and browser fixtures remove their own users (cascading sessions, workspaces, accounts, events, scenarios, adjustments and FX shocks) and throttle keys after tests.
 
 ## Authorization boundary
 
-Application queries derive ownership from an unexpired session in the database, never a browser-submitted user ID. The workspace read and upsert, the danger threshold, the cash accounts and events, the scenarios and adjustments, and the reporting currency read and update join/select through `sessions`; an expired or unknown token cannot select an owner. This is application-level authorization, not PostgreSQL row-level security. Direct privileged SQL can bypass it, so database credentials stay server-only.
+Application queries derive ownership from an unexpired session in the database, never a browser-submitted user ID. The workspace read and upsert, the danger threshold, the cash accounts and events, the scenarios, adjustments and FX shocks, and the reporting currency and appearance read and update join/select through `sessions`; an expired or unknown token cannot select an owner. This is application-level authorization, not PostgreSQL row-level security. Direct privileged SQL can bypass it, so database credentials stay server-only.
 
 ## Environments and privileges
 
@@ -142,7 +142,7 @@ Local development and automated tests use separate databases. The isolated CI Po
 
 Staging requires its own hosted database and TLS. Use a migration owner for schema changes and a separate runtime role with only the needed table privileges. Runtime credentials must not grant schema modification or access to unrelated projects. Record the actual staging setup in deployment documentation.
 
-Expired sessions and throttle rows are ignored/reset but not periodically deleted yet. A later maintenance procedure should delete expired rows; no scheduler is introduced in Issue 1.
+Expired sessions and throttle rows are ignored or reset but not periodically deleted. A later maintenance procedure should delete expired rows; the project has no scheduler.
 
 ## Cash accounts and cash events (migration 005)
 
@@ -165,10 +165,12 @@ One provider response is inserted in one SQL statement, so USD and SGD cannot be
 
 ## Delayed-invoice scenarios (migration 007)
 
-Scenarios store only date overrides; they do not copy or edit cash events. `workspace_id` is repeated on each adjustment so the database can enforce both `(scenario_id, workspace_id)` and `(cash_event_id, workspace_id)` composite foreign keys. Only an expected positive event can be delayed, and the override must be later than its stored date. Deleting an expected event cascades its adjustment; the canonical store does not allow deleting settled events.
+Scenarios store only date overrides; they do not copy or edit cash events. `workspace_id` is repeated on each adjustment so the database can enforce both `(scenario_id, workspace_id)` and `(cash_event_id, workspace_id)` composite foreign keys. Only an expected positive event can be delayed, and the override must be later than its stored date. Deleting an expected event cascades its adjustment; the cash-event store does not allow deleting settled events.
 
 ## Percentage-based FX shocks (migration 008)
 
-An FX shock references an immutable snapshot and applies `sourceRate × (1 + shockPercent / 100)` using Decimal arithmetic. A composite foreign key keeps the shock in its scenario's workspace. The snapshot uses `ON DELETE RESTRICT`, so a persisted scenario cannot silently lose its rate provenance. The application accepts only plain decimal percentages from -99.99 to 100 with at most four decimals; the database independently rejects `NaN` and values outside that range (migration 009 made the column `numeric(7,4)` and added the range check), and it rounds silently to four decimals on insert, which is why the application refuses more precise input instead. For rows saved before migration 009, the migration first checks every existing shock and refuses to run if one is out of range or more precise than four decimals, because the type change would round it silently and alter a saved scenario.
+An FX shock references an immutable snapshot and applies `sourceRate × (1 + shockPercent / 100)` using Decimal arithmetic. A composite foreign key keeps the shock in its scenario's workspace. The snapshot uses `ON DELETE RESTRICT`, so a persisted scenario cannot silently lose its rate provenance. The application accepts only plain decimal percentages from -99.99 to 100 with at most four decimals; the database independently rejects `NaN` and values outside that range (migration 009 made the column `numeric(7,4)` and added the range check).
 
-The FX service, rather than the Forecast Engine, resolves direct, reciprocal and cross-currency rates. Scenario Lab receives one result containing the requested pair, source and adjusted decimal strings, effective date, provider, source snapshot IDs and `CURRENT`, `STALE` or `UNAVAILABLE`. An unavailable rate produces null source and adjusted rates; no fallback number is invented.
+The database rounds silently to four decimals on insert, which is why the application refuses more precise input instead. For rows saved before migration 009, the migration first checks every existing shock and refuses to run if one is out of range or more precise than four decimals, because the type change would round it silently and alter a saved scenario.
+
+The FX service, rather than the Forecast Engine, resolves direct, reciprocal and cross-currency rates. The Scenario lab receives one result containing the requested pair, source and adjusted decimal strings, effective date, provider, source snapshot IDs and `CURRENT`, `STALE` or `UNAVAILABLE`. An unavailable rate produces null source and adjusted rates; no fallback number is invented.

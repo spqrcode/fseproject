@@ -9,12 +9,12 @@ Owner: Gabriel (Product Experience), with Cash events and Scenario lab integrati
 | `/` | Public home page: what FinTwin Global is, what each of the three views does today, how it is built | Implemented; signed-in users are redirected to `/dashboard` |
 | `/login`, `/register` | Account access | Existing, rebranded |
 | `/dashboard` | Liquidity overview: the forecast from the Forecast Engine, plus the status of the workspace, reporting currency, cash events and scenario lab | Implemented: one account's deterministic forecast for 30, 90, 180 or 365 days (balance today, lowest point, closing balance, runway, danger threshold, overdue events, a step chart and a day-by-day table); an empty state asks for a cash account when there is none |
-| `/cash-events` | Cash accounts and planned income and expenses by date | Connected to the session-scoped cash-event store; create, edit, settle, cancel and delete expected events |
-| `/scenarios` | Scenario lab: delayed invoices and ECB percentage-FX shocks | Connected to persisted scenarios and adjustments, with an ECB rate preview; numerical forecast comparison still awaits the shared adapter |
+| `/cash-events` | Cash accounts and planned income and expenses by date | Connected to the session-scoped cash-event store; create, edit, settle, cancel and delete expected events; a new event can repeat monthly, quarterly or annually (2 to 60 occurrences or an end date) |
+| `/scenarios` | Scenario lab: delayed invoices and ECB percentage-FX shocks | Implemented: delayed-invoice scenarios, base-versus-scenario comparison in the reporting currency, ECB rate preview and saved FX shocks (not part of the comparison) |
 | `/workspace` | Workspace name and configurable danger threshold | The user can store a fixed threshold in the reporting currency or clear it to restore the 50% default; changing currency safely clears a custom amount |
 | `/settings` | Reporting currency, appearance and active sessions | Implemented |
 
-On the Scenario lab, a selected scenario with delayed invoices is compared with the base forecast of one account for 30, 90, 180 or 365 days: closing balance, lowest balance and its date, first day below the danger threshold and runway, side by side with the difference, then one effect per delayed invoice that adds up to the closing-balance difference. Adjustments that do not apply to that forecast are listed with the reason, never hidden. Amounts are in the reporting currency, converted with the same ECB rate and note as the Liquidity overview (`src/components/conversion-note.tsx`); without a usable rate no comparison is shown. Exchange-rate shocks are not part of the comparison yet.
+On the Scenario lab, a selected scenario with delayed invoices is compared with the base forecast of one account for 30, 90, 180 or 365 days: closing balance, lowest balance and its date, first day below the danger threshold and runway, side by side with the difference, then one effect per delayed invoice that adds up to the closing-balance difference. Adjustments that do not apply to that forecast are listed with the reason, never hidden. Amounts are in the reporting currency, converted with the same ECB rate and note as the Liquidity overview (`src/components/conversion-note.tsx`); without a usable rate no comparison is shown. Exchange-rate shocks are not part of the comparison.
 
 Every private route checks the session on the server (`requireUser`) and reads data only through session-scoped queries. The navigation marks exactly one current section with `aria-current="page"`, including nested routes added later (for example `/scenarios/compare`).
 
@@ -22,7 +22,7 @@ Section names follow the MVP views agreed by the team on 2 October 2026: Liquidi
 
 The home page marks all three views as available, now that the forecast and the Scenario lab comparison are on main, and describes each one only as far as it works today: exchange-rate shocks are previewed, not yet part of the comparison. The logo on the sign-in and registration pages links back to it.
 
-Pages that are not connected yet never show placeholder numbers. A demo figure on a financial screen can be mistaken for a real one, so the overview states that it has no projected balance yet. The Scenario lab displays persisted invoice dates and real ECB snapshot rates, but does not invent a cash-flow comparison. The Cash events page shows only persisted account and event values.
+Empty states never show placeholder numbers, because a demo figure on a financial screen can be mistaken for a real one. Without a cash account the overview shows an outline figure and asks for an account; without a usable ECB rate no converted figures or comparison are shown. The Cash events page shows only persisted account and event values.
 
 ## US-11: cash accounts and events
 
@@ -35,6 +35,7 @@ Acceptance criteria:
 - Received, paid and cancelled events remain visible as an audit trail and cannot be edited or deleted.
 - Deleting takes a second step (a native disclosure with "Delete permanently"), and the confirmation points to cancelling as the way to keep a record. Each action's accessible name includes the event (for example "Delete: Office rent"), starting with the visible words. An action on an event that has already changed is answered with a message rather than ignored. Dates use the shared `formatDate`.
 - A user never supplies a workspace or user ID. Every action resolves ownership from the session and verifies the request origin.
+- A new event can repeat monthly, quarterly or annually, ending after 2 to 60 occurrences or on an end date; each occurrence is saved as its own expected event with its own status.
 - Empty, validation, success and error states are announced accessibly, and the page remains usable on a phone-sized viewport.
 
 Implementation: `src/app/(protected)/cash-events/page.tsx`, `src/app/actions/cash-events.ts`, the three `cash-*` components, and `tests/e2e/cash-events.spec.ts`.
@@ -53,18 +54,18 @@ The fonts are installed from npm (Fontsource packages, SIL Open Font License) an
 
 The dark palette keeps the same roles: near-black paper, warm off-white ink, a lighter cobalt accent, and sign-in and onboarding panels that stay dark in both themes. Every colour in `globals.css` is a token, so the two palettes cannot drift apart.
 
-The logo is two overlapping circles: the finances as they are and their twin. Header, page content and footer share one content column (`--edge` in `globals.css`), so every left edge lines up with the logo. Placeholder figures on the forecast and scenario pages are outlines with a "today" marker and no values, for the reason given under Information architecture.
+The logo is two overlapping circles: the finances as they are and their twin. Header, page content and footer share one content column (`--edge` in `globals.css`), so every left edge lines up with the logo. Outline figures in the empty states of the Liquidity overview and Scenario lab are drawn with a "today" marker and no values, for the reason given under Information architecture.
 
 ## Shared states
 
 - Loading: `src/app/(protected)/loading.tsx` shows a skeleton inside the application shell and announces "Loading this page" to screen readers.
 - Error: `src/app/(protected)/error.tsx` keeps navigation and sign-out available, says that data was not changed, and offers a retry and a way back to the overview.
-- Empty and not connected: `EmptyState` and status badges ("Ready", "Not created", "Not connected yet").
+- Empty and not connected: `EmptyState` and status badges ("Ready", "Not created", "Set up", "Available").
 - Forms: errors use `role="alert"`, confirmations use `role="status"`, and buttons show progress while a server action runs.
 
 ## Presentation rules for amounts
 
-`src/lib/format.ts` is the single place where amounts, percentages and timestamps become text. The Forecast Engine and Scenarios & FX pages should use it instead of formatting numbers themselves.
+`src/lib/format.ts` is the single place where amounts, percentages and timestamps become text. The Forecast Engine and Scenarios & FX pages use it instead of formatting numbers themselves.
 
 - Amounts are passed as decimal strings, the form PostgreSQL `numeric` values arrive in, and are never converted to JavaScript numbers. `12345678901234567.89` is displayed exactly; as a number it would lose its last digits.
 - Rounding happens only at display time, half to even (1.245 becomes 1.24, 1.255 becomes 1.26), using the currency's own minor units (two decimals for EUR, USD and SGD). This is the rule the forecast engine uses when it rounds, so the screen never disagrees with a rounded calculation by a cent. Unrounded engine results with 40 significant digits are accepted as they are.
@@ -88,7 +89,7 @@ Acceptance criteria:
 
 Implementation: `db/migrations/003_reporting_currency.sql`, `src/lib/currency.ts`, `reportingCurrencySchema` in `src/lib/validation.ts`, `src/lib/preferences-store.ts`, `src/app/actions/preferences.ts`, `src/components/currency-form.tsx`, `src/app/(protected)/settings/page.tsx`.
 
-The currency is stored as a column on `users` because it is one value per account. The staging runtime role receives `UPDATE` on that column only, so the application still cannot change email addresses or password hashes. The list of offered currencies lives in the application, because it depends on the FX data that Scenarios & FX will supply; the database checks only the ISO 4217 shape.
+The currency is stored as a column on `users` because it is one value per account. The staging runtime role receives `UPDATE` on that column only, so the application still cannot change email addresses or password hashes. The list of offered currencies lives in the application, because it depends on the FX data that Scenarios & FX supplies; the database checks only the ISO 4217 shape.
 
 ## US-10: appearance
 
@@ -125,12 +126,11 @@ Sessions record no browser name or IP address, so the list shows times only. Sto
 
 A skip link is the first keyboard stop on every page. Headings follow one `h1` per page. Form controls have visible labels and descriptions linked with `aria-describedby`. Status colours are paired with text. On phone-sized screens the navigation scrolls horizontally inside the header, scrolls itself so the current section is fully visible, and the page itself never scrolls sideways. Animations run only when the user has not asked for reduced motion.
 
-## How the Forecast Engine and Scenarios & FX plug in
+## How the Forecast Engine and Scenarios & FX are connected
 
-1. The Liquidity overview reads the forecast input, the adapter and the engine (#20). The numerical base-versus-scenario comparison in `scenarios/page.tsx` came with #23 and is in the reporting currency since #30. Cash events, scenario adjustments and FX preview are connected already.
-2. Read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
-3. Pass amounts as decimal strings from the calculation layer; pass `null` when a value is unavailable.
-4. Update the module row on the liquidity overview from "Not connected yet" to the real status.
+1. The Liquidity overview reads the forecast input, the adapter and the engine (#20). The numerical base-versus-scenario comparison in `scenarios/page.tsx` came with #23 and has used the reporting currency since #30. Cash events, scenario adjustments and the FX preview are connected too.
+2. Pages read the user's currency with `getReportingCurrency(token)` and format every value with `formatMoney`, `formatPercent` and `formatTimestamp`.
+3. The calculation layer passes amounts as decimal strings, and `null` when a value is unavailable.
 
 ## Verification
 
@@ -141,10 +141,10 @@ See [testing](testing.md). Unit tests cover formatting and currency validation, 
 - The ECB service resolves rates and the Scenario lab previews and saves shocked rates. Forecasts and the comparison are shown in the reporting currency with one persisted rate per forecast.
 - EUR is the default because the team and the assessment are based in Europe. Changing the default needs a migration and a decision in `decisions.md`.
 - The interface is English only and uses a fixed `en-GB` number format.
-- The Scenario lab's comparison covers delayed invoices only; saved FX shocks are shown with their snapshot but do not change the compared forecast yet.
+- The Scenario lab's comparison covers delayed invoices only; saved FX shocks are shown with their snapshot but do not change the compared forecast.
 
 ## Scenario lab integration
 
 As a signed-in user, I can create a named scenario, move an expected positive invoice to a later date inside that scenario, and see the original and hypothetical dates side by side. The original event stays unchanged on Cash events. The page also previews an ECB percentage shock with source and adjusted rates as decimal strings, effective date, provider and current/stale/unavailable status. Unavailable data has no adjusted number. Direct EUR/USD and EUR/SGD shocks may be saved against one immutable snapshot; cross and reciprocal rates remain preview-only. Saved shocks display that snapshot's ECB date and rate; if a different latest snapshot for the same pair is already cached, a hint says so without changing the saved result or making an ECB request.
 
-Implementation: `src/app/(protected)/scenarios/page.tsx`, `src/app/actions/scenarios.ts`, `src/components/scenario-forms.tsx`, and `tests/e2e/scenarios.spec.ts`. Numerical base-versus-scenario forecasts are separate product work, although the shared adapter has merged.
+Implementation: `src/app/(protected)/scenarios/page.tsx`, `src/app/actions/scenarios.ts`, `src/components/scenario-forms.tsx`, and `tests/e2e/scenarios.spec.ts`. The base-versus-scenario comparison is in `src/components/scenario-comparison.tsx` and `src/lib/scenario-comparison.ts` (PRs #23 and #30).

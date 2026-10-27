@@ -39,7 +39,7 @@ GitHub Actions runs `.github/workflows/ci.yml` on every pull request and on ever
 7. Production build.
 8. Playwright browser tests on the production build, including WCAG 2.2 AA checks.
 
-The same sequence runs locally with `npm run verify` ([testing](testing.md)).
+`npm run verify` runs the same checks locally, except step 6, the runtime-role run ([testing](testing.md)).
 
 ## Branch protection
 

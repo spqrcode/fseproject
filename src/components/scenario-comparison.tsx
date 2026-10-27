@@ -16,7 +16,7 @@ function runwayText(days: number | null, horizon: number) {
 
 // The base forecast and the scenario forecast side by side, and the difference split into one effect per delayed
 // invoice that adds up to it. Everything shown is computed by the engine; the page only formats. Amounts are in the
-// account's own currency, because conversion into the reporting currency is not connected yet.
+// reporting currency, converted with one persisted ECB rate (see src/lib/scenario-comparison.ts).
 export function ScenarioComparisonPanel({ comparison, currency, horizon, described }: {
   comparison: ScenarioComparison; currency: string; horizon: number; described: Described[];
 }) {

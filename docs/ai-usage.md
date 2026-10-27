@@ -4,7 +4,9 @@ AI-generated work must meet the same requirements as student-written work. Stude
 
 ## Summary
 
-**Tools.** As recorded in the entries below: OpenAI Codex (documentation baseline, authentication scaffold, Forecast Engine, scenarios, exchange rates, Cash events and Scenario lab pages), Claude Code (Foundation & Security work, Product Experience, Liquidity overview) and Antigravity (delayed-invoice scenarios, ECB snapshot cache).
+**Tools.** As recorded in the entries below: OpenAI Codex (documentation baseline, authentication scaffold, Forecast Engine, danger threshold, scenarios, exchange rates, Cash events and Scenario lab pages), Claude Code (Foundation & Security work, Product Experience, Liquidity overview, comparison, feedback log and submission documents), Claude in the Cowork app (repeating cash events) and Antigravity (delayed-invoice scenarios, ECB snapshot cache).
+
+**Order.** Entries are in the order they were added, not strictly by date; each entry states its own date.
 
 **Team rules**, as stated in this document and in the entries:
 - The AI does not stage, commit or push. The student inspects the change, runs the tests and commits it.
@@ -13,10 +15,10 @@ AI-generated work must meet the same requirements as student-written work. Stude
 
 | Member · Area | Where AI was used | Example correction |
 | --- | --- | --- |
-| Bastian · Foundation & Security | Authentication scaffold, migration runner and CI (Codex, [foundation](#issue-1-foundation-and-verification)); [login throttle](#login-throttle-fix-and-origin-test-coverage-branch-fixauth-throttle), [workspace and cash-event schema](#workspace-and-cash-events-schema-migration-005) and stores, [forecast input](#forecast-input-starting-balance-overdue-events-status-mapping-branch-featforecast-input) (Claude Code) | The agent deployed staging with `vercel deploy` and uploaded files that Git ignores; found in the upload manifest, passwords rotated, deployments moved to Git-only builds ([credential exposure](#issue-1--ai-caused-credential-exposure-detected-and-corrected)) |
-| Haina Liu · Forecast Engine | [money and FX foundation](#haina-liu--forecast-money-and-fx-foundation), [cash projection](#haina-liu--cash-projection-and-review-follow-up) and [PR #12 corrections](#haina-liu--pr-12-review-corrections) (Codex) | A first revision made the engine use the database statuses directly; rejected because the team decision gives the adapter that mapping ([PR #12 corrections](#haina-liu--pr-12-review-corrections)) |
-| Jiaxin Huang · Scenarios & Exchange Rates | [delayed-invoice scenarios](#jiaxin-huang--delayed-invoice-scenarios) (Antigravity, Codex); [ECB snapshot cache](#jiaxin--ecb-snapshot-cache-and-failure-handling-migration-006), [FX shocks](#jiaxin-huang--percentage-based-fx-shocks), [Cash events page](#cash-events-product-integration) and [Scenario lab page](#jiaxin--scenario-lab-product-integration) (Codex); [Liquidity overview](#jiaxin-covering-product-experience--liquidity-overview-connected-to-the-forecast-branch-featproduct-liquidity-overview) (Claude Code) | The first ECB snapshot draft updated a stored rate in place when ECB republished it, which would silently change reproducible scenarios; changed so a corrected rate is a new immutable snapshot ([ECB snapshot cache](#jiaxin--ecb-snapshot-cache-and-failure-handling-migration-006)) |
-| Gabriel Piraccini · Product Experience | [interface shell, formatting and reporting currency](#product-experience-increment-fintwin-global-shell-formatting-and-reporting-currency), [home page, sessions, appearance and accessibility checks](#product-experience-follow-ups-home-page-sessions-appearance-and-accessibility-checks) and [exchange-rate display](#product-experience-exchange-rate-display) (Claude Code) | The first currency form made the select jump back to EUR after saving USD; the browser test caught it and the select is now keyed by the saved currency ([interface shell, formatting and reporting currency](#product-experience-increment-fintwin-global-shell-formatting-and-reporting-currency)) |
+| Bastian · Foundation & Security | Authentication scaffold, migration runner and CI (Codex, [foundation](#issue-1-foundation-and-verification)); [login throttle](#login-throttle-fix-and-origin-test-coverage-branch-fixauth-throttle), [workspace and cash-event schema](#workspace-and-cash-events-schema-migration-005) and stores, [forecast input](#forecast-input-starting-balance-overdue-events-status-mapping-branch-featforecast-input), [CI as the runtime role](#ci-runs-the-data-store-tests-as-the-restricted-staging-role-branch-choreci-runtime-role) and [submission cleanup](#submission-cleanup-branch-choresubmission-cleanup) (Claude Code); [repeating cash events](#repeating-cash-events-branch-featmonthly-recurring-events) (Claude, Cowork) | The agent deployed staging with `vercel deploy` and uploaded files that Git ignores; found in the upload manifest, passwords rotated, deployments moved to Git-only builds ([credential exposure](#issue-1--ai-caused-credential-exposure-detected-and-corrected)) |
+| Haina Liu · Forecast Engine | [money and FX foundation](#haina-liu--forecast-money-and-fx-foundation), [cash projection](#haina-liu--cash-projection-and-review-follow-up) and [PR #12 corrections](#haina-liu--pr-12-review-corrections), [status reconciliation](#haina-liu--forecast-engine-status-reconciliation-after-pr-26) and [danger threshold](#haina-liu--configurable-workspace-danger-threshold) (Codex) | A first revision made the engine use the database statuses directly; rejected because the team decision gives the adapter that mapping ([PR #12 corrections](#haina-liu--pr-12-review-corrections)) |
+| Jiaxin Huang · Scenarios & Exchange Rates | [delayed-invoice scenarios](#jiaxin-huang--delayed-invoice-scenarios) (Antigravity, Codex); [ECB snapshot cache](#jiaxin--ecb-snapshot-cache-and-failure-handling-migration-006), [FX shocks](#jiaxin-huang--percentage-based-fx-shocks), [Cash events page](#cash-events-product-integration) and [Scenario lab page](#jiaxin--scenario-lab-product-integration) (Codex); [Liquidity overview](#jiaxin-covering-product-experience--liquidity-overview-connected-to-the-forecast-branch-featproduct-liquidity-overview), [comparison](#base-versus-scenario-comparison-branch-featscenario-comparison), [comparison in the reporting currency](#comparison-in-the-reporting-currency-branch-featcomparison-reporting-currency), [feedback log](#jiaxin-huang--presentation-feedback-log), [feature ideas](#jiaxin-huang--feature-ideas-and-final-feedback-status) and [submission guide](#jiaxin-huang--submission-guide-git-workflow-and-deployment-update) (Claude Code) | The first ECB snapshot draft updated a stored rate in place when ECB republished it, which would silently change reproducible scenarios; changed so a corrected rate is a new immutable snapshot ([ECB snapshot cache](#jiaxin--ecb-snapshot-cache-and-failure-handling-migration-006)) |
+| Gabriel Piraccini · Product Experience | [interface shell, formatting and reporting currency](#product-experience-increment-fintwin-global-shell-formatting-and-reporting-currency), [home page, sessions, appearance and accessibility checks](#product-experience-follow-ups-home-page-sessions-appearance-and-accessibility-checks) and [review changes](#product-experience-changes-requested-in-review-and-at-the-team-meeting-of-2-october), [exchange-rate display](#product-experience-exchange-rate-display) and [home page after the merges](#product-experience-home-page-after-the-forecast-and-scenario-lab-merges) (Claude Code) | The first currency form made the select jump back to EUR after saving USD; the browser test caught it and the select is now keyed by the saved currency ([interface shell, formatting and reporting currency](#product-experience-increment-fintwin-global-shell-formatting-and-reporting-currency)) |
 
 ## 2026-09-13 — Documentation baseline
 
@@ -26,8 +28,8 @@ AI-generated work must meet the same requirements as student-written work. Stude
 - Generated work: README and eight engineering documents describing proposed scope, acceptance criteria, architecture, tests, security, delivery, and limitations.
 - AI-proposed scope choices requiring team review: one portfolio per user, USD-only instruments, current positions rather than transaction history, concentration rather than historical risk models.
 - Validation: document completeness and basic content checks; no executable application or automated application tests exist.
-- Student review: pending. Do not describe this entry as student-approved.
-- Corrections or rejected suggestions: none recorded yet. Do not invent examples to satisfy assessment requirements.
+- Student review: not recorded at the time. The baseline documents were later reviewed and rewritten by the team through the pull requests in the entries below.
+- Corrections or rejected suggestions: none recorded for this entry; the scope choices above were later replaced (see [decisions](decisions.md)).
 
 ## Record each meaningful AI-assisted change
 
@@ -37,17 +39,17 @@ Keep genuine examples where students identified a problem, corrected an assumpti
 
 ## Scope correction
 
-The student rejected hosted backend/authentication services, including Supabase, and allowed Vercel deployment. Documentation was revised to use direct PostgreSQL access and application-managed accounts and sessions. This increases responsibility for authentication security. PostgreSQL hosting for public assessment remains unresolved. Code comments should explain useful technical details rather than include generic AI boilerplate.
+The student rejected hosted backend/authentication services, including Supabase, and allowed Vercel deployment. Documentation was revised to use direct PostgreSQL access and application-managed accounts and sessions. This increases responsibility for authentication security. Staging later used a dedicated Neon PostgreSQL database (see [deployment](deployment.md)). Code comments should explain useful technical details rather than include generic AI boilerplate.
 
 ## Issue 1 foundation and verification
 
 Codex generated the authentication scaffold, PostgreSQL migration runner, tests, and CI workflow. The student instructed an audit first, then authorized Issue 1 only and staging deployment. No holdings or financial calculations were added.
 
-Corrections: removed an unsafe global authentication lockout; isolated test databases/servers; corrected an ambiguous accessibility test locator; aligned Node 24; separated staging administrator and runtime database credentials. Verification: clean install, lint, TypeScript, build, 8 unit tests, 20 database integration tests, and 4 Chromium tests passed. See the Issue 1 evidence record for test boundaries. Student review remains pending; no student approval or collaboration history is fabricated.
+Corrections: removed an unsafe global authentication lockout; isolated test databases/servers; corrected an ambiguous accessibility test locator; aligned Node 24; separated staging administrator and runtime database credentials. Verification: clean install, lint, TypeScript, build, 8 unit tests, 20 database integration tests, and 4 Chromium tests passed. See the [Issue 1 evidence](issue-1-evidence.md) for test boundaries. A separate student review was not recorded for this entry; no student approval or collaboration history is fabricated.
 
 ## Issue 1 — AI-caused credential exposure, detected and corrected
 
-This is the clearest example so far of AI-generated work failing review.
+This is the clearest example of AI-generated work failing review.
 
 The agent deployed staging with `vercel deploy`, assuming `.gitignore` would keep local files out of the upload. It does not: the CLI uploads the working directory. The agent then checked the published deployment's own upload manifest and found `.local/staging.env`, `.local/staging-runtime-url`, and the local PostgreSQL data directory in the uploaded source.
 
@@ -55,40 +57,40 @@ What the AI got wrong: it treated `.gitignore` as a deployment boundary, and it 
 
 What was corrected: `.vercelignore` was added, the affected deployment deleted, both database passwords rotated and the old ones confirmed dead, the Vercel variable replaced, and the deployment path changed so staging is only built from Git. The final control is architectural, not a pattern file.
 
-Evidence retained: the saved upload manifest showing the ignored paths, the later manifest showing them empty, the 404 for the deleted deployment ID, the failed authentication for the old credentials, and the smoke test against the rotated staging environment. See the security document for the full incident record.
+Evidence retained: the saved upload manifest showing the ignored paths, the later manifest showing them empty, the 404 for the deleted deployment ID, the failed authentication for the old credentials, and the smoke test against the rotated staging environment. See [security](security.md#issue-1--credential-exposure-incident-and-remediation) for the full incident record.
 
 ## Haina Liu — Forecast money and FX foundation
 
 - Date: 2026-09-29 to 2026-10-03. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
 - Instruction: inspect the repository first, create a separate branch, and begin the Forecast Engine foundation. The student remained responsible for reviewing, staging, committing, pushing, and opening the PR.
-- Workflow: the work was developed on `haina`, reviewed by the student, pushed to `origin/haina`, and then rebased onto the updated `main`. PR #8 was approved by a teammate on 2026-10-07; resolving its merge conflicts with main remained pending.
+- Workflow: the work was developed on `haina`, reviewed by the student, pushed to `origin/haina`, and then rebased onto the updated `main`. PR #8 was approved by a teammate on 2026-10-07; PR #8 was merged after its conflicts with `main` were resolved.
 - Generated work: strict Decimal parsing, immutable Money values, EUR/USD/SGD validation, direct and reciprocal FX conversion, explicit rounding, public exports, documentation, and focused domain tests.
 - Scope deliberately deferred: cash-event projection, minimum balance, liquidity runway, Scenario contribution, and provider integration require agreed business rules or interfaces.
 - Validation: On 2026-10-03, `npm ci` reported 7 vulnerabilities: one critical production vulnerability in the inherited Next.js 16.3.5 dependency and six high-severity development-tooling vulnerabilities. The focused Forecast tests passed 34 tests, and `npm run check` passed lint, TypeScript, all 100 unit tests, and the production build. `npm audit fix --force` was not used; dependency remediation is separate.
 
 ## Jiaxin Huang — Delayed-invoice scenarios
 
-- Date: 2026-10-03 to 2026-10-08. Tools: Antigravity and OpenAI Codex. Owner: Jiaxin Huang, Scenarios and Exchange Rates.
+- Date: 2026-10-03 to 2026-10-08. Tools: Antigravity and OpenAI Codex. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
 - Instruction: implement a delayed-invoice scenario without modifying the original cash event or base forecast, keep financial calculations deterministic, use decimal strings rather than JavaScript numbers, enforce ownership in PostgreSQL, and add focused unit and integration tests.
 - Student ownership: Jiaxin defined the scenario behavior and feature boundaries, coordinated the shared contracts with the Forecast Engine, Foundation and Product Experience owners, reviewed the proposed changes before delivery, and decided which work could be accepted immediately and which work had to wait for PR #10 and PR #12. She remained responsible for branch management, review decisions, commits, pushing and the Draft pull request.
-- Workflow: the implementation was developed iteratively on `feat/scenario-delay-isolation`. Before finalizing the interface, Jiaxin asked Haina Liu which cash-event and Forecast Engine contracts were already included in PR #8. She then compared the scenario persistence design with Bastian's workspace schema and confirmed the Scenario Lab result requirements with Gabriel.
+- Workflow: the implementation was developed iteratively on `feat/scenario-delay-isolation`. Before finalizing the interface, Jiaxin asked Haina Liu which cash-event and Forecast Engine contracts were already included in PR #8. She then compared the scenario persistence design with Bastian's workspace schema and confirmed the Scenario lab result requirements with Gabriel.
 - AI assistance: AI tools assisted with implementation drafts, debugging, regression-test suggestions, database edge-case analysis and inspection of Git and pull-request state. The suggestions were reviewed rather than accepted automatically, and dependent Phase 2 and Phase 3 work was deliberately kept out of the Draft PR.
 - Implemented work: immutable delayed-invoice adjustments, scenario persistence, ownership-scoped queries and focused unit and PostgreSQL integration tests. Applying a scenario creates a new in-memory projection; it does not update the persisted cash event or mutate the base forecast.
 - Human review and corrections: Bastian reviewed PR #9 and identified issues involving the shared workspace schema, monetary precision, deletion behavior, staging database grants, PostgreSQL DATE conversion and malformed UUIDs. In response, DATE values are now read as date-only strings, UUIDs are validated before database queries, hard deletion no longer blocks account or workspace cleanup, guarded `fse_runtime` grants were added, and regression tests cover date handling, malformed identifiers and deletion cascades.
-- Collaboration decisions: Haina confirmed that PR #8 supplied the Decimal, Money and FX foundations but not the cash-event or projection engine used by the first scenario prototype. Gabriel confirmed that Scenario Lab will consume decimal-string rates, source and adjusted rates, base and quote currencies, the applied percentage, effective date, provider and freshness status. The scenario schema is now aligned with the merged PR #10; final engine alignment remains dependent on PR #12.
+- Collaboration decisions: Haina confirmed that PR #8 supplied the Decimal, Money and FX foundations but not the cash-event or projection engine used by the first scenario prototype. Gabriel confirmed that Scenario lab will consume decimal-string rates, source and adjusted rates, base and quote currencies, the applied percentage, effective date, provider and freshness status. The scenario schema is now aligned with the merged PR #10; final engine alignment remains dependent on PR #12.
 - Delivery: the work is in Draft PR #9, `https://github.com/spqrcode/fseproject/pull/9`. Commit `2217b4c` contains the review corrections. Commit `4922e25` merges the latest `main`, preserves both sides of the validation contract and retargets the PR from `haina` to `main`.
 - Validation: ESLint passed with zero warnings, TypeScript checking passed, 96 unit tests passed and the production build succeeded locally. GitHub Actions run `37695164245` passed migrations, lint, type checking, unit tests, PostgreSQL integration tests, the production build and Playwright end-to-end tests. The Vercel preview failure is caused by contributor-account verification on the Hobby project and is not a code or CI failure.
-- Scope deliberately deferred: ECB snapshot caching and percentage-based FX shocks remain on separate local branches. Phase 3 result-contract work remains in a local stash. They are not claimed as merged, deployed or complete.
+- Scope deliberately deferred: ECB snapshot caching and percentage-based FX shocks remain on separate local branches. Phase 3 result-contract work remains in a local stash. They were not merged at that time; they were delivered later in PR #17 (FX shocks) and the ECB entry below.
 - Data handling: no real passwords, session tokens, database credentials or private financial data were supplied to an AI tool. Local environment files remain ignored and were not committed.
 - Post-review alignment on 2026-10-08: after Jiaxin reviewed and approved Bastian's PR #10, its workspace/account/event schema was merged into `main`. The duplicate cash-event migration and store were removed from this Draft; scenario persistence now uses migration 007, the canonical cash-event store and workspace-safe composite foreign keys. Jiaxin retained migration 006 for the separate ECB snapshot work and kept the Forecast Engine adapter deferred until PR #12 is finalized. Final local checks covered 143 unit tests, 115 PostgreSQL integration tests and 24 Chromium tests. A separate fresh database containing the staging role confirmed that it can select and insert scenario data and update only adjustment status metadata, but cannot delete scenario rows or rewrite their ownership columns.
-- Follow-up on 2026-10-12: after PR #12 was merged, OpenAI Codex resolved PR #9's conflicts by retaining Haina's canonical cash-event and forecast-engine files and adapting only Jiaxin's scenario module and tests. The old scenario tests had assumed event-only timeline points and ignored overdue events; they now assert the engine's daily timeline and overdue-on-start rule. This follow-up remains subject to Jiaxin's review before merge.
+- Follow-up on 2026-10-12: after PR #12 was merged, OpenAI Codex resolved PR #9's conflicts (the student made the merge commit) by retaining Haina's canonical cash-event and forecast-engine files and adapting only Jiaxin's scenario module and tests. The old scenario tests had assumed event-only timeline points and ignored overdue events; they now assert the engine's daily timeline and overdue-on-start rule. Jiaxin reviewed the follow-up and PR #9 was merged.
 
 ## Jiaxin Huang — Percentage-based FX shocks
 
 - Date: 2026-10-10 to 2026-10-12. Tool: OpenAI Codex. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
-- Student decisions: Jiaxin set the ownership boundary: the FX service resolves direct, reciprocal and cross rates, while the Forecast Engine receives resolved rates and remains deterministic. Jiaxin also confirmed that `-10` means minus 10%, unavailable results contain no fallback rate, and Scenario Lab receives freshness and snapshot metadata with the adjusted result.
-- AI assistance: inspected and adapted the Phase 3 work to the merged forecast and scenario contracts, including test events with canonical timestamps and statuses. This work remains subject to Jiaxin's review before GitHub delivery or merge.
-- Validation: focused unit tests and PostgreSQL integration tests passed after the 2026-10-12 alignment; the full-suite result is recorded separately once complete. No staging or production deployment is claimed.
+- Student decisions: Jiaxin set the ownership boundary: the FX service resolves direct, reciprocal and cross rates, while the Forecast Engine receives resolved rates and remains deterministic. Jiaxin also confirmed that `-10` means minus 10%, unavailable results contain no fallback rate, and Scenario lab receives freshness and snapshot metadata with the adjusted result.
+- AI assistance: inspected and adapted the Phase 3 work to the merged forecast and scenario contracts, including test events with canonical timestamps and statuses. Jiaxin reviewed it and it was merged in PR #17.
+- Validation: focused unit tests and PostgreSQL integration tests passed after the 2026-10-12 alignment; the full suite then passed in the CI run of PR #17.
 
 ## Product experience increment: FinTwin Global shell, formatting and reporting currency
 
@@ -140,7 +142,7 @@ Validation (2026-10-04, cloud container with Node 22.22 and PostgreSQL 16): four
 
 ## Login throttle fix and origin test coverage (branch `fix/auth-throttle`)
 
-Date: 2026-09-29. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian
+Date: 2026-09-29. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian Bundschuh, Foundation & Security.
 
 Problem found by the student: the throttle counted successful logins (10 correct sign-ins in 15 minutes locked the account) and shared its counter with registration, so anyone could lock a known email through the register form. The origin (CSRF) test covered only `register` and `login`.
 
@@ -165,7 +167,7 @@ Validation (2026-09-29, local, Node 24, PostgreSQL 16): npm run verify passed. E
 
 ## Workspace and cash events schema (migration 005)
 
-Date: 2026-10-07. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian
+Date: 2026-10-07. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian Bundschuh, Foundation & Security.
 
 Task given by the student: rename `portfolios` to `workspaces`; add cash accounts and cash events with the agreed rules (EUR/USD/SGD, signed amounts, date-only, four statuses, one workspace per user); a session-scoped store; integration tests against real PostgreSQL; documentation. The student required a plan and a list of unclear points before any code, and answered six questions (narrower grants, no auto-created workspace, `expected`-only status transitions, 2000–2100 dates, a danger-threshold reader and writer, full rename scope).
 
@@ -181,33 +183,33 @@ Reviewed and changed by the student: reviewed the plan before any code was writt
 
 Concerns for the student's review: the status order and the immutability of settled events are enforced by the application, not the database; the renamed table keeps its old portfolios_* constraint names; and the rename requires migration and deployment to happen together (see the deployment document).
 
-Validation (2026-10-07, local, PostgreSQL 16): `npm run verify` exit code 0 — lint with zero warnings and strict TypeScript clean; 86 unit tests; migrations applied to the test database; 95 integration tests (37 of them new, in `cash-events.test.ts`); 24 Chromium tests; production build succeeded. Run as a role holding exactly the grants in `deployment.md` (migrations 003–005 plus the base grants, on a separate `_test` database): the 37 cash tests passed with the application as `fse_runtime` and fixtures as owner, and the 24 Chromium tests passed with the application server as `fse_runtime`. As that role, `UPDATE` of `cash_events.workspace_id` or `account_id`, of `cash_accounts.currency` or `workspace_id`, and `DELETE` on `cash_accounts` or `workspaces` were refused with "permission denied". Student review: done, see above.
+Validation (2026-10-07, local, PostgreSQL 16): `npm run verify` exit code 0: lint with zero warnings and strict TypeScript clean; 86 unit tests; migrations applied to the test database; 95 integration tests (37 of them new, in `cash-events.test.ts`); 24 Chromium tests; production build succeeded. Run as a role holding exactly the grants in `deployment.md` (migrations 003–005 plus the base grants, on a separate `_test` database): the 37 cash tests passed with the application as `fse_runtime` and fixtures as owner, and the 24 Chromium tests passed with the application server as `fse_runtime`. As that role, `UPDATE` of `cash_events.workspace_id` or `account_id`, of `cash_accounts.currency` or `workspace_id`, and `DELETE` on `cash_accounts` or `workspaces` were refused with "permission denied". Student review: done, see above.
 
 Review finding (PR #10, Jiaxin, 2026-10-08): the AI-generated `updateCashEvent` and `deleteCashEvent` still allowed changing and deleting received, paid and cancelled events, although they feed the forecast's starting balance; the student's own review and the AI's earlier "concerns" note had accepted this. Fixed with `status = 'expected'` in the `WHERE` clause and `StatusConflictError` for the caller's own settled events, with new tests; `npm run verify` exit code 0 afterwards (86 unit, 99 integration, 24 Chromium tests).
 
 ## Cash events product integration
 
-Date: 2026-10-11. Tool: OpenAI Codex. Owner: Jiaxin.
+Date: 2026-10-11. Tool: OpenAI Codex. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
 
 Jiaxin decided to take over the unimplemented Cash events user flow after reviewing the Product Experience workload. She set the scope boundary: connect the already-merged session-scoped stores without duplicating forecast or scenario calculations, keep the work on a separate branch, preserve the existing visual system, and verify the complete browser path before committing.
 
 Codex assisted with the server actions, account and event forms, persisted event schedule, responsive styling, overview status, documentation and browser tests. During browser verification, Jiaxin retained the existing financial rules from PR #10: signed decimal strings, account-owned currency, `expected`-only edits, and final settled events. The tests exposed two presentation issues before delivery: success feedback was hidden or lost after server revalidation, and an invalid amount reset the other form values. The implementation was changed to use redirect-backed success messages and controlled inputs that survive validation errors.
 
-Verification used a local PostgreSQL 16 container bound only to localhost with the dedicated `portfolio_risk_test` database. No staging or production data was used. Final validation evidence is recorded in `docs/testing.md`; staging deployment and PR publication remain separate student decisions.
+Verification used a local PostgreSQL 16 container bound only to localhost with the dedicated `portfolio_risk_test` database. No staging or production data was used. Final validation evidence is recorded in `docs/testing.md`; the student published it as PR #16, which was reviewed and merged.
 
 ## Jiaxin — ECB snapshot cache and failure handling (migration 006)
 
-Date: 2026-10-08 to 2026-10-09. Tools: Antigravity and OpenAI Codex. Owner: Jiaxin (Scenarios & Exchange Rates).
+Date: 2026-10-08 to 2026-10-09. Tools: Antigravity and OpenAI Codex. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
 
 Student direction and review: Jiaxin split the work into separate scenario, ECB-cache and FX-shock phases; confirmed the contract with Haina, Bastian and Gabriel; chose decimal strings, explicit `CURRENT`/`STALE`/`UNAVAILABLE` states and `null` for an unavailable rate; kept the provider layer independent of the deterministic shock calculation; and asked for a clean branch based on main after discovering that the first local branch also contained unrelated forecast and scenario commits. Jiaxin reviewed the proposed API and database behavior before the final PR and remains responsible for accepting the diff.
 
 AI-assisted implementation and debugging: generated the initial migration, ECB parser/provider, snapshot store, rate service and focused tests; then audited them against the official ECB API and the merged workspace schema. The audit added narrow `fse_runtime` grants, strict real-date and database-precision checks, atomic persistence of both ECB legs, protection against an older response overwriting a newer fetch, normalized decimal strings, typed failure metadata, and a same-effective-date requirement for cross-rates. It also added PostgreSQL integration tests using a separate owner connection for fixtures while the application runs with the restricted runtime role.
 
-Corrections to the initial AI-assisted version: it had no runtime grants, accepted impossible calendar dates, recorded fetch time before the response body completed, persisted the two rates separately, could combine different effective dates into one cross-rate, and returned too little information for the Scenario Lab to distinguish stale from unavailable data. These issues were found during review and corrected before the PR. A live smoke request to the official ECB endpoint returned the expected CSV columns and both USD and SGD observations; deterministic automated tests still mock the provider so CI does not depend on the network.
+Corrections to the initial AI-assisted version: it had no runtime grants, accepted impossible calendar dates, recorded fetch time before the response body completed, persisted the two rates separately, could combine different effective dates into one cross-rate, and returned too little information for the Scenario lab to distinguish stale from unavailable data. These issues were found during review and corrected before the PR. A live smoke request to the official ECB endpoint returned the expected CSV columns and both USD and SGD observations; deterministic automated tests still mock the provider so CI does not depend on the network.
 
 Review correction (PR #13, Bastian, 2026-10-10): the first draft updated `rate` in place when ECB republished the same pair and effective date. Because a scenario will retain `snapshotId`, that would silently change a previously reproducible result. The schema now treats provider/pair/date/rate as one observation: an identical repeat updates only `fetched_at`, while a corrected rate creates a new immutable id. The runtime role can no longer update `rate`. The same review led to fixed UI-safe failure messages with raw details only in server logs, a real `server-only` boundary in the provider, a 64 KiB response cap, and effective-date-first stale ordering. The requested parallel-refresh lock remains documented follow-up work rather than expanding this PR.
 
-Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify` exited 0 — ESLint with zero warnings, strict TypeScript, 162 unit tests, production build, 111 integration tests and 24 Chromium tests passed. Migrations 001–006 were applied successfully from an empty database. The 12 FX integration tests passed with the application connected as `fse_runtime` and fixtures connected as the database owner; direct privilege checks returned SELECT=true, INSERT=true, DELETE=false, UPDATE `fetched_at`=true, UPDATE `rate`=false and UPDATE `provider`=false. Phase 3 percentage-shock work and Scenario Lab UI are deliberately not part of this increment.
+Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify` exited 0: ESLint with zero warnings, strict TypeScript, 162 unit tests, production build, 111 integration tests and 24 Chromium tests passed. Migrations 001–006 were applied successfully from an empty database. The 12 FX integration tests passed with the application connected as `fse_runtime` and fixtures connected as the database owner; direct privilege checks returned SELECT=true, INSERT=true, DELETE=false, UPDATE `fetched_at`=true, UPDATE `rate`=false and UPDATE `provider`=false. Phase 3 percentage-shock work and the Scenario lab UI are deliberately not part of this increment.
 
 ## Haina Liu — PR #12 review corrections
 
@@ -220,9 +222,9 @@ Validation (2026-10-10, local, Node 24.14.0 and PostgreSQL 16): `npm run verify`
 
 ## Jiaxin — Scenario lab product integration
 
-Date: 2026-10-12. Tool: OpenAI Codex. Owner: Jiaxin (Scenarios & Exchange Rates).
+Date: 2026-10-12. Tool: OpenAI Codex. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
 
-Jiaxin authorized taking on the unfinished Scenario lab page and set the contract boundary: use the existing session-scoped scenario and ECB services, keep cash events and snapshots unchanged, and do not show invented forecast balances while the shared forecast-input adapter is under review. Codex assisted with the server actions, forms, page layout, styling, browser test and documentation. The implementation exposes original and delayed invoice dates, a percentage-shock preview with ECB provenance and freshness, and saving only for direct EUR pairs backed by one snapshot. The first browser run exposed a currency-label mismatch and a missing wait for workspace creation; a later run found an ambiguous `alert` test locator. These were corrected and all 27 Chromium tests passed. The student will inspect the diff, review the PR and own the final merge decision. Numerical base-versus-scenario forecasts remain for a later integration.
+Jiaxin authorized taking on the unfinished Scenario lab page and set the contract boundary: use the existing session-scoped scenario and ECB services, keep cash events and snapshots unchanged, and do not show invented forecast balances while the shared forecast-input adapter is under review. Codex assisted with the server actions, forms, page layout, styling, browser test and documentation. The implementation exposes original and delayed invoice dates, a percentage-shock preview with ECB provenance and freshness, and saving only for direct EUR pairs backed by one snapshot. The first browser run exposed a currency-label mismatch and a missing wait for workspace creation; a later run found an ambiguous `alert` test locator. These were corrected and all 27 Chromium tests passed. The student inspected the diff and opened PR #18, which was reviewed and merged. The numerical base-versus-scenario comparison followed in #23 and #30.
 
 Review follow-up (Bastian, 2026-10-12): Jiaxin accepted that saved shocks must stay tied to their original immutable ECB snapshot. Bastian asked for the snapshot's ECB date and a hint when a newer cached rate exists. The date and source rate were already displayed; Codex added a read-only latest-snapshot comparison and the hint. Tests cover a repeat fetch, another pair, a later ECB date and a correction to the same ECB date, while verifying the saved calculation still uses its original rate.
 
@@ -234,7 +236,7 @@ Change: adjustments that cannot apply are skipped and returned with a reason, `g
 
 ## Forecast input: starting balance, overdue events, status mapping (branch `feat/forecast-input`)
 
-Date: 2026-10-10. Tool: Claude Code (Claude Sonnet 5.5). Owner: Foundation & Security student.
+Date: 2026-10-10. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian Bundschuh, Foundation & Security.
 
 Task given by the student: one server-only function that loads, for one account, everything the forecast engine needs, resolved by the team's decisions of 2026-10-08, plus a pure status mapping; no call into the engine yet. The student required a plan and open questions first, approved the plan, and answered the one open question.
 
@@ -248,19 +250,19 @@ Reviewed and changed by the student: reviewed the plan before any code was writt
 
 Concerns for the student’s review: an early-settled event loses its planned date, since only the date the money moved is kept (accepted and documented in limitations.md); both queries repeat the ownership joins on purpose rather than trusting ids from the first query; the 366-day limit is enforced here and should also be enforced by the engine (PR #12); the one-off test timeout could not be reproduced or explained; decision 2 (threshold default) still depends on PR #12.
 
-Validation (2026-10-10, local, PostgreSQL 16): `npm run verify` exit code 0 — lint with zero warnings and strict TypeScript clean; 124 unit tests; test migrations applied; 126 integration tests (the new forecast-input file and the settling tests included); production build succeeded; 24 Chromium tests. The cash-events and forecast-input integration files also passed (68 tests) with the application connected as a role holding exactly the grants in `deployment.md`; no new grants were needed, since the forecast input only reads. Student review: done, see above.
+Validation (2026-10-10, local, PostgreSQL 16): `npm run verify` exit code 0: lint with zero warnings and strict TypeScript clean; 124 unit tests; test migrations applied; 126 integration tests (the new forecast-input file and the settling tests included); production build succeeded; 24 Chromium tests. The cash-events and forecast-input integration files also passed (68 tests) with the application connected as a role holding exactly the grants in `deployment.md`; no new grants were needed, since the forecast input only reads. Student review: done, see above.
 
-Review finding (PR #14, Haina, 2026-10-11): two defects in the AI-generated forecast input, both missed by the AI and by the student's review. (1) The starting balance counted settled events dated before the start date, so money that moved on the start day, including an event marked paid today in a forecast that starts today, was in neither the balance nor the list; fixed by counting `<=` the start date (overdue stays `<`) with two new integration tests and an updated starting-balance test. (2) The 366-day limit counted differences instead of dates, so it allowed 367 dates while the engine in PR #12 allows 366; fixed by counting both ends, with the boundary tests moved to 2026-10-01 to 2027-10-01 (accepted) and 2027-10-02 (rejected). Validation after the fix (2026-10-11, local, PostgreSQL 16): `npm run verify` exit code 0 — 124 unit, 128 integration and 24 Chromium tests; lint and TypeScript clean; production build succeeded. Student review: read the diff line by line and confirmed that only the starting-balance condition changed to `<=` while the overdue condition stays `<`.
+Review finding (PR #14, Haina, 2026-10-11): two defects in the AI-generated forecast input, both missed by the AI and by the student's review. (1) The starting balance counted settled events dated before the start date, so money that moved on the start day, including an event marked paid today in a forecast that starts today, was in neither the balance nor the list; fixed by counting `<=` the start date (overdue stays `<`) with two new integration tests and an updated starting-balance test. (2) The 366-day limit counted differences instead of dates, so it allowed 367 dates while the engine in PR #12 allows 366; fixed by counting both ends, with the boundary tests moved to 2026-10-01 to 2027-10-01 (accepted) and 2027-10-02 (rejected). Validation after the fix (2026-10-11, local, PostgreSQL 16): `npm run verify` exit code 0: 124 unit, 128 integration and 24 Chromium tests; lint and TypeScript clean; production build succeeded. Student review: read the diff line by line and confirmed that only the starting-balance condition changed to `<=` while the overdue condition stays `<`.
 
 ## Jiaxin (covering Product Experience) — Liquidity overview connected to the forecast (branch `feat/product-liquidity-overview`)
 
-Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin, covering Gabriel's Product Experience work.
+Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin Huang, covering Gabriel's Product Experience work.
 
-Student direction: connect the overview only to real data — the store of PR #14, the adapter of PR #19 and the engine of PR #12 — without editing those branches, and show nothing estimated. Keep amounts in the account's currency with a visible notice until FX conversion exists. While reviewing PR #19 the student and AI found that the workspace danger threshold (reporting currency) is applied unconverted to accounts in other currencies; the overview now states this and it is recorded in `limitations.md`.
+Student direction: connect the overview only to real data (the store of PR #14, the adapter of PR #19 and the engine of PR #12) without editing those branches, and show nothing estimated. Keep amounts in the account's currency with a visible notice until FX conversion exists. While reviewing PR #19 the student and AI found that the workspace danger threshold (reporting currency) is applied unconverted to accounts in other currencies; the overview now states this and it is recorded in `limitations.md`.
 
 AI-generated: `src/lib/liquidity-overview.ts` (horizon, UTC window, chart geometry), `src/lib/liquidity-forecast.ts`, `src/components/liquidity-chart.tsx`, the overview page, `formatDate`, the forecast styles, and the unit, integration and Chromium tests. Corrections during development: the engine's minimum can be the balance before the start date's events and so lie below every end-of-day point, so the chart marker uses the engine's minimum rather than a timeline point; two existing browser assertions were updated only where the page's behaviour intentionally changed (the overview no longer shows "not connected"), and the reporting-currency sentence was kept so the original assertion still holds.
 
-Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — lint and TypeScript clean; 250 unit tests; 144 integration tests; production build; 30 Chromium tests, including WCAG 2.2 AA checks of the forecast view (with a breach, overdue events and the daily table open) in light and dark mode, and a 375 px phone width.
+Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0: lint and TypeScript clean; 250 unit tests; 144 integration tests; production build; 30 Chromium tests, including WCAG 2.2 AA checks of the forecast view (with a breach, overdue events and the daily table open) in light and dark mode, and a 375 px phone width.
 
 Merge with `main` (2026-10-12, after PRs #12, #13 and #19): Claude Code resolved the conflicts in four documentation files by keeping both sides; the student compared the result line by line with `main` (no line from `main` lost except text that this branch deliberately updates) and with Gabriel's resolution on `feat/product-liquidity-overview`, and updated the 2026-10-10 decision entry now that the engine and `toForecastInput` are merged. AI-generated: one integration test that runs `getForecastInput` → `toForecastInput` → `runForecast` for an account with a settled, an overdue and a future event. Validation: CI on the merge commit 6c7bf18 passed: 238 unit, 141 integration and 24 Chromium tests, lint, typecheck and build.
 
@@ -270,19 +272,19 @@ Review correction: the first AI-assisted FX-shock code validated only "greater t
 
 ## Base versus scenario comparison (branch `feat/scenario-comparison`)
 
-Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin (Scenarios & Exchange Rates), covering the Scenario lab for Product Experience.
+Date: 2026-10-12. Tool: Claude Code. Owner: Jiaxin Huang, Scenarios & Exchange Rates, covering the Scenario lab for Product Experience.
 
 Student direction: build the side-by-side view on the merged forecast input, adapter and scenario calculation, make the breakdown add up to the difference by construction and not by rounding, and show what was not applied instead of hiding it (a consequence of Bastian's review of #9).
 
 AI-generated: `compareScenario`, the server composition, the comparison panel, and the unit, integration and browser tests. Design check by the student: the closing balance is the opening balance plus the events dated inside the range, so it is additive across events and one adjustment per event makes the per-adjustment effects sum exactly to the total; the function checks the equality and throws instead of showing a breakdown that does not add up. Found while testing: a first browser test used the wrong locator once an event existed (two Description fields); a final assertion assumed the Cash events date format from another branch and was made independent of it.
 
-Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0 — lint and TypeScript clean, 318 unit tests, 173 integration tests, production build, 32 Chromium tests including WCAG 2.2 AA checks of the comparison in light and dark mode at 375 px.
+Validation (2026-10-12, local, PostgreSQL 16): `npm run verify` exit code 0: lint and TypeScript clean, 318 unit tests, 173 integration tests, production build, 32 Chromium tests including WCAG 2.2 AA checks of the comparison in light and dark mode at 375 px.
 
-Follow-up merge (2026-10-12): Codex incorporated the latest Scenario Lab branch after its saved-ECB-snapshot review change. The comparison code and tests remain in this branch; the merged page now refreshes the FX preview before reading saved shocks and then computes the account comparison. Local `npm run verify` passed with 318 unit, 190 PostgreSQL integration and 36 Chromium tests, plus lint, typecheck and production build, against a fresh dedicated test database.
+Follow-up merge (2026-10-12): Codex incorporated the latest Scenario lab branch (the student made the merge commit) after its saved-ECB-snapshot review change. The comparison code and tests remain in this branch; the merged page now refreshes the FX preview before reading saved shocks and then computes the account comparison. Local `npm run verify` passed with 318 unit, 190 PostgreSQL integration and 36 Chromium tests, plus lint, typecheck and production build, against a fresh dedicated test database.
 
 ## Product experience: exchange-rate display
 
-Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel (Product Experience). Delivered as a patch that the student inspected, tested and committed.
+Date: 2026-10-12. Tool: Claude Code. Owner: Gabriel Piraccini, Product Experience. Delivered as a patch that the student inspected, tested and committed.
 
 Request: while reviewing PR #18 the student ran the Scenario lab with seeded ECB snapshots and saw cross and reciprocal rates printed with about 40 digits ("1 USD = 1.30130803242446573323507737656595431098 SGD"). AI-generated: `formatRate` in `src/lib/format.ts`, its unit tests and the presentation rule in `docs/product-experience.md`. Rates are shown with four decimals, half to even like amounts; the calculation keeps every digit and pages keep the exact value next to the text.
 
@@ -290,7 +292,7 @@ Validation: ESLint and TypeScript clean, all unit tests passed including the new
 
 ## CI runs the data-store tests as the restricted staging role (branch `chore/ci-runtime-role`)
 
-Date: 2026-10-12. Tool: Claude Code (Claude Sonnet 5.5). Owner: Foundation & Security student.
+Date: 2026-10-12. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian Bundschuh, Foundation & Security.
 
 Task given by the student: make CI fail on a missing or too-broad grant by running the data-store integration tests with the application connected as `fse_runtime`, as the student had done by hand for earlier PRs; separate role-setup script, a separate test mode instead of changing the existing one, no weakened guards, and a mutation check.
 
@@ -310,7 +312,7 @@ Validation (2026-10-12, local, rebuilt `portfolio_risk_test` in CI state): `npm 
 
 ## Submission cleanup (branch `chore/submission-cleanup`)
 
-Date: 2026-10-13. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian
+Date: 2026-10-13. Tool: Claude Code (Claude Sonnet 5.5). Owner: Bastian Bundschuh, Foundation & Security.
 
 Task given by the student: prepare the repository for the professor's access without touching `README.md` or `docs/limitations.md` (both are being rewritten in PR #21). The AI did not stage, commit or push.
 
@@ -326,13 +328,13 @@ Validation: npm run verify passed locally on this branch: 313 unit, 196 integrat
 
 ## Comparison in the reporting currency (branch `feat/comparison-reporting-currency`)
 
-Date: 2026-10-13. Tool: Claude Code. Owner: Jiaxin. Follow-up requested by Haina in her approval of #23.
+Date: 2026-10-13. Tool: Claude Code. Owner: Jiaxin Huang, Scenarios & Exchange Rates. Follow-up requested by Haina in her approval of #23.
 
 Found before writing the change: a probe with converted inputs showed that the exact sum check in `compareScenario` throws for real rates such as EUR/SGD 1.4127, because converted amounts carry 40 significant digits and sums round in the last digit. Connecting the comparison to the conversion as it was would have broken the Scenario lab for every Singapore-dollar account. The student chose a documented tolerance (10⁻¹⁰) over rounding converted amounts, to keep #26's rule that amounts are rounded only for display.
 
 AI-generated: the tolerance and `contributionsAddUp`, the comparison through `forecastStoredInReportingCurrency`, the shared `ConversionNote` and `NoRateNotice` (now used by both pages), and the unit and PostgreSQL tests. The overview's notes keep their exact wording, which its browser tests check.
 
-Validation (2026-10-13, local, fresh PostgreSQL 16 database): see the PR description for the numbers of the final run.
+Validation (2026-10-13, local, fresh PostgreSQL 16 database): see the description of PR #30 for the numbers of the final run.
 
 ## Haina Liu — Forecast Engine status reconciliation after PR #26
 
@@ -340,8 +342,8 @@ Validation (2026-10-13, local, fresh PostgreSQL 16 database): see the PR descrip
 - Request: update local `main`, inspect the merged implementation and continue the next independent Forecast Engine task without duplicating open pull requests.
 - AI-assisted work: audited the merged Forecast Engine, input adapter, reporting-currency service and open branches; updated `docs/forecast-engine.md` to record the actual store → adapter → FX conversion → engine → UI boundary and distinguish merged behavior from remaining scope.
 - Scope decision for student review: no multi-account forecast was added. That would require a team rule for combining accounts converted with different rates and effective dates, so it remains explicit future scope rather than an AI assumption.
-- Validation: after fast-forwarding `main` through PR #26, `npm run check` passed ESLint, TypeScript, 325 unit tests and the Next.js production build. The student must inspect this documentation diff and remains responsible for staging, committing, pushing and opening the PR.
-- Follow-up: after PRs #23 and #30 merged, Codex merged the latest `main` into the documentation branch, retained both appended AI usage entries, and updated the Forecast Engine status, reporting-currency comparison, contribution tolerance and date-validation boundary in response to review. The student reviewed PR #30 separately before it merged. `npm run check` then passed ESLint, TypeScript, 341 unit tests and the Next.js production build.
+- Validation: after fast-forwarding `main` through PR #26, `npm run check` passed ESLint, TypeScript, 325 unit tests and the Next.js production build. The student inspected the diff, then staged, committed and opened the PR.
+- Follow-up: after PRs #23 and #30 merged, Codex resolved the conflicts of a merge of the latest `main` into the documentation branch (the student ran and committed the merge), retained both appended AI usage entries, and updated the Forecast Engine status, reporting-currency comparison, contribution tolerance and date-validation boundary in response to review. The student reviewed PR #30 separately before it merged. `npm run check` then passed ESLint, TypeScript, 341 unit tests and the Next.js production build.
 
 ## Product experience: home page after the forecast and Scenario lab merges
 
@@ -349,7 +351,7 @@ Date: 2026-10-16. Tool: Claude Code. Owner: Gabriel Piraccini, Product Experienc
 
 Task given by the student: check what a signed-out visitor sees on the deployed app before the presentation. The AI did not stage, commit or push.
 
-Found: the public home page still labelled the Liquidity overview and the Scenario lab "In development" and said only cash events were available, although both views have been on main since #20, #18 and #23. It is the first page the examiner opens, so it contradicted the demo.
+Found: the public home page still labelled the Liquidity overview and the Scenario lab "In development" and said only cash events were available, although both views had been on main since #20 (overview) and #18 (Scenario lab, comparison added in #23). It is the first page the examiner opens, so it contradicted the demo.
 
 AI-generated: the three view states set to Available, the Scenario lab description and the "Available today" note rewritten to what works today (exchange-rate shocks are previewed and are not part of the comparison), the first principle no longer mentions sections that are not connected, the landing browser test and the home page paragraph in docs/product-experience.md.
 
@@ -357,7 +359,7 @@ Reviewed and changed by the student: I checked each sentence against the Liquidi
 
 ## Jiaxin Huang — presentation feedback log
 
-Date: 2026-10-17. Tool: Claude Code. Owner: Jiaxin Huang.
+Date: 2026-10-17. Tool: Claude Code. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
 
 Task given by the student: record the consultation notes of 13 October and the written assessment of 17 October in `docs/presentation-feedback.md`, with a decision per item and a plan until 28 October.
 
@@ -367,14 +369,13 @@ Reviewed by the student: the wording of each row against the recap and the asses
 
 Follow-up (2026-10-23): AI-drafted `docs/business-metrics.md` (feedback #8) from the engine and comparison code: each measure with its definition, code field and business question, the change in the lowest balance as the primary impact measure, the demo as a worked example. The student checked every definition against `forecast-engine.ts` and `scenario-comparison.ts`, the example numbers against the deployed demo, and added the known gap that per-invoice contributions explain only the closing balance. The owners in the plan table are those agreed in the team chat on 20 October.
 
-
 ## Haina Liu — configurable workspace danger threshold
 
 - Date: 2026-10-26. Tool: OpenAI Codex. Owner: Haina Liu, Forecast Engine.
 - Request: implement the presentation follow-up for the danger threshold while leaving staging, committing, pushing and PR creation to the student.
 - AI-assisted work: added the Workspace form and server action for a fixed threshold in the reporting currency, clearing it back to the engine's computed 50% default; reused the existing session-scoped store and validation; added origin, validation, ownership and browser regression coverage; documented the business rationale and its limitation.
 - Scope decision for student review: 50% remains a zero-setup convention rather than being presented as a universal financial rule. The user sets an absolute amount because that is the existing database and Forecast Input contract; a configurable percentage remains out of scope.
-- Student review: Haina Liu confirmed on 2026-10-26 that she completed her review of the diff. She remains responsible for personally staging, committing, pushing and opening the PR.
+- Student review: Haina Liu confirmed on 2026-10-26 that she completed her review of the diff. She staged, committed and opened PR #37, which was merged.
 - Validation (2026-10-26, local, Node 24 and PostgreSQL 16): ESLint with zero warnings, strict TypeScript, all 344 unit tests and the production build passed; migrations 001–009 applied to a fresh test database; 228 PostgreSQL integration tests passed with one runtime-privilege test intentionally skipped in the ordinary integration step; after installing the required Playwright Chromium binary, all 42 browser tests passed, including the new threshold save/restore flow and the existing WCAG 2.2 AA checks.
 
 ## Repeating cash events (branch `feat/monthly-recurring-events`)
@@ -385,7 +386,7 @@ Decisions made by the student: a repeat creates separate ordinary events instead
 
 AI-generated: `recurringDates` and `recurringDatesUntil`, the repeat schemas, `createCashEvents` (one INSERT over `unnest`, so all occurrences are saved or none, with the same session → workspace → account ownership chain as `createCashEvent`), the Repeat and Ends fields and the success message, the unit and integration tests, and the documentation changes.
 
-Validation: TypeScript and ESLint passed in the AI's environment, and the date functions were checked against month-end, leap-year, quarterly, annual and end-date cases. The student ran `npm run verify` locally before opening the PR (numbers in the PR description).
+Validation: TypeScript and ESLint passed in the AI's environment, and the date functions were checked against month-end, leap-year, quarterly, annual and end-date cases. The student ran `npm run verify` locally before opening the PR (numbers in the description of PR #35).
 
 ## Jiaxin Huang — feature ideas and final feedback status
 
@@ -399,7 +400,7 @@ Reviewed by the student: every "built" row against the merged PR it cites (#9, #
 
 ## Jiaxin Huang — submission guide, Git workflow and deployment update
 
-Date: 2026-10-27. Tool: Claude Code. Owner: Jiaxin Huang.
+Date: 2026-10-27. Tool: Claude Code. Owner: Jiaxin Huang, Scenarios & Exchange Rates.
 
 Task given by the student: prepare the final submission against the course checklist: a guide for the assessor, a written Git workflow, and a `docs/deployment.md` that matches the current deployments.
 

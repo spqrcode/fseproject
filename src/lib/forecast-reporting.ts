@@ -39,8 +39,8 @@ export type ReportingForecast =
     };
 
 // One account's forecast expressed in the reporting currency. Ownership comes from getForecastInput (session token),
-// so another user's account gives null. Rates come from persisted ECB snapshots through the rate service (cached,
-// at most one refresh per hour); STALE is labelled, and without any usable rate the forecast is unavailable
+// so another user's account gives null. Rates come from persisted ECB snapshots through the rate service (a snapshot
+// younger than one hour is used without a network call, otherwise a refresh is attempted); STALE is labelled, and without any usable rate the forecast is unavailable
 // instead of being shown in the wrong currency or with an invented rate.
 export async function getForecastInReportingCurrency(
   token: string | undefined,
