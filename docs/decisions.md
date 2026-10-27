@@ -178,3 +178,11 @@ Tests: unit tests for the bounds, the duplicate and the expired session; integra
 **Alternatives.** Round converted amounts to a fixed scale before the engine runs: exact sums, but it would change #26's rule of rounding only for display. Compare in the account currency and convert the results: the workspace threshold would then be compared in the wrong currency, the problem #26 fixed.
 
 **Verification.** Unit tests with the rates that used to throw (1.4127, 3, 1.123456789) and the tolerance boundary (10⁻¹⁰ accepted, 10⁻⁹, a cent and a missing invoice refused); a PostgreSQL test comparing a dollar account in euro; a test that no comparison is shown without a rate.
+
+## 2026-10-26 — The danger threshold has a zero-setup default and a user-set amount
+
+The 50% default is an onboarding convention, not a claim that every company should hold half its current cash. It gives a new workspace an immediate, deterministic warning without asking the user to choose a policy before seeing a forecast, and it scales with the balance instead of assuming that the same amount fits every account. Its limitation is equally important: it does not know the company's payroll, rent, credit facilities or risk appetite.
+
+The Workspace page therefore lets the user replace that default with a fixed amount in the workspace reporting currency. A fixed amount is easier to relate to a real operating buffer, such as the cash needed for the next payroll and rent. Clearing the field stores `NULL` and restores the computed 50% default; the default itself is never stored. Changing the reporting currency also clears a custom amount atomically and tells the user to set a new one, because silently treating the same number as another currency would be wrong. The warning remains strict: equality is safe and only an end-of-day balance below the amount triggers it. Alternatives were a mandatory amount (rejected because it blocks a first forecast) and a user-set percentage (deferred because the database and existing Forecast Input contract store an amount).
+
+The action derives ownership from the session, verifies the request origin and reuses the existing `dangerThresholdSchema` and `saveDangerThreshold` store. Tests cover validation, ownership, origin checking, saving and restoring the default, plus the browser form.

@@ -150,7 +150,7 @@ button:disabled { opacity: .6; cursor: progress; }
 .field input:focus-visible, .field select:focus-visible { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--focus-ring); }
 .field input::placeholder { color: var(--placeholder); }
 .field small { color: var(--muted); font-size: 12.5px; }
-.workspace-form .button, .currency-form .button { justify-self: start; }
+.workspace-form .button, .currency-form .button, .danger-threshold-form .button { justify-self: start; }
 .notice { margin: 0; padding: 12px 14px; border-left: 3px solid; font-size: 14px; }
 .notice.error { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
 .notice.success { border-color: var(--ready); background: var(--ready-bg); color: var(--ready); }

@@ -2,10 +2,10 @@ import { beforeAll, beforeEach, afterEach, afterAll, describe, it, expect, vi } 
 import { randomUUID } from "node:crypto";
 import { database } from "@/lib/db";
 import { createSession, findSession, revokeSession, tokenHash } from "@/lib/session-store";
-import { saveWorkspace, getWorkspace } from "@/lib/workspace-store";
+import { getDangerThreshold, saveDangerThreshold, saveWorkspace, getWorkspace } from "@/lib/workspace-store";
 import { allowAuthAttempt, authLimitKey, recordFailedAuth } from "@/lib/rate-limit";
 import { register, login, logout } from "@/app/actions/auth";
-import { updateWorkspace } from "@/app/actions/workspace";
+import { updateDangerThreshold, updateWorkspace } from "@/app/actions/workspace";
 import { requireUser, SESSION_COOKIE } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 
@@ -170,17 +170,46 @@ describe("server actions with a real database", () => {
     expect((await login({}, credentials(emails[0]))).error).toBeTruthy();
     expect(query).not.toHaveBeenCalled();
   });
-  it.each([null, "https://untrusted.example"])("rejects missing or foreign origin for logout and updateWorkspace without changing data: %s", async origin => {
+  it.each([null, "https://untrusted.example"])("rejects missing or foreign origin for logout and workspace updates without changing data: %s", async origin => {
     await saveWorkspace(alice, "Original name");
+    await saveDangerThreshold(alice, "100");
     request.cookies.set(SESSION_COOKIE, alice);
     request.origin = origin;
     const form = new FormData();
     form.set("name", "Changed by forged request");
+    const threshold = new FormData();
+    threshold.set("dangerThreshold", "999");
     expect((await logout()).error).toBeTruthy();
     expect((await updateWorkspace({}, form)).error).toBeTruthy();
+    expect((await updateDangerThreshold({}, threshold)).error).toBeTruthy();
     expect((await getWorkspace(alice))?.name).toBe("Original name");
+    expect(await getDangerThreshold(alice)).toEqual({ dangerThreshold: "100.00" });
     expect(await findSession(alice)).toEqual({ id: ids[0], email: emails[0] });
     expect(request.cookies.get(SESSION_COOKIE)).toBe(alice);
+  });
+  it("sets and clears the signed-in workspace danger threshold through the server action", async () => {
+    await saveWorkspace(alice, "Threshold workspace");
+    request.cookies.set(SESSION_COOKIE, alice);
+    const form = new FormData();
+    form.set("dangerThreshold", "750.5");
+    expect(await updateDangerThreshold({}, form)).toEqual({ success: "Danger threshold saved." });
+    expect(await getDangerThreshold(alice)).toEqual({ dangerThreshold: "750.50" });
+    expect(await getDangerThreshold(bob)).toBeNull();
+
+    form.set("dangerThreshold", "1.234");
+    expect((await updateDangerThreshold({}, form)).error).toContain("at most 2 decimals");
+    expect(await getDangerThreshold(alice)).toEqual({ dangerThreshold: "750.50" });
+
+    form.set("dangerThreshold", "");
+    expect(await updateDangerThreshold({}, form)).toEqual({ success: "Default danger threshold restored." });
+    expect(await getDangerThreshold(alice)).toEqual({ dangerThreshold: null });
+  });
+  it("does not create a workspace implicitly when saving a danger threshold", async () => {
+    request.cookies.set(SESSION_COOKIE, alice);
+    const form = new FormData();
+    form.set("dangerThreshold", "100");
+    expect(await updateDangerThreshold({}, form)).toEqual({ error: "Create your workspace before setting a danger threshold." });
+    expect(await getWorkspace(alice)).toBeNull();
   });
   it("returns the same response for wrong passwords and unknown accounts", async () => {
     expect(await login({}, credentials(emails[0], "a wrong long password"))).toEqual(await login({}, credentials(uniqueEmail(), "a wrong long password")));

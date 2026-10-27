@@ -10,10 +10,12 @@ export async function updateReportingCurrency(_state: FormState, form: FormData)
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   try {
     await verifyOrigin();
-    await saveReportingCurrency(await sessionToken(), parsed.data);
+    const thresholdCleared = await saveReportingCurrency(await sessionToken(), parsed.data);
+    revalidatePath("/", "layout");
+    return { success: thresholdCleared
+      ? "Reporting currency saved. Set a new danger threshold for this currency."
+      : "Reporting currency saved." };
   } catch { return { error: "Unable to save your settings. Please try again." }; }
-  revalidatePath("/", "layout");
-  return { success: "Reporting currency saved." };
 }
 export async function updateAppearance(_state: FormState, form: FormData): Promise<FormState> {
   await requireUser();
