@@ -56,6 +56,18 @@ test("US-01: registration, login, workspace persistence, logout and replay rejec
   await expect(page.getByRole("status")).toHaveText("Workspace saved.");
   await page.reload();
   await expect(page.getByLabel("Workspace name")).toHaveValue("Long-term savings");
+  const threshold = page.getByLabel("Danger threshold (EUR)");
+  await expect(threshold).toHaveValue("");
+  await threshold.fill("750.50");
+  await page.getByRole("button", { name: "Save threshold", exact: true }).click();
+  await expect(page.getByText("Danger threshold saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Danger threshold (EUR)")).toHaveValue("750.50");
+  await page.getByLabel("Danger threshold (EUR)").fill("");
+  await page.getByRole("button", { name: "Save threshold", exact: true }).click();
+  await expect(page.getByText("Default danger threshold restored.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Danger threshold (EUR)")).toHaveValue("");
   const anonymous = await browser.newContext();
   try {
     const other = await anonymous.newPage();
