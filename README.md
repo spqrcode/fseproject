@@ -2,6 +2,8 @@
 
 Multi-currency cash-flow and liquidity scenario tool for the Financial Software Engineering course at Frankfurt School.
 
+**Assessing the final submission?** Start with [SUBMISSION.md](SUBMISSION.md): the deployed app, the review history, where each required topic is documented, and the latest test results.
+
 ## Current scope
 
 The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. The foundation also has a server-only ECB exchange-rate provider with a validated PostgreSQL snapshot cache for EUR, USD and SGD, the deterministic Forecast Engine, forecast input for one account, and the data layer for delayed-invoice scenarios and percentage FX shocks. The Scenario Lab page uses them: it delays invoices, compares base and scenario in the reporting currency, and previews and saves ECB exchange-rate shocks. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
@@ -10,7 +12,7 @@ The interface is branded FinTwin Global. Signed-out visitors see a public home p
 
 ## Deployed application and demo access
 
-- **URL:** https://fseproject-staging.vercel.app (staging, a Vercel deployment of this repository with a managed PostgreSQL database in Frankfurt). How it is built, configured and promoted is in [deployment](docs/deployment.md). The staging address points at the deployment someone assigned to it, so it can lag `main`; the status table below says what is expected to be live.
+- **URL:** https://fseproject-staging.vercel.app, with a backup of the same code at https://fintwin-global.vercel.app (staging, a Vercel deployment of this repository with a managed PostgreSQL database in Frankfurt). How it is built, configured and promoted is in [deployment](docs/deployment.md). The staging address points at the deployment someone assigned to it, so it can lag `main`; the status table below says what is expected to be live.
 - **Demo access:** there is no shared demo account and no credentials are committed. Open `/register`, create an account with any address and a 15–128 character passphrase (no email is sent and the address is not verified), and sign in. Use a throwaway address and a passphrase you do not use elsewhere.
 - **Suggested check in a private window:** `/dashboard` redirects to `/login` when signed out; register, sign in, name a workspace, change the reporting currency and appearance in settings, sign out, sign in again and confirm everything persisted; open another browser and confirm the second account sees none of it.
 

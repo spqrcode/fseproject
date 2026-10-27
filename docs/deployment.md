@@ -1,10 +1,20 @@
 # Deployment
 
-Repository: https://github.com/spqrcode/fseproject. Application work stays on `feat/auth-foundation` and reaches main only through a reviewed PR.
+Repository: https://github.com/spqrcode/fseproject (public). Every change reaches `main` through a reviewed pull request with a passing `verify` check; see [Git workflow](git-workflow.md).
+
+## Current deployments (27 October 2026)
+
+| Deployment | URL | Built from | Database | Purpose |
+| --- | --- | --- | --- | --- |
+| Staging (canonical) | https://fseproject-staging.vercel.app | `main` of `spqrcode/fseproject`, Vercel project `fseproject`, Preview environment | Neon `fseproject-staging`, Frankfurt, migrations 001–009 | The address for the assessment and the presentation |
+| Backup | https://fintwin-global.vercel.app | `main` of the mirror `JiaxinHuang77/fseproject` (the same commits), Vercel project `fintwin-global`, Production environment | A separate Neon project, Frankfurt, migrations 001–009 | Fallback if staging is unavailable; holds the presentation's demo data |
+| Production domain of the Vercel project `fseproject` | https://fseproject.vercel.app | `main` | None configured | Not used: without a database only the public pages work. Do not hand it out |
+
+Both deployments that are used connect as the restricted role `fse_runtime` described below. The database owner is used only for migrations.
 
 ## Staging configuration
 
-Existing Vercel project: `fseproject`, project ID `prj_kDOrGWxd4htfHHHHTVbUtuQVXa1v`, linked to that exact GitHub repository. Node 24.x matches `.nvmrc` and `package.json`. Staging is a Preview deployment; production promotion is not part of Issue 1.
+Vercel project `fseproject`, project ID `prj_kDOrGWxd4htfHHHHTVbUtuQVXa1v`, linked to that exact GitHub repository. Node 24.x matches `.nvmrc` and `package.json`. Staging is a Preview deployment of `main` with its own environment variables; after each merge the staging alias is moved to the newest build of `main`.
 
 PostgreSQL: dedicated Neon resource `fseproject-staging`, free_v3 plan, Frankfurt, managed authentication disabled. The service provisioned PostgreSQL 18.6; local/CI PostgreSQL is 16.15/16. The SQL uses features common to both. Staging migrations were applied successfully. Certificate-verified TLS was checked on the actual client connection; backend `pg_stat_ssl` is not evidence of client TLS when a provider proxy terminates it.
 
@@ -39,15 +49,24 @@ Preview variables: `DATABASE_URL` (restricted runtime connection, sensitive), `A
 
 The staging sign-in page is public, as requested. Application authentication still protects private pages and data. Vercel's additional login wall is disabled only for this school project.
 
-Main branch protection and a student review are still required. GitHub/Vercel integration can build previews before CI finishes; preview availability alone is not approval for production. Do not promote until the PR checks and human review pass. Application rollback does not roll back database migrations.
+`main` is protected: a change needs a pull request, one approval from another member and a passing `verify` check. The GitHub/Vercel integration can build previews before CI finishes; preview availability alone is not approval. Application rollback does not roll back database migrations.
 
 ## Migration 005 is not backward-compatible
 
 Migration `005_workspace_cash_events.sql` renames the table `portfolios` to `workspaces`. Code from before this change reads and writes `portfolios`; code from this change uses `workspaces`. On staging and production, run the migration immediately before (or together with) deploying this code. Between the two steps either the old or the new code will fail on every workspace query (sign-in is unaffected). Run it with the owner connection as in step 3 above, then deploy straight away. Rolling back the application does not roll back the migration; rolling back needs `ALTER TABLE workspaces RENAME TO portfolios` by the owner (the new tables and `danger_threshold` can stay).
 
-## Production
+## Production domain
 
-The project has no working production deployment. The only production-target build is an errored one from the documentation-only commit made before any application code existed. Production comes with the merge to `main` plus production-target environment variables and its own database; that is deliberately outside Issue 1, which asked for staging.
+The Vercel project's production domain (https://fseproject.vercel.app) builds `main` but has no database variables, so sign-in and every private page fail there. It is not used; staging is the canonical deployment. Giving it a database would mean a second set of production-target variables and its own migrated database, which the assessment does not need.
+
+## Backup deployment
+
+The backup at https://fintwin-global.vercel.app was set up on 16 October 2026, when the staging deployment was briefly blocked, so the presentation would not depend on a single account.
+
+- Source: a private mirror, `JiaxinHuang77/fseproject`, of this repository. It receives the same commits: `git fetch origin && git push mirror origin/main:main`. It adds no code of its own.
+- Build: Vercel builds from the mirror on GitHub, never from a working folder. On the Hobby plan, Vercel blocks Git-triggered builds of commits whose author is not the account owner, so after a sync the production build of `main` is requested through the Vercel API with the same GitHub commit as its source.
+- Database: a separate Neon project in Frankfurt. The role `fse_runtime` was created first with a generated password, then the owner applied migrations 001–009 and the base grants, in the same order as `scripts/ci-runtime-role.mjs` and CI. The application's `DATABASE_URL` is the pooled `fse_runtime` connection, stored only as a sensitive Vercel variable; `APP_ORIGIN` is `https://fintwin-global.vercel.app`.
+- Demo data: seeded with `npm run demo:seed` for an account registered in the browser.
 
 ## Preview deployments blocked by commit author
 

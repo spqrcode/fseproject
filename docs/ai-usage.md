@@ -386,3 +386,13 @@ Decisions made by the student: a repeat creates separate ordinary events instead
 AI-generated: `recurringDates` and `recurringDatesUntil`, the repeat schemas, `createCashEvents` (one INSERT over `unnest`, so all occurrences are saved or none, with the same session → workspace → account ownership chain as `createCashEvent`), the Repeat and Ends fields and the success message, the unit and integration tests, and the documentation changes.
 
 Validation: TypeScript and ESLint passed in the AI's environment, and the date functions were checked against month-end, leap-year, quarterly, annual and end-date cases. The student ran `npm run verify` locally before opening the PR (numbers in the PR description).
+
+## Jiaxin Huang — submission guide, Git workflow and deployment update
+
+Date: 2026-10-27. Tool: Claude Code. Owner: Jiaxin Huang.
+
+Task given by the student: prepare the final submission against the course checklist: a guide for the assessor, a written Git workflow, and a `docs/deployment.md` that matches the current deployments.
+
+AI-generated: `SUBMISSION.md`, `docs/git-workflow.md`, the current-deployments table and the backup and production-domain sections of `docs/deployment.md`, and the README pointer. The pull-request and review counts and the test numbers were read from GitHub and from CI run 40478418295.
+
+Reviewed by the student: the deployment facts against both Vercel projects and the team chat of 16 October, the workflow against the CI file and the protected `main`, and every PR number in the feature walkthrough. Documentation only; no code or test changed.
