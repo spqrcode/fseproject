@@ -22,13 +22,15 @@ All measures are computed per account, in the workspace's reporting currency, fr
 | Balance at the end of the horizon | End-of-day balance on the last date | `closingBalance` | Where do we end up? |
 | Danger threshold | The minimum cash the company wants to keep: an amount set for the workspace, or by default 50% of today's balance | `dangerThresholdAmount`, `dangerThresholdPercent` | What is "too little cash" for us? |
 | First day below the threshold | The first date whose end-of-day balance is strictly below the threshold | `firstDangerDate` | When do we have to act? |
-| Runway | Calendar days from today to the first day below the threshold; shown as "N+ days" when that does not happen within the horizon | `runwayDays` | How much time do we have? |
+| Runway | Calendar days from today to the first day below the threshold; when that does not happen within the horizon, shown as "N+ days" on the overview and "Not reached in N days" in the Scenario lab | `runwayDays` | How much time do we have? |
+
+"Opening balance of the account" in the first row is the balance entered when the account was created. Everywhere else, "opening balance" means the forecast's starting balance, the balance today (`openingBalance`).
 
 **Why the lowest balance leads, not the closing balance.** Small-company cash flow is lumpy: payroll and rent leave on fixed dates, invoices arrive late. A forecast can end higher than it started and still dip below a safe level in between. The closing balance hides that dip; the lowest balance and the first day below the threshold show it. That is why the overview shows the lowest balance right after today's balance, and the closing balance after it.
 
 **Why our runway is event-based.** The common startup definition is cash divided by monthly burn rate. It assumes spending is steady. Our users' spending is not, so we count the days until the projected balance actually falls below the threshold, using the dated events themselves. The trade-off: the result depends on the events being entered; an event that is missing from the plan is missing from the runway.
 
-**The threshold.** The 50% default is an onboarding convention: it gives a new workspace an immediate warning without asking for a policy first. The user can replace it on the Workspace page with a fixed amount in the reporting currency, for example the cash needed for the next payroll and rent (PR #37; see [decisions](decisions.md) of 26 October). Every measure above uses whichever threshold applies, and the overview says which one it is.
+**The threshold.** The 50% default is an onboarding convention: it gives a new workspace an immediate warning without asking for a policy first. The user can replace it on the Workspace page with a fixed amount in the reporting currency, for example the cash needed for the next payroll and rent (PR #37; see [decisions](decisions.md#2026-10-26--the-danger-threshold-has-a-zero-setup-default-and-a-user-set-amount) of 26 October). Every measure above uses whichever threshold applies, and the overview says which one it is.
 
 ## How the impact of a scenario is measured
 
@@ -60,7 +62,7 @@ The example also shows why the lowest balance, not the closing balance, is the p
 
 - **Contributions explain the closing balance only.** A delay that stays inside the horizon contributes €0, even when it causes a breach, as in the example above. The timing effect is visible for the scenario as a whole (lowest balance, first day below the threshold, runway) but is not yet split per invoice. Splitting the change in the lowest balance per invoice is possible, but when two delays interact the split depends on the order in which they are applied, so it needs an agreed attribution rule first.
 - **One account at a time.** There is no combined measure across accounts; combining accounts converted at different rates needs an agreed rule (see [limitations](limitations.md)).
-- **FX shocks are previewed, not measured.** A shocked rate is shown next to the ECB rate, but its effect on the lowest balance and the runway is not computed yet.
+- **FX shocks are previewed and saved, not measured.** A shocked rate is shown next to its ECB snapshot, but its effect on the lowest balance and the runway is not computed yet.
 - **Inputs, not predictions.** Every measure is only as complete as the events entered; nothing is estimated or extrapolated.
 
 ## How the measures are verified

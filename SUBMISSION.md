@@ -9,7 +9,7 @@ This page points to everything the final submission asks for. Each line links to
 - **Application:** https://fseproject-staging.vercel.app. Backup with the same code: https://fintwin-global.vercel.app.
 - **Access:** open `/register` and create an account with any address and a 15–128 character passphrase. No email is sent, and there is no shared account.
 - **What to try:** a new account starts empty.
-  1. On **Cash events**, add an account and a few dated income and expense events. "Repeat monthly" is the quickest way to add payroll or rent.
+  1. On **Cash events**, add an account and a few dated income and expense events. Setting **Repeat** to Monthly is the quickest way to add payroll or rent.
   2. Open the **Liquidity overview** to see the forecast.
   3. In the **Scenario lab**, delay an invoice and compare the scenario with the base.
   4. Set your own danger threshold on the **Workspace** page.
@@ -18,7 +18,7 @@ This page points to everything the final submission asks for. Each line links to
 ## Code and collaboration
 
 - **Repository:** https://github.com/spqrcode/fseproject
-- **Merged pull requests with their reviews:** https://github.com/spqrcode/fseproject/pulls?q=is%3Apr+is%3Amerged. As of 27 October there are 30 merged pull requests and 94 reviews. Every member authored pull requests and reviewed the others' work.
+- **Merged pull requests with their reviews:** https://github.com/spqrcode/fseproject/pulls?q=is%3Apr+is%3Amerged. As of 27 October there are 32 merged pull requests. Every member authored pull requests and reviewed the others' work.
 - **CI runs:** https://github.com/spqrcode/fseproject/actions
 - **How we work:** [Git workflow](docs/git-workflow.md). `main` is protected: a pull request, one approval and a passing `verify` check.
 
@@ -46,13 +46,13 @@ This page points to everything the final submission asks for. Each line links to
 | Agentic AI usage and relevant AI interactions | [AI usage](docs/ai-usage.md), agent rules in [CLAUDE.md](CLAUDE.md) |
 | Engineering decisions and their rationale | [decisions](docs/decisions.md) |
 | Known limitations and feature ideas | [limitations](docs/limitations.md) |
-| Reflection: what would change for a real financial institution | [limitations](docs/limitations.md), "Reflection" |
+| Reflection: what would change for a real financial institution | [limitations](docs/limitations.md#reflection-what-must-change-before-real-financial-use), "Reflection" |
 | Feedback from the presentation | [presentation feedback](docs/presentation-feedback.md), with a decision and evidence per item |
 | Business view: how liquidity and user impact are measured | [business metrics](docs/business-metrics.md) |
 
 ## Test evidence
 
-The last CI run on `main` before this guide was [run 40478418295](https://github.com/spqrcode/fseproject/actions/runs/40478418295) on commit `54694f7`. It passed:
+The CI run on `main` after the last code change was [run 40478418295](https://github.com/spqrcode/fseproject/actions/runs/40478418295) on commit `54694f7`; later merges changed documentation only. It passed:
 
 - ESLint with zero warnings, strict TypeScript, and a production build.
 - 378 unit tests.
@@ -74,6 +74,6 @@ Run everything locally with `npm run verify` (setup in the [README](README.md)).
    - the Repeat fields in the cash-event form
 5. **Tests.**
    - Unit tests for month ends, 29 February, year changes and the 60-occurrence limit.
-   - Integration tests for ownership, invalid input and expired sessions.
+   - Integration tests for ownership, invalid input and anonymous or unknown sessions.
 6. **Review and CI.** Haina reviewed and approved it. Its first CI run exposed an order-dependent demo-seed test, which was fixed separately in PR #36. #35's CI then passed.
-7. **Deployment.** The merge `ff36bbc` reached `main`. The backup deployment was rebuilt from `main` on 27 October (`54694f7`), and staging is moved to the newest build of `main` after each merge (see [deployment](docs/deployment.md)).
+7. **Deployment.** The merge `ff36bbc` reached `main`. The backup deployment is rebuilt from `main` after a mirror sync, and staging is moved to the newest build of `main` after each merge (see [deployment](docs/deployment.md)).

@@ -14,7 +14,7 @@ npm run check              # lint (no warnings), typecheck, unit tests, build
 npm run db:migrate         # applies db/migrations to DATABASE_URL
 npm run test:integration   # needs TEST_DATABASE_URL ending in _test
 npm run test:e2e           # Playwright on port 3100, needs TEST_DATABASE_URL
-npm run verify             # everything above, what CI runs
+npm run verify             # check, test migrations, integration, E2E; CI also runs integration as fse_runtime
 ```
 
 Node 24 (`.nvmrc`), PostgreSQL 16. Copy `.env.example` to `.env.local` for your own local database. Never point tests at a database whose name does not end in `_test`.

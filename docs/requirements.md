@@ -2,9 +2,9 @@
 
 What each number on the screen means for the user, and how the impact of a scenario is measured, is defined in [business metrics](business-metrics.md).
 
-Status: the stories below are implemented as the traceability table at the end of this document states; stories that belonged to the earlier portfolio dashboard are recorded under "Earlier scope (replaced)".
+Status: all stories below are implemented; the traceability table at the end shows where. Stories of the earlier portfolio dashboard are listed under "Earlier scope (replaced)".
 
-## US-01 — Account and session
+## US-01 Account and session
 
 As a visitor, I can register, log in, and log out so that I can securely access my data.
 
@@ -14,7 +14,7 @@ Acceptance criteria:
 - Protected pages and server operations reject unauthenticated or expired sessions.
 - Logout removes the current session and protected navigation requires login again.
 
-## US-02 — Workspace
+## US-02 Workspace
 
 As a signed-in user, I can create, view and rename my own workspace, the container for my cash accounts, cash events and scenarios.
 
@@ -27,7 +27,7 @@ Acceptance criteria:
 
 ## Earlier scope (replaced)
 
-US-03 (Holdings), US-04 (Quotes), US-05 (Valuation) and US-06 (Allocation and P/L contribution) described the portfolio dashboard that FinTwin Global replaced after the group consultation. They were removed as stories, no holdings, quotes or valuations exist in the code, and the numbers US-03 to US-06 are not reused.
+US-03 (Holdings), US-04 (Quotes), US-05 (Valuation) and US-06 (Allocation and P/L contribution) described the portfolio dashboard that FinTwin Global replaced after the group consultation. They were removed as stories. No holdings, quotes or valuations exist in the code, and the numbers US-03 to US-06 are not reused.
 
 ## US-07 — Ownership isolation
 
@@ -37,15 +37,23 @@ Acceptance criteria:
 - Server-side data access starts at an unexpired session and reaches rows through the session's user and workspace; no user, workspace or ownership id is taken from input, and unknown keys such as a submitted `workspaceId` are ignored. The database is not exposed to browser clients.
 - Another user's id and a non-existent id give the same result, and a malformed id is treated like a missing one, without a distinguishable database error.
 - Anonymous, unknown and expired sessions can neither read nor change data.
-- PostgreSQL refuses cross-workspace references even if the application check is bypassed: composite foreign keys tie an event to an account of its own workspace, and an adjustment or FX shock to a scenario of its own workspace, and an adjustment to an event of its own workspace.
-- Deleting a user removes their workspace, accounts, events, scenarios and adjustments.
+- PostgreSQL refuses cross-workspace references even if the application check is bypassed: composite foreign keys tie an event to an account, and an adjustment or FX shock to a scenario, of the same workspace; an adjustment's event must also be in that workspace.
+- Deleting a user removes their workspace, accounts, events, scenarios, adjustments and FX shocks.
 - Automated tests use two users and unauthenticated or expired clients to attempt unauthorized operations on each of these data sets; the cash-event and forecast-input tests can also be run with the application connected as the restricted staging role (see [testing](testing.md)).
 
 ## US-08 Reporting currency and navigation (FinTwin Global)
 
 As a signed-in user, I can move between the FinTwin Global sections and choose the currency in which my figures are reported. Acceptance criteria and implementation are in [product experience](product-experience.md#us-08-reporting-currency).
 
-Supported reporting currencies: EUR, USD and SGD, agreed at the team meeting on 2 October 2026. SGD is kept for the APAC use case in the proposal and is dropped only if its exchange rates cause problems. All three are published as ECB euro reference rates, so the FX source can supply EUR/USD and EUR/SGD directly and USD/SGD in both directions through the euro. The Forecast Engine and Scenarios & FX build against this list. To change it, edit this line, `REPORTING_CURRENCIES` in `src/lib/currency.ts` and the forecast currency list; no migration is needed, because the database only checks the three-letter shape.
+Supported reporting currencies: EUR, USD and SGD, agreed at the team meeting on 2 October 2026. SGD is kept for the APAC use case in the proposal. All three are published as ECB euro reference rates, so the FX source can supply EUR/USD and EUR/SGD directly and USD/SGD in both directions through the euro. The Forecast Engine and Scenarios & FX build against this list. To change it, edit this line, `REPORTING_CURRENCIES` in `src/lib/currency.ts` and the forecast currency list; no migration is needed, because the database only checks the three-letter shape.
+
+## US-09 Active sessions
+
+As a signed-in user, I can see my active sessions and sign out of the others. Acceptance criteria and implementation are in [product experience](product-experience.md#us-09-active-sessions).
+
+## US-10 Appearance
+
+As a signed-in user, I can choose a light, dark or device-following appearance. Acceptance criteria and implementation are in [product experience](product-experience.md#us-10-appearance).
 
 ## US-11 Cash accounts and cash events (data layer)
 
@@ -83,7 +91,7 @@ As a signed-in user, I can use EUR, USD and SGD exchange rates with visible sour
 - With no usable snapshot, the result is UNAVAILABLE with a null rate and an explicit failure code; zero and hard-coded fallback numbers are forbidden. Failure messages exposed to the UI are fixed safe text rather than raw network, proxy or database details.
 - Existing snapshot ids are immutable. A corrected ECB rate for the same effective date receives a new id, while an identical repeat updates only its fetch time.
 - A cross-rate uses two ECB legs from the same effective date. Different dates return UNAVAILABLE instead of a mixed-date number.
-- Results include provider, source snapshot IDs, effective date and fetch timestamp for the Scenario Lab.
+- Results include provider, source snapshot IDs, effective date and fetch timestamp for the Scenario lab.
 
 ## US-14 Percentage-based FX shocks
 
@@ -110,7 +118,7 @@ As a signed-in user, I can apply a percentage shock to a resolved EUR, USD or SG
 
 | Requirement | Implementation | Verification | Delivery |
 | --- | --- | --- | --- |
-| US-01 registration, login, logout | `src/app/actions/auth.ts`, password/session modules | Unit security tests; integration server-action tests; all four E2E scenarios | `feat/auth-foundation`; staging record in deployment document |
+| US-01 registration, login, logout | `src/app/actions/auth.ts`, password/session modules | Unit security tests; integration server-action tests; the four tests in `tests/e2e/auth.spec.ts` | `feat/auth-foundation`; staging record in deployment document |
 | US-01 session expiration/revocation | Session SQL and protected page/action checks | Integration expiry/replay; browser expiry, logout replay, expired open form | Same branch and deployment |
 | US-07 ownership isolation | `src/lib/workspace-store.ts`, `src/lib/cash-events-store.ts`, `src/lib/forecast-input-store.ts`, `src/lib/scenario-store.ts`, `src/lib/fx/shock-store.ts`, `requireUser`, composite foreign keys in migrations 005, 007 and 008 | Real-database two-user, anonymous, expired, forged-owner and malformed-id tests in `ownership`, `cash-events`, `cash-event-actions`, `forecast-input`, `liquidity-forecast`, `scenario` and `fx-shock`; cross-workspace insert refused by the database with application checks bypassed; the cash-event and forecast tests were also run as the staging role | Foundation & Security branches, extended by each feature branch |
 | Reproducible automated checks | `scripts/test.mjs`, `.github/workflows/ci.yml` | Migration rerun; full `npm run verify` | GitHub PR CI |
@@ -118,13 +126,14 @@ As a signed-in user, I can apply a percentage shock to a resolved EUR, USD or SG
 | US-08 public home page | `src/app/page.tsx` | Playwright content, links, signed-in redirect and phone-width tests | Product experience branch |
 | US-10 appearance | Migration 004, `src/lib/preferences-store.ts`, `updateAppearance`, `src/components/appearance-form.tsx`, dark palette | Unit choice validation; integration ownership, origin, expiry and constraint tests; Playwright device-following, saved dark and light overrides and persistence | Product experience branch |
 | US-09 active sessions | `src/lib/account-sessions.ts`, `src/app/actions/account.ts`, settings page | Integration own-sessions listing, other-user isolation, expired caller, origin and redirect tests; Playwright two-browser sign-out test | Product experience branch |
-| US-08 navigation and states | `src/components/navigation.tsx`, `(protected)` loading, error, forecast, scenarios and settings pages | Playwright navigation, signed-out redirects, keyboard and phone-width tests | Product experience branch |
+| US-08 navigation and states | `src/components/navigation.tsx`, `(protected)` loading and error states and the dashboard, cash-events, scenarios, workspace and settings pages | Playwright navigation, signed-out redirects, keyboard and phone-width tests | Product experience branch |
 | US-11 cash accounts and events | Migration 005, `src/lib/cash-events-store.ts`, `src/lib/workspace-store.ts`, cash schemas in `src/lib/validation.ts` | Integration constraints by direct SQL, two-user ownership matrix, anonymous/unknown/expired sessions, malformed ids, status transitions, cascade, and a run as the staging role; unit amount and date validation | Foundation & Security branch; the Cash events page (`/cash-events`) is built on it |
-| US-11 repeating events | `src/lib/recurring-dates.ts`, `repeatFrequencySchema`, `repeatEndSchema` and `repeatDatesSchema` in `src/lib/validation.ts`, `createCashEvents` in `src/lib/cash-events-store.ts` (one `INSERT` over `unnest`), `addCashEvent`, the Repeat and Ends fields in `src/components/cash-event-form.tsx` | Unit: monthly, quarterly and annual dates, month ends and 29 February, year change, end date inclusive, the 60-occurrence limit, accepted and rejected frequencies and ends; integration: one row per date in order, per-occurrence status, another user's or a missing account saves nothing, invalid input, anonymous and unknown sessions, and the server action's messages for every refused input | Foundation & Security branch `feat/monthly-recurring-events` |
+| US-11 repeating events | `src/lib/recurring-dates.ts`, `repeatFrequencySchema`, `repeatEndSchema` and `repeatDatesSchema` in `src/lib/validation.ts`, `createCashEvents` in `src/lib/cash-events-store.ts` (one `INSERT` over `unnest`), `addCashEvent`, the Repeat and Ends fields in `src/components/cash-event-form.tsx` | Unit: monthly, quarterly and annual dates, month ends and 29 February, year change, end date inclusive, the 60-occurrence limit, accepted and rejected frequencies and ends; integration: one row per date in order, per-occurrence status, another user's or a missing account saves nothing, invalid input, anonymous and unknown sessions, and the server action's messages for every refused input | Foundation & Security, PR #35 |
+| US-11 danger threshold | `getDangerThreshold` and `saveDangerThreshold` in `src/lib/workspace-store.ts`, `updateDangerThreshold` in `src/app/actions/workspace.ts`, `src/components/danger-threshold-form.tsx`, the threshold reset in `src/lib/preferences-store.ts` | Integration in `ownership`, `preferences` and `forecast-input`; Playwright persistence and restoring the default in `auth.spec.ts` | Forecast Engine, PR #37 |
 | US-11 settled events immutable | `updateCashEvent` and `deleteCashEvent` in `src/lib/cash-events-store.ts` (status condition in the `WHERE` clause) | Integration: editing and deleting received, paid and cancelled events refused with the row unchanged; expected events still work; another user's settled event gives the same null as a missing one | Foundation & Security branch (review feedback on PR #10) |
 | US-11 forecast input (decisions of 2026-10-08, implemented 2026-10-10) | `src/lib/forecast-input-store.ts` (starting balance, overdue events, threshold), `toForecastInput` in `src/lib/forecast/input-adapter.ts` (status mapping), date rule in `setCashEventStatus`; see [decisions](decisions.md#2026-10-10--forecast-input-implemented-a-settled-events-date-is-the-date-the-money-moved) | Integration: starting balance with events before, on and after the start date (on or before counts), cancelled and other accounts and users ignored, early-settled event in the balance, overdue events, ranges, ownership matrix; unit: range and the adapter (`input-adapter.test.ts`); also run as the staging role | Foundation & Security branch `feat/forecast-input`. The Liquidity overview (`src/lib/liquidity-forecast.ts`) calls the store, `toForecastInput` and the engine |
 | US-12 delayed-invoice scenarios | Migration 007, `src/lib/scenario-store.ts`, immutable scenario projection in `src/lib/forecast/scenario.ts` | Unit immutability and delta tests; PostgreSQL ownership, composite-FK, eligibility, date-only, cascade and base-forecast isolation tests | PR #9; aligned to the merged PR #12 engine; adjustments that cannot apply are skipped and reported (decision of 2026-10-12) |
-| US-12 base versus scenario comparison | `src/lib/forecast/scenario-comparison.ts` (`compareScenario`), `src/lib/scenario-comparison.ts`, the Scenario lab page | Unit: contributions add up to the closing-balance difference, skipped adjustments, purity, overdue events; PostgreSQL: one account's comparison, isolation, ownership; browser: side by side, effects add up, WCAG, 375 px | PR on top of the Scenario lab; delayed invoices only, exchange-rate shocks are not part of the comparison yet |
+| US-12 base versus scenario comparison | `src/lib/forecast/scenario-comparison.ts` (`compareScenario`), `src/lib/scenario-comparison.ts`, the Scenario lab page | Unit: contributions add up to the closing-balance difference, skipped adjustments, purity, overdue events; PostgreSQL: one account's comparison, isolation, ownership; browser: side by side, effects add up, WCAG, 375 px | PRs #23 and #30 (reporting currency); delayed invoices only, exchange-rate shocks are not part of the comparison |
 | US-13 reliable ECB exchange rates | Migration 006 and `src/lib/fx/*` | Parser/provider/cache unit tests; PostgreSQL constraints, atomic persistence, stale fallback and restricted-role integration tests | Scenarios & Exchange Rates Phase 2 branch; the Scenario lab reads the rates |
 | US-14 percentage-based FX shocks | Migration 008, `src/lib/fx/fx-shock.ts`, `src/lib/fx/shock-store.ts` | Decimal shock/result-contract unit tests; PostgreSQL constraint, provenance, invalidation, malformed-id and cross-workspace tests | Scenarios & Exchange Rates Phase 3 branch; the Scenario lab saves and shows the shocks |
 | US-02 workspace | `src/lib/workspace-store.ts`, `src/app/actions/workspace.ts`, `src/components/workspace-form.tsx`, migration 002 renamed to `workspaces` by 005 | Integration: two-user isolation, invalid and anonymous writes, SQL name and uniqueness constraints, origin check; unit name validation; Playwright persistence after reload and expired-session submit | Foundation & Security branch; the table was a portfolio before 005 renamed it |

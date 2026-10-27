@@ -1,4 +1,6 @@
-# Issue 1 verification record — 2026-09-13
+# Issue 1 verification record (2026-09-13)
+
+This is the historical record of Issue 1, the authentication foundation, as verified on 13 September 2026. The `portfolio` names below are from that time; the table and page were later renamed to `workspaces` and `/workspace`. Current instructions for the assessment are in [SUBMISSION.md](../SUBMISSION.md).
 
 ## Local results
 
@@ -16,7 +18,7 @@ Security cases include two users, anonymous access, submitted owner ID, expired/
 
 ## Staging database checks
 
-Dedicated Neon resource provisioned on the free plan in Frankfurt with provider auth disabled. Both migrations applied. Client TLS encryption and certificate verification confirmed. Restricted runtime role cannot create tables or modify migration history. Deployed application smoke results are recorded after deployment.
+Dedicated Neon resource provisioned on the free plan in Frankfurt with provider auth disabled. Migrations 001 and 002 (all that existed then) applied. Client TLS encryption and certificate verification confirmed. Restricted runtime role cannot create tables or modify migration history. Smoke results of the deployed application are below.
 
 ## Corrections worth retaining
 
@@ -28,11 +30,11 @@ Dedicated Neon resource provisioned on the free plan in Frankfurt with provider 
 
 Retain the PR diff, CI run, this record, migration SQL, Playwright report, final deployed commit/URL, and genuine student review comments. AI review is not a substitute for a second student's review.
 
-## Deployed staging verification — 2026-09-13
+## Deployed staging verification (2026-09-13)
 
 - Public URL: https://fseproject-staging.vercel.app
-- Deployment: source `git`, Preview target, branch `feat/auth-foundation`. The alias is moved onto the newest Git build of the branch. The smoke test below passed on `dpl_FAZ41RxeG9AmayQec2kKPhQhNvRV` (commit `487394f`) and again on `dpl_EntWcmwpRvv6b4KJGYsY66nnCj6d` (commit `05f0c95`). Later commits on this branch are documentation only and do not change application behaviour; re-run the smoke test before the assessment if the alias has moved again.
-- Environment: Vercel Preview variables scoped to that branch only — `DATABASE_URL` (restricted `fse_runtime` role, sensitive) and `APP_ORIGIN` (the canonical alias). Node 24.x. Database: dedicated Neon PostgreSQL, Frankfurt, provider authentication disabled.
+- Deployment at that time: source `git`, Preview target, branch `feat/auth-foundation` (staging now builds `main`, see [deployment](deployment.md)). The alias is moved onto the newest Git build of the branch. The smoke test below passed on `dpl_FAZ41RxeG9AmayQec2kKPhQhNvRV` (commit `487394f`) and again on `dpl_EntWcmwpRvv6b4KJGYsY66nnCj6d` (commit `05f0c95`). Later commits on this branch are documentation only and do not change application behaviour; re-run the smoke test before the assessment if the alias has moved again.
+- Environment: Vercel Preview variables scoped to that branch only: `DATABASE_URL` (restricted `fse_runtime` role, sensitive) and `APP_ORIGIN` (the canonical alias). Node 24.x. Database: dedicated Neon PostgreSQL, Frankfurt, provider authentication disabled.
 
 Automated smoke test against the public alias passed every step:
 
@@ -50,9 +52,9 @@ The credentials used by this deployment were issued after the rotation described
 
 ## Manual steps for a reviewer
 
-1. Open https://fseproject-staging.vercel.app/dashboard — you must be redirected to `/login`.
-2. Go to `/register`, use a fresh address and a password of at least 15 characters, and expect the confirmation message.
+1. Open https://fseproject-staging.vercel.app/dashboard. You must be redirected to `/login`.
+2. Go to `/register`, use a fresh address and a passphrase of 15 to 128 characters, and expect the confirmation message.
 3. Sign in at `/login`; you should land on `/dashboard`.
-4. Open `/portfolio`, save a portfolio name, then reload and confirm the value is still there.
-5. Sign out, then reopen `/portfolio` and confirm login is required again.
-6. In a second browser, register a different account and confirm it sees no portfolio from the first account.
+4. Open `/workspace`, save a workspace name, then reload and confirm the value is still there.
+5. Sign out, then reopen `/workspace` and confirm login is required again.
+6. In a second browser, register a different account and confirm it sees no workspace from the first account.

@@ -79,7 +79,7 @@ The Forecast Engine never fetches a rate and never invents a fallback. The FX se
 
 | Case | Result |
 | --- | --- |
-| Same-day `+100` and `-250`, opening `100` | One end-of-day balance of `-50`; equal timestamps apply the expense first |
+| Same-day `+100` and `-250`, opening `100` | One end-of-day balance of `-50` in either order; with equal timestamps the expense is sorted first so 40-digit sums are reproducible |
 | Balance equals threshold | No warning; the comparison is strictly below |
 | Repeated minimum | The first date is returned |
 | Overdue expected event | Applied on `startDate` |
@@ -88,14 +88,14 @@ The Forecast Engine never fetches a rate and never invents a fallback. The FX se
 | Missing required FX rate | Explicit unavailable/error result; never zero or fallback |
 | Negative opening balance with default threshold | Warning on the first forecast day |
 
-On 2026-10-13, after updating the documentation branch through PR #30, `npm run check` passed ESLint, TypeScript, 341 unit tests and the Next.js production build. Database integration and browser validation remain recorded in the individual feature PRs and the final `npm run verify` run.
+The engine's tests run in every CI run; the latest results are in [testing](testing.md#current-results).
 
 ## Remaining work requiring team scope
 
 - Saved FX shocks are displayed with provenance but are not yet applied to the base-versus-scenario cash-flow comparison.
 - There is no combined forecast across several accounts. Adding one requires an agreed rule for combining accounts converted with different rates and effective dates; it is not silently assumed by the current engine.
 - Scenarios that combine delayed events and FX shocks need an agreed attribution rule before individual contributions can claim to explain the total effect.
-- Recurrence, interpolation, probabilistic forecasting and predicted future FX rates remain outside the agreed MVP.
+- Open-ended recurrence rules, interpolation, probabilistic forecasting and predicted future FX rates remain outside the agreed MVP. Simple repeats (PR #35) are stored as ordinary events, so the engine is unchanged.
 
 ## Deliberately outside the pure engine
 

@@ -6,7 +6,7 @@ import { Brand } from "@/components/brand";
 
 const views = [
   { title: "Liquidity overview", text: "Your projected balance over time, its lowest point and how long your cash lasts.", state: "Available", tone: "ready" },
-  { title: "Cash events", text: "Record cash accounts and dated income or expenses, each in its own currency.", state: "Available", tone: "ready" },
+  { title: "Cash events", text: "Record cash accounts, each in its own currency, and dated income or expenses.", state: "Available", tone: "ready" },
   { title: "Scenario lab", text: "Delay an invoice and compare it with your base case, or preview an exchange-rate shock on a stored ECB rate.", state: "Available", tone: "ready" },
 ];
 const principles = [

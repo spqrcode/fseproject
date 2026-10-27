@@ -6,23 +6,23 @@ Multi-currency cash-flow and liquidity scenario tool for the Financial Software 
 
 ## Current scope
 
-The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. The foundation also has a server-only ECB exchange-rate provider with a validated PostgreSQL snapshot cache for EUR, USD and SGD, the deterministic Forecast Engine, forecast input for one account, and the data layer for delayed-invoice scenarios and percentage FX shocks. The Scenario Lab page uses them: it delays invoices, compares base and scenario in the reporting currency, and previews and saves ECB exchange-rate shocks. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
+The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. The foundation also has a server-only ECB exchange-rate provider with a validated PostgreSQL snapshot cache for EUR, USD and SGD, the deterministic Forecast Engine, forecast input for one account, and the data layer for delayed-invoice scenarios and percentage FX shocks. The Scenario lab page uses them: it delays invoices, compares base and scenario in the reporting currency, and previews and saves ECB exchange-rate shocks. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
 
-The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the three MVP views, Liquidity overview, Cash events and Scenario lab, all three live on `main` (see the status table below), a Workspace page with a custom danger threshold, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
+The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users see three views, all live on `main` (see the status table below): Liquidity overview, Cash events and Scenario lab. They also get a Workspace page with a custom danger threshold and a settings page for the reporting currency, the appearance (light, dark or device) and their active sessions, with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
 
 ## Deployed application and demo access
 
-- **URL:** https://fseproject-staging.vercel.app, with a backup of the same code at https://fintwin-global.vercel.app (staging, a Vercel deployment of `main` with a managed PostgreSQL database in Frankfurt). Both are rebuilt from `main` after each merge; how they are built and configured is in [deployment](docs/deployment.md).
+- **URL:** https://fseproject-staging.vercel.app (canonical: a Vercel Preview deployment of `main` with a managed Neon PostgreSQL database in Frankfurt, rebuilt after each merge). Backup with the same code: https://fintwin-global.vercel.app (its own database, rebuilt by hand after a mirror sync). How both are built and configured is in [deployment](docs/deployment.md).
 - **Demo access:** there is no shared demo account and no credentials are committed. Open `/register`, create an account with any address and a 15–128 character passphrase (no email is sent and the address is not verified), and sign in. Use a throwaway address and a passphrase you do not use elsewhere.
 - **Suggested check in a private window:** `/dashboard` redirects to `/login` when signed out; register, sign in, name a workspace, change the reporting currency and appearance in settings, sign out, sign in again and confirm everything persisted; open another browser and confirm the second account sees none of it.
 
-Status of the three business views on `main`, as of 27 October 2026. Update this table when a pull request merges.
+Status of the three views on `main`, as of 27 October 2026.
 
 | View | On `main` | Pull request |
 | --- | --- | --- |
 | Liquidity overview (`/dashboard`) | Live: one account's forecast for 30 to 365 days with chart, runway and danger threshold (50% by default or set on the Workspace page), in the reporting currency (one persisted ECB rate per forecast) | #20, #26 and #37, merged |
 | Cash events (`/cash-events`) | Live: accounts and expected events; create, edit, settle, cancel and delete; monthly, quarterly or annual repeats | #16 and #35, merged |
-| Scenario Lab (`/scenarios`) | Live: delayed invoices, base versus scenario comparison in the reporting currency, ECB shock preview and saved shocks with their snapshot | #18, #23, #24 and #30, merged |
+| Scenario lab (`/scenarios`) | Live: delayed invoices, base versus scenario comparison in the reporting currency, ECB shock preview and saved shocks with their snapshot | #18, #23, #24 and #30, merged |
 
 ## Local setup
 
@@ -61,16 +61,16 @@ Before the demo:
 
 1. Seed on the day of the demo or the day before. Every date is relative to today, so seeding earlier moves the invoices closer and changes the story.
 2. Run the `--dry-run` with `DATABASE_URL` set the day before, to catch a missing user or a workspace that already has data.
-3. The seed inserts no exchange rate, so pages that convert currencies depend on a fresh ECB fetch. Open the Scenario lab once beforehand and preview a shock (and, once forecasts are shown in the reporting currency, open the overview of the dollar account), so a validated snapshot is already cached when presenting.
+3. The seed inserts no exchange rate, so pages that convert currencies depend on a fresh ECB fetch. Open the Scenario lab once beforehand and preview a shock and open the overview of the dollar account, so a validated snapshot is already cached when presenting.
 
-## Verify Issue 1
+## Verify locally
 
 ```sh
 npx playwright install chromium
 npm run verify
 ```
 
-`verify` runs lint (no warnings), TypeScript, unit tests, a production build, test migrations, database integration tests, and Chromium end-to-end tests. Integration and browser tests require a `TEST_DATABASE_URL` ending in `_test`; they override `DATABASE_URL` for their own processes. Browser tests launch a production server on port 3100 and never reuse your development server. On Linux, install browser dependencies with `npx playwright install --with-deps chromium`.
+`verify` runs lint (no warnings), TypeScript, unit tests, a production build, test migrations, database integration tests, and Chromium end-to-end tests. CI additionally runs the integration tests as the restricted `fse_runtime` role (see [testing](docs/testing.md)). Integration and browser tests require a `TEST_DATABASE_URL` ending in `_test`; they override `DATABASE_URL` for their own processes. Browser tests launch a production server on port 3100 and never reuse your development server. On Linux, install browser dependencies with `npx playwright install --with-deps chromium`.
 
 Node 24 is declared in `.nvmrc`, `package.json` (also used by Vercel), and GitHub Actions. Dependencies are pinned in `package-lock.json`; Node patch releases remain managed by each environment.
 
@@ -80,10 +80,10 @@ Node 24 is declared in `.nvmrc`, `package.json` (also used by Vercel), and GitHu
 - [Architecture](docs/architecture.md) (component diagram) and [database](docs/database.md) (entity-relationship diagrams)
 - [Decisions](docs/decisions.md), [security](docs/security.md), and [limitations](docs/limitations.md)
 - [Testing](docs/testing.md) and [deployment](docs/deployment.md)
-- [Forecast Engine working draft](docs/forecast-engine.md)
+- [Forecast Engine](docs/forecast-engine.md)
 - [Product experience](docs/product-experience.md)
 - [AI use and corrections](docs/ai-usage.md); coding-agent instructions are versioned in [CLAUDE.md](CLAUDE.md)
 - [Presentation feedback and decisions](docs/presentation-feedback.md)
 - [Issue 1 evidence](docs/issue-1-evidence.md)
 
-Work uses small feature branches and reviewed PRs in [spqrcode/fseproject](https://github.com/spqrcode/fseproject). Student review and the later financial features remain separate work.
+Work uses small feature branches and reviewed PRs in [spqrcode/fseproject](https://github.com/spqrcode/fseproject). Holdings, market quotes and `/analytics` are outside the MVP (see [limitations](docs/limitations.md)).
