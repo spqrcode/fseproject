@@ -396,3 +396,13 @@ Task given by the student: write the feature-ideas table (feedback #11), mark fe
 AI-generated: the table in `docs/limitations.md` and the status edits, drafted from the merged PRs and the existing docs.
 
 Reviewed by the student: every "built" row against the merged PR it cites (#9, #17, #18, #22, #23, #24, #26, #28, #30, #35, #37), every "planned" row against an existing limitation or known gap, and the rejection of more scenario types against feedback #10. Documentation only; no code or test changed.
+
+## Jiaxin Huang — submission guide, Git workflow and deployment update
+
+Date: 2026-10-27. Tool: Claude Code. Owner: Jiaxin Huang.
+
+Task given by the student: prepare the final submission against the course checklist: a guide for the assessor, a written Git workflow, and a `docs/deployment.md` that matches the current deployments.
+
+AI-generated: `SUBMISSION.md`, `docs/git-workflow.md`, the current-deployments table and the backup and production-domain sections of `docs/deployment.md`, and the README pointer. The pull-request and review counts and the test numbers were read from GitHub and from CI run 40478418295.
+
+Reviewed by the student: the deployment facts against both Vercel projects and the team chat of 16 October, the workflow against the CI file and the protected `main`, and every PR number in the feature walkthrough. Documentation only; no code or test changed.

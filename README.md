@@ -2,15 +2,17 @@
 
 Multi-currency cash-flow and liquidity scenario tool for the Financial Software Engineering course at Frankfurt School.
 
+**Assessing the final submission?** Start with [SUBMISSION.md](SUBMISSION.md): the deployed app, the review history, where each required topic is documented, and the latest test results.
+
 ## Current scope
 
 The implemented foundation provides account registration, login/logout, database-backed sessions, protected pages, workspaces, cash accounts and cash events. The foundation also has a server-only ECB exchange-rate provider with a validated PostgreSQL snapshot cache for EUR, USD and SGD, the deterministic Forecast Engine, forecast input for one account, and the data layer for delayed-invoice scenarios and percentage FX shocks. The Scenario Lab page uses them: it delays invoices, compares base and scenario in the reporting currency, and previews and saves ECB exchange-rate shocks. Holdings, market quotes and `/analytics` are outside the current cash-forecast MVP. No Supabase or hosted authentication service is used.
 
-The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the three MVP views, Liquidity overview, Cash events and Scenario lab, all three live on `main` (see the status table below for what is still in review), a Workspace page, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
+The interface is branded FinTwin Global. Signed-out visitors see a public home page at `/`. Signed-in users get navigation for the three MVP views, Liquidity overview, Cash events and Scenario lab, all three live on `main` (see the status table below), a Workspace page with a custom danger threshold, and a settings page with the reporting currency, a light, dark or device appearance, and their active sessions with a sign-out for the others. Every page is checked automatically against WCAG 2.2 AA rules in both themes. See [product experience](docs/product-experience.md).
 
 ## Deployed application and demo access
 
-- **URL:** https://fseproject-staging.vercel.app (staging, a Vercel deployment of this repository with a managed PostgreSQL database in Frankfurt). How it is built, configured and promoted is in [deployment](docs/deployment.md). The staging address points at the deployment someone assigned to it, so it can lag `main`; the status table below says what is expected to be live.
+- **URL:** https://fseproject-staging.vercel.app, with a backup of the same code at https://fintwin-global.vercel.app (staging, a Vercel deployment of `main` with a managed PostgreSQL database in Frankfurt). Both are rebuilt from `main` after each merge; how they are built and configured is in [deployment](docs/deployment.md).
 - **Demo access:** there is no shared demo account and no credentials are committed. Open `/register`, create an account with any address and a 15–128 character passphrase (no email is sent and the address is not verified), and sign in. Use a throwaway address and a passphrase you do not use elsewhere.
 - **Suggested check in a private window:** `/dashboard` redirects to `/login` when signed out; register, sign in, name a workspace, change the reporting currency and appearance in settings, sign out, sign in again and confirm everything persisted; open another browser and confirm the second account sees none of it.
 
