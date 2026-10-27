@@ -1,5 +1,7 @@
 # Requirements
 
+What each number on the screen means for the user, and how the impact of a scenario is measured, is defined in [business metrics](business-metrics.md).
+
 Status: the stories below are implemented as the traceability table at the end of this document states; stories that belonged to the earlier portfolio dashboard are recorded under "Earlier scope (replaced)".
 
 ## US-01 — Account and session
